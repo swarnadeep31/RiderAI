@@ -10,6 +10,7 @@
   },
   "scripts": {
     "gear": "node bin/gear.js",
+    "demo-video": "node bin/demo-video.js",
     "test": "node --test"
   },
   "engines": {

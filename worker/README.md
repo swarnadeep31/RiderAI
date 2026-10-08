@@ -14,9 +14,19 @@ the same place in every frame. So the reader:
 4. Reports gear changes, and flags any that skip a gear (3 → 5), since gearboxes are sequential and that usually means
    a missed reading.
 
+## No video yet? Try the demo
+
+```sh
+npm run demo-video
+```
+
+This makes `demo.mp4`, a 12-second fake dashboard whose gear display goes N, 1, 2, 3, 4, 3, 2, and prints the exact
+commands to run on it (the box for the demo is `214,144,62,82`).
+
 ## Using it on your own video
 
-Run these from the `worker/` folder.
+Run these from the `worker/` folder. `ride.mp4` below stands for your own video: copy it into the `worker/` folder,
+or give its full path, e.g. `~/Videos/ride.mp4`.
 
 **1. Find the gear indicator.** Save a frame where the display is clearly visible:
 

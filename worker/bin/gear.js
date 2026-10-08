@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Command-line front end for the gear reader. Run `npm run gear -- help`.
-import { writeFile } from 'node:fs/promises';
+import { access, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { DEFAULTS, analyzeGears, findGearSamples, parseRoi, saveGearSamples } from '../src/gear.js';
 import { extractFrame } from '../src/video/ffmpeg.js';
@@ -71,6 +72,14 @@ async function main() {
     return;
   }
   if (!video) throw new Error(`Missing <video>. Run "npm run gear -- help" for usage.`);
+  try {
+    await access(video);
+  } catch {
+    throw new Error(
+      `Can't find the video "${video}" (looked for ${resolve(video)}).\n` +
+        'Give the path to one of your own videos, or run "npm run demo-video" to make a test video.',
+    );
+  }
   const common = { fps: number('fps'), maxShift: number('max-shift'), onProgress: showProgress };
 
   if (command === 'frame') {
