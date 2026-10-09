@@ -1,0 +1,21 @@
+{
+  "name": "trailcast",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Adventure videos with the map beside them.",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently --names server,client --prefix-colors blue,green \"npm run dev -w server\" \"npm run dev -w client\"",
+    "test": "npm test -w server && npm test -w client",
+    "build": "npm run build -w client"
+  },
+  "engines": {
+    "node": ">=22.22.0"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6"
+  }
+}
