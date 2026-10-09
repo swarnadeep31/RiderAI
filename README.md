@@ -8,6 +8,10 @@ that moment, and save the places to Google Maps, a GPS app or a printable trip s
 
 ## What works today
 
+- **Accounts:** sign up with email, username and password. New users answer one short welcome question (what
+  they'll use TrailCast for), plus two optional ones (how they found TrailCast, what they'd like to see). Anyone can
+  watch; you need an account to add trails, and only the person who added a trail can change it.
+- **Feedback:** logged-in users can send feedback from the link at the bottom of every page.
 - **Add a trail:** paste a YouTube link (normal video or live stream) and, optionally, upload the GPS route as a
   `.gpx` file from Strava, Garmin, Komoot or any tracking app.
 - **Watch page:** the video on one side, the map on the other.
@@ -57,7 +61,10 @@ Open http://localhost:5173. The API runs on http://localhost:4000.
 
 If the in-memory database can't start on your system, use one of these instead.
 
-**Try it out:** click "+ New trail", paste any YouTube riding video and upload `samples/sample-ride.gpx`. That file is
+**Logins:** `.env.example` also explains `JWT_SECRET`, the secret that signs login sessions. While developing you can
+leave it empty; it must be set before TrailCast goes online.
+
+**Try it out:** sign up, answer the welcome question, click "+ New trail", paste any YouTube riding video and upload `samples/sample-ride.gpx`. That file is
 a made-up 20-minute route near Manali with times, so the blue dot will move as the video plays (it won't match the
 real video, of course).
 
@@ -74,8 +81,10 @@ real video, of course).
 ```
 client/                  React website (Vite, Tailwind CSS, Leaflet)
   src/
-    pages/               One file per page: Home, NewTrail, Trail (watch + edit), Print (trip sheet)
-    components/          Pieces used by the pages: the map, key point list, add-point form...
+    pages/               One file per page: Home, NewTrail, Trail (watch + edit), Print (trip sheet),
+                         Signup, Login, Welcome (questions after signing up), Account, Feedback
+    components/          Pieces used by the pages: the map, key point list, add-point form,
+                         RequireAuth (makes a page logged-in only)
     hooks/               useYouTubePlayer: puts a YouTube player on the page and reports its time
     lib/                 Plain functions, each with a .test.js next to it:
       gpx.js               read GPX files in the browser
@@ -83,12 +92,13 @@ client/                  React website (Vite, Tailwind CSS, Leaflet)
       exports.js           GPX/KML files and Google Maps / YouTube links
       time.js              12:30 <-> 750 seconds
     api.js               All calls to the server
+    auth.jsx             Knows who is logged in, for every page (useAuth)
 server/                  Express API + MongoDB (Mongoose)
   src/
-    models/Trail.js      What a trail looks like in the database, and its validation rules
+    models/              What trails, users and feedback look like in the database, with validation rules
     controllers/         What each API request does
     routes/              Which URL goes to which controller
-    middleware/          Turns errors into clear JSON messages
+    middleware/          auth.js: login sessions; errorHandler.js: clear JSON error messages
     utils/               YouTube link parsing and small helpers
   test/                  API tests against a real (in-memory) MongoDB
 samples/                 A sample GPX file to try
@@ -96,24 +106,32 @@ samples/                 A sample GPX file to try
 
 ### API
 
-| Method | URL | What it does |
-| --- | --- | --- |
-| GET | `/api/trails` | List trails (without their routes) |
-| POST | `/api/trails` | Create a trail from `youtubeUrl`, `title` and optional route |
-| GET | `/api/trails/:id` | One trail with its route and key points |
-| PATCH | `/api/trails/:id` | Change a trail (title, sync, support link...) |
-| DELETE | `/api/trails/:id` | Delete a trail |
-| POST | `/api/trails/:id/points` | Add a key point |
-| PATCH | `/api/trails/:id/points/:pointId` | Change a key point |
-| DELETE | `/api/trails/:id/points/:pointId` | Delete a key point |
+| Method | URL | Who | What it does |
+| --- | --- | --- | --- |
+| POST | `/api/auth/signup` | Anyone | Create an account (`email`, `username`, `password`) and log in |
+| POST | `/api/auth/login` | Anyone | Log in with `email` and `password` |
+| POST | `/api/auth/logout` | Anyone | Log out |
+| GET | `/api/auth/me` | Anyone | The logged-in user, or `null` |
+| PUT | `/api/auth/onboarding` | Logged in | Save the welcome answers (`interests`, `referralSource`, `wishlist`) |
+| POST | `/api/feedback` | Logged in | Send feedback (`message`) |
+| GET | `/api/trails` | Anyone | List trails (without their routes) |
+| GET | `/api/trails/:id` | Anyone | One trail with its route and key points |
+| POST | `/api/trails` | Logged in | Create a trail from `youtubeUrl`, `title` and optional route |
+| PATCH | `/api/trails/:id` | Owner | Change a trail (title, sync, support link...) |
+| DELETE | `/api/trails/:id` | Owner | Delete a trail |
+| POST | `/api/trails/:id/points` | Owner | Add a key point |
+| PATCH | `/api/trails/:id/points/:pointId` | Owner | Change a key point |
+| DELETE | `/api/trails/:id/points/:pointId` | Owner | Delete a key point |
+
+Logging in sets an httpOnly cookie, which the browser sends with every request after that.
 
 ## Roadmap
 
 1. ~~Watch page with the synced map, key points, downloads, trip sheet~~ ✓
-2. **Accounts:** creators sign in and only they can edit their trails. Until then anyone can edit, so don't put
-   TrailCast online yet.
+2. ~~Accounts: email login, welcome questions, feedback, only owners can edit~~ ✓
 3. **Put it online:** one free host serving the API and the website, MongoDB Atlas, and a map tile provider with a
-   free tier (OpenStreetMap's own servers are only for light use).
+   free tier (OpenStreetMap's own servers are only for light use). Before that: limit login attempts, and add
+   "forgot password" by email.
 4. **Explore:** search and filter trails by region and activity, and a map of all trails.
 5. **Live location:** during a YouTube live stream, the creator's phone sends its GPS position and viewers see the dot
    move in real time.
@@ -121,3 +139,4 @@ samples/                 A sample GPX file to try
 7. **Donations in TrailCast itself:** only once there are real users, because it needs a payments company, identity
    checks and taxes.
 8. **Draw a route by hand** for creators who didn't record a GPX file.
+9. **Log in with a phone number.**

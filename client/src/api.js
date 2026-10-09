@@ -1,4 +1,5 @@
-// Every call to the Express API goes through here.
+// Every call to the Express API goes through here. The browser sends the
+// login cookie along automatically, because the API is on the same site.
 
 async function request(path, { method = 'GET', body } = {}) {
   let res;
@@ -21,6 +22,15 @@ async function request(path, { method = 'GET', body } = {}) {
 }
 
 export const api = {
+  // Accounts
+  me: () => request('/auth/me'),
+  signup: (details) => request('/auth/signup', { method: 'POST', body: details }),
+  login: (email, password) => request('/auth/login', { method: 'POST', body: { email, password } }),
+  logout: () => request('/auth/logout', { method: 'POST' }),
+  saveOnboarding: (answers) => request('/auth/onboarding', { method: 'PUT', body: answers }),
+  sendFeedback: (message) => request('/feedback', { method: 'POST', body: { message } }),
+
+  // Trails
   listTrails: () => request('/trails'),
   getTrail: (id) => request(`/trails/${id}`),
   createTrail: (trail) => request('/trails', { method: 'POST', body: trail }),

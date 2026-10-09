@@ -10,6 +10,11 @@ export function errorHandler(err, req, res, next) {
     return res.status(400).json({ error: message });
   }
   if (err.name === 'CastError') return res.status(400).json({ error: `"${err.path}" has the wrong type.` });
+  // MongoDB refused a duplicate of a unique field (e.g. two sign-ups with one email at the same moment).
+  if (err.code === 11000) {
+    const field = Object.keys(err.keyPattern ?? {})[0] ?? 'value';
+    return res.status(409).json({ error: `That ${field} is already taken.` });
+  }
   if (err.type === 'entity.too.large') return res.status(413).json({ error: 'That upload is too big.' });
   if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'The request body is not valid JSON.' });
   if (err.status) return res.status(err.status).json({ error: err.message });

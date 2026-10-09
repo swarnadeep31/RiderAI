@@ -28,6 +28,8 @@ const keyPointSchema = new mongoose.Schema({
 
 const trailSchema = new mongoose.Schema(
   {
+    // The user who added the trail. Only they can change it.
+    owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     title: { type: String, required: [true, 'Give the trail a title.'], trim: true, maxlength: 120 },
     description: { type: String, trim: true, maxlength: 5000, default: '' },
     activity: { type: String, enum: ACTIVITIES, default: 'ride' },

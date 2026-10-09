@@ -21,6 +21,7 @@ function TrailCard({ trail }) {
           <h2 className="font-semibold group-hover:text-orange-700">{trail.title}</h2>
           <p className="mt-1 text-sm text-stone-500">
             {ACTIVITIES[trail.activity]} · {trail.points.length} key {trail.points.length === 1 ? 'point' : 'points'}
+            {trail.owner && ` · by @${trail.owner.username}`}
           </p>
         </div>
       </Link>

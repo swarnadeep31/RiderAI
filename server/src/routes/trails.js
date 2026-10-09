@@ -10,6 +10,7 @@ import {
   updatePoint,
   updateTrail,
 } from '../controllers/trailsController.js';
+import { requireUser } from '../middleware/auth.js';
 import { httpError } from '../utils/httpError.js';
 
 export const trailsRouter = Router();
@@ -21,12 +22,15 @@ function checkId(req, res, next, id) {
 trailsRouter.param('id', checkId);
 trailsRouter.param('pointId', checkId);
 
+// Anyone can watch...
 trailsRouter.get('/', listTrails);
-trailsRouter.post('/', createTrail);
 trailsRouter.get('/:id', getTrail);
-trailsRouter.patch('/:id', updateTrail);
-trailsRouter.delete('/:id', deleteTrail);
 
-trailsRouter.post('/:id/points', addPoint);
-trailsRouter.patch('/:id/points/:pointId', updatePoint);
-trailsRouter.delete('/:id/points/:pointId', deletePoint);
+// ...but adding and changing trails needs an account.
+trailsRouter.post('/', requireUser, createTrail);
+trailsRouter.patch('/:id', requireUser, updateTrail);
+trailsRouter.delete('/:id', requireUser, deleteTrail);
+
+trailsRouter.post('/:id/points', requireUser, addPoint);
+trailsRouter.patch('/:id/points/:pointId', requireUser, updatePoint);
+trailsRouter.delete('/:id/points/:pointId', requireUser, deletePoint);

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { api } from '../api.js';
+import { useAuth } from '../auth.jsx';
 import AddPointForm from '../components/AddPointForm.jsx';
 import ErrorMessage from '../components/ErrorMessage.jsx';
 import KeyPointList from '../components/KeyPointList.jsx';
@@ -22,7 +23,7 @@ export default function TrailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const editing = searchParams.has('edit');
+  const { user } = useAuth();
 
   const [trail, setTrail] = useState(null);
   const [loadError, setLoadError] = useState(null);
@@ -58,6 +59,9 @@ export default function TrailPage() {
   }
   if (!trail) return <p className="px-4 py-8 text-stone-500">Loading trail...</p>;
 
+  // Only the person who added the trail sees the Edit button and the creator tools.
+  const isOwner = Boolean(user && trail.owner?._id === user._id);
+  const editing = isOwner && searchParams.has('edit');
   const position = positionAt(trail.track, trail.trackTimes, trail.videoStartsAt, video.currentTime);
   const activePoint = trail.points.findLast((p) => p.time <= video.currentTime + 0.5);
   const canSync = trail.trackTimes.length > 0;
@@ -156,7 +160,10 @@ export default function TrailPage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h1 className="text-2xl font-bold">{trail.title}</h1>
-                <p className="text-sm text-stone-500">{ACTIVITIES[trail.activity]}</p>
+                <p className="text-sm text-stone-500">
+                  {ACTIVITIES[trail.activity]}
+                  {trail.owner && ` · by @${trail.owner.username}`}
+                </p>
               </div>
               <div className="flex gap-2">
                 {trail.supportUrl && (
@@ -169,17 +176,19 @@ export default function TrailPage() {
                     ♥ Support the creator
                   </a>
                 )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    stopMapMode();
-                    setNotice(null);
-                    setSearchParams(editing ? {} : { edit: '1' });
-                  }}
-                  className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium hover:bg-stone-100"
-                >
-                  {editing ? 'Done editing' : 'Edit'}
-                </button>
+                {isOwner && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      stopMapMode();
+                      setNotice(null);
+                      setSearchParams(editing ? {} : { edit: '1' });
+                    }}
+                    className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium hover:bg-stone-100"
+                  >
+                    {editing ? 'Done editing' : 'Edit'}
+                  </button>
+                )}
               </div>
             </div>
             {trail.description && <p className="mt-3 whitespace-pre-line text-stone-700">{trail.description}</p>}
@@ -189,12 +198,7 @@ export default function TrailPage() {
 
           {editing && (
             <section className="space-y-4 rounded-xl border border-orange-200 bg-orange-50 p-4">
-              <div>
-                <h2 className="font-semibold">Creator tools</h2>
-                <p className="text-xs text-stone-600">
-                  TrailCast has no accounts yet, so anyone can edit. Accounts are the next step.
-                </p>
-              </div>
+              <h2 className="font-semibold">Creator tools</h2>
 
               {mapMode === 'add' ? (
                 <AddPointForm
