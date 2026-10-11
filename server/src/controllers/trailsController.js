@@ -29,14 +29,14 @@ async function findTrail(id) {
 }
 
 // Finds the trail and checks that the logged-in user is the one who added it.
-async function findOwnTrail(req) {
+export async function findOwnTrail(req) {
   const trail = await findTrail(req.params.id);
   if (!trail.owner?.equals(req.user._id)) throw httpError(403, 'Only the person who added this trail can change it.');
   return trail;
 }
 
 // routeNotice: a message for the user when drawing the route didn't go as asked.
-async function sendTrail(res, trail, { status = 200, routeNotice = null } = {}) {
+export async function sendTrail(res, trail, { status = 200, routeNotice = null } = {}) {
   await trail.populate('owner', OWNER_FIELDS);
   res.status(status).json({ ...trail.toJSON(), routeNotice });
 }
@@ -48,7 +48,7 @@ function sortPoints(trail) {
 
 // Draws the route through the key points in video order, with estimated times
 // so the map can follow the video. Returns a notice if it fell back to straight lines.
-async function drawRouteFromPoints(trail) {
+export async function drawRouteFromPoints(trail) {
   const points = [...trail.points].sort((a, b) => a.time - b.time);
   if (points.length < 2) {
     trail.set({ track: [], trackTimes: [] });

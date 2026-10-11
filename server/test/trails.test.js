@@ -255,7 +255,7 @@ describe('routes drawn from key points', () => {
   });
 });
 
-test('the config says whether roads can be followed', async () => {
+test('the config says what the server can do', async () => {
   const res = await request(app).get('/api/config');
-  assert.deepEqual(res.body, { roadRouting: false });
+  assert.deepEqual(res.body, { roadRouting: false, aiRoute: false });
 });

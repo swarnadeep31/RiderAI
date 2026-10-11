@@ -1,5 +1,6 @@
 import { createApp } from './app.js';
 import { connectDatabase, disconnectDatabase } from './db.js';
+import { startWorker } from './jobs/worker.js';
 
 const port = Number(process.env.PORT) || 4000;
 
@@ -11,11 +12,15 @@ try {
   process.exit(1);
 }
 
+// Runs AI route analyses in the background.
+const stopWorker = startWorker();
+
 const server = createApp().listen(port, () => {
   console.log(`TrailCast API listening on http://localhost:${port}`);
 });
 
 async function shutDown() {
+  stopWorker();
   server.close();
   await disconnectDatabase();
   process.exit(0);

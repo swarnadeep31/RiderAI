@@ -12,8 +12,9 @@ const cache = new Map();
 let queue = Promise.resolve();
 let lastSearchAt = 0;
 
-export async function searchPlaces(query) {
-  const key = query.trim().toLowerCase();
+// near: [lat, lng] to rank places around there first (many villages share a name).
+export async function searchPlaces(query, { near } = {}) {
+  const key = `${query.trim().toLowerCase()}|${near ? near.map((n) => Math.round(n)).join(',') : ''}`;
   if (cache.has(key)) return cache.get(key);
 
   // One search at a time for the whole server, at least 1.1 s apart.
@@ -21,7 +22,7 @@ export async function searchPlaces(query) {
     const wait = lastSearchAt + MIN_GAP_MS - Date.now();
     if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
     lastSearchAt = Date.now();
-    return fetchPlaces(query);
+    return fetchPlaces(query, near);
   });
   queue = places.catch(() => {});
 
@@ -35,8 +36,16 @@ export function clearPlaceCache() {
   cache.clear();
 }
 
-async function fetchPlaces(query) {
+const NEAR_DEGREES = 1.5; // about 150 km around the "near" point
+
+async function fetchPlaces(query, near) {
   const params = new URLSearchParams({ q: query, format: 'jsonv2', limit: '5', 'accept-language': 'en' });
+  if (near) {
+    const [lat, lng] = near;
+    // A preferred area, not a hard limit (bounded=0): places inside it rank first.
+    params.set('viewbox', [lng - NEAR_DEGREES, lat + NEAR_DEGREES, lng + NEAR_DEGREES, lat - NEAR_DEGREES].join(','));
+    params.set('bounded', '0');
+  }
   let res;
   try {
     res = await fetch(`${nominatimUrl()}/search?${params}`, {

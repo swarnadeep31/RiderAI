@@ -50,3 +50,24 @@ test('timedTrack thins out very long routes, keeping the start and end', () => {
   assert.equal(trackTimes.at(-1), 100);
   assert.ok(trackTimes.every((t, i) => i === 0 || t >= trackTimes[i - 1]));
 });
+
+test('timedTrack makes the marker wait at a stop, then ride on', () => {
+  const points = [
+    { time: 100, stayUntil: 160, lat: 0, lng: 0 }, // a 1-minute chai break
+    { time: 400, lat: 0, lng: 0.02 },
+  ];
+  const segments = [[[0, 0], [0, 0.01], [0, 0.02]]];
+  const { track, trackTimes } = timedTrack(points, segments);
+  assert.deepEqual(track, [[0, 0], [0, 0], [0, 0.01], [0, 0.02]]);
+  // Waits from 100 to 160, then covers the road between 160 and 400.
+  assert.deepEqual(trackTimes, [100, 160, 280, 400]);
+});
+
+test('timedTrack: a stop never lasts past the next place, and the last place can be a stop', () => {
+  const points = [
+    { time: 0, stayUntil: 999, lat: 0, lng: 0 },
+    { time: 100, stayUntil: 150, lat: 0, lng: 0.01 },
+  ];
+  const { trackTimes } = timedTrack(points, [[[0, 0], [0, 0.01]]]);
+  assert.deepEqual(trackTimes, [0, 100, 100, 150]);
+});

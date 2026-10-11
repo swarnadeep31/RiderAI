@@ -26,7 +26,44 @@ const keyPointSchema = new mongoose.Schema({
   time: { type: Number, required: [true, 'A key point needs a video time.'], min: 0 }, // seconds into the video
   lat: { type: Number, required: true, validate: { validator: isLatitude, message: 'Latitude must be between -90 and 90.' } },
   lng: { type: Number, required: true, validate: { validator: isLongitude, message: 'Longitude must be between -180 and 180.' } },
+  // The marker waits here until this video time (a tea break, sightseeing...).
+  stayUntil: {
+    type: Number,
+    validate: {
+      validator(value) {
+        return value === null || value === undefined || value >= this.time;
+      },
+      message: 'A stop must end after it starts.',
+    },
+  },
+  // Added by a person, or suggested by the AI and accepted in review.
+  origin: { type: String, enum: ['manual', 'ai'], default: 'manual' },
+  // For AI places: how sure the AI was, and what it relied on.
+  confidence: { type: Number, min: 0, max: 1 },
+  evidence: { type: String, enum: ['sign', 'milestone', 'speech', 'landmark'] },
+  quote: { type: String, trim: true, maxlength: 200 },
 });
+
+// Parts of the video that don't show the journey (intro, recap, drone montage):
+// no marker is shown then.
+export const HIDDEN_REASONS = ['intro', 'recap', 'montage', 'flashback', 'off_route'];
+const hiddenRangeSchema = new mongoose.Schema(
+  {
+    start: { type: Number, required: true, min: 0 },
+    end: {
+      type: Number,
+      required: true,
+      validate: {
+        validator(value) {
+          return value > this.start;
+        },
+        message: 'A hidden part must end after it starts.',
+      },
+    },
+    reason: { type: String, enum: HIDDEN_REASONS, default: 'off_route' },
+  },
+  { _id: false },
+);
 
 const trailSchema = new mongoose.Schema(
   {
@@ -64,6 +101,14 @@ const trailSchema = new mongoose.Schema(
     // (then trackTimes are estimated video times, and the route is approximate).
     routeSource: { type: String, enum: ['gpx', 'keypoints'] },
     routeStyle: { type: String, enum: ROUTE_STYLES, default: 'roads' },
+    hiddenRanges: { type: [hiddenRangeSchema], default: [] },
+    // Set when an AI analysis was accepted, to trace and evaluate it.
+    ai: {
+      job: { type: mongoose.Schema.Types.ObjectId, ref: 'Job' },
+      model: String,
+      promptVersion: String,
+      analyzedAt: Date,
+    },
 
     points: {
       type: [keyPointSchema],

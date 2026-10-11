@@ -14,24 +14,42 @@ export function distanceMeters([lat1, lng1], [lat2, lng2]) {
 
 // Joins the route pieces between neighbouring key points into one track, and
 // estimates when (in video seconds) each track point is passed: between two
-// key points, time moves on in step with the distance travelled.
+// key points, time moves on in step with the distance travelled. A key point
+// with stayUntil is a stop: the marker waits there, then rides on.
 // segments[i] runs from points[i] to points[i + 1], as [[lat, lng], ...].
 export function timedTrack(points, segments, maxPoints = Infinity) {
   let track = [];
   let trackTimes = [];
+  const push = (location, time) => {
+    track.push([round(location[0], 6), round(location[1], 6)]);
+    trackTimes.push(round(time, 1));
+  };
+  // Leave a stop when it ends, but never later than reaching the next place.
+  const departure = (point, next) => Math.min(Math.max(point.stayUntil ?? point.time, point.time), next ? next.time : Infinity);
+
   segments.forEach((segment, i) => {
-    const start = points[i].time;
+    const arrive = points[i].time;
+    const depart = departure(points[i], points[i + 1]);
     const end = points[i + 1].time;
     const distances = [0];
     for (let j = 1; j < segment.length; j++) distances.push(distances[j - 1] + distanceMeters(segment[j - 1], segment[j]));
     const total = distances.at(-1);
     segment.forEach((location, j) => {
-      if (i > 0 && j === 0) return; // the same place the previous piece ended
+      if (j === 0) {
+        // The previous piece already ended here, at the arrival time.
+        if (i === 0) push(location, arrive);
+        // The same place at two times: the marker waits there.
+        if (depart > arrive) push(location, depart);
+        return;
+      }
       const fraction = total > 0 ? distances[j] / total : j / (segment.length - 1);
-      track.push([round(location[0], 6), round(location[1], 6)]);
-      trackTimes.push(round(start + (end - start) * fraction, 1));
+      push(location, depart + (end - depart) * fraction);
     });
   });
+
+  // A stop at the very last place keeps the marker there until it ends.
+  const last = points.at(-1);
+  if (segments.length > 0 && last.stayUntil > last.time) push(track.at(-1), last.stayUntil);
 
   // Very long routes: keep evenly spaced points, always including the start and end.
   if (track.length > maxPoints) {

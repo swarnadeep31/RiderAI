@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import mongoose from 'mongoose';
+import { acceptAiRoute, latestAiRoute, startAiRoute } from '../controllers/aiRouteController.js';
 import {
   addPoint,
   createTrail,
@@ -12,16 +12,12 @@ import {
   updateTrail,
 } from '../controllers/trailsController.js';
 import { requireUser } from '../middleware/auth.js';
-import { httpError } from '../utils/httpError.js';
+import { checkObjectId } from '../middleware/validId.js';
 
 export const trailsRouter = Router();
 
-// A malformed ID can't belong to any trail or key point.
-function checkId(req, res, next, id) {
-  next(mongoose.isValidObjectId(id) ? undefined : httpError(404, 'Not found.'));
-}
-trailsRouter.param('id', checkId);
-trailsRouter.param('pointId', checkId);
+trailsRouter.param('id', checkObjectId);
+trailsRouter.param('pointId', checkObjectId);
 
 // Anyone can watch...
 trailsRouter.get('/', listTrails);
@@ -32,6 +28,11 @@ trailsRouter.post('/', requireUser, createTrail);
 trailsRouter.patch('/:id', requireUser, updateTrail);
 trailsRouter.delete('/:id', requireUser, deleteTrail);
 trailsRouter.post('/:id/route', requireUser, drawRoute);
+
+// Building the route with AI (owner only): start, check the latest, accept the reviewed places.
+trailsRouter.get('/:id/ai-route', requireUser, latestAiRoute);
+trailsRouter.post('/:id/ai-route', requireUser, startAiRoute);
+trailsRouter.post('/:id/ai-route/accept', requireUser, acceptAiRoute);
 
 trailsRouter.post('/:id/points', requireUser, addPoint);
 trailsRouter.patch('/:id/points/:pointId', requireUser, updatePoint);
