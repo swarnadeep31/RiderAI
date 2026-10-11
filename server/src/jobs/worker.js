@@ -16,7 +16,7 @@ export async function processNextJob(services = defaultServices) {
   const job = await Job.findOneAndUpdate(
     { state: { $in: ['queued', 'running'] }, lockedUntil: { $lt: now } },
     { $set: { state: 'running', lockedUntil: new Date(now.getTime() + LEASE_MS), workerId }, $inc: { attempts: 1 } },
-    { sort: { createdAt: 1 }, new: true },
+    { sort: { createdAt: 1 }, returnDocument: 'after' },
   );
   if (!job) return null;
 

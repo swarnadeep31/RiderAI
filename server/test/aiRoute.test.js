@@ -133,6 +133,21 @@ describe('AI route jobs', () => {
     assert.equal(fresh.status, 202);
   });
 
+  test('the worker runs without warnings (it checks for jobs every 2 seconds)', async () => {
+    const warnings = [];
+    const onWarning = (warning) => warnings.push(warning.message);
+    process.on('warning', onWarning);
+    try {
+      await start();
+      await processNextJob(fakeServices().services);
+      await processNextJob(fakeServices().services); // nothing left to do
+      await new Promise((resolve) => setImmediate(resolve));
+    } finally {
+      process.off('warning', onWarning);
+    }
+    assert.deepEqual(warnings, []);
+  });
+
   test('a job can be cancelled, and Gemini is not asked', async () => {
     const { body: job } = await start();
     const cancelled = await alice.post(`/api/jobs/${job._id}/cancel`);
