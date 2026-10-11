@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { boundsOf, isGpxRoute, nearestIndex, positionAt } from './track.js';
+import { boundsOf, hiddenRangeAt, indexAtOrBefore, isGpxRoute, nearestIndex, positionAt, travelledAt } from './track.js';
 
 const track = [
   [10, 20],
@@ -51,4 +51,33 @@ test('isGpxRoute', () => {
   expect(isGpxRoute({ track })).toBe(true); // trails from before routes could be drawn
   expect(isGpxRoute({ track, routeSource: 'keypoints' })).toBe(false);
   expect(isGpxRoute({ track: [] })).toBe(false);
+});
+
+test('no position during hidden parts of the video', () => {
+  const hidden = [{ start: 40, end: 60, reason: 'montage' }];
+  expect(positionAt(track, times, 0, 50, hidden)).toBeNull();
+  expect(positionAt(track, times, 0, 60, hidden)).toEqual([10, 20.6]);
+  expect(hiddenRangeAt(hidden, 45)).toEqual(hidden[0]);
+  expect(hiddenRangeAt(hidden, 61)).toBeNull();
+});
+
+test('indexAtOrBefore', () => {
+  expect(indexAtOrBefore(times, -1)).toBe(-1);
+  expect(indexAtOrBefore(times, 0)).toBe(0);
+  expect(indexAtOrBefore(times, 150)).toBe(1);
+  expect(indexAtOrBefore(times, 999)).toBe(2);
+});
+
+test('travelledAt: the covered part of the route, ending at the rider', () => {
+  expect(travelledAt(track, times, 0, -5)).toEqual([]);
+  expect(travelledAt(track, times, 0, 50)).toEqual([
+    [10, 20],
+    [10, 20.5],
+  ]);
+  expect(travelledAt(track, times, 0, 150)).toEqual([
+    [10, 20],
+    [10, 21],
+    [10.5, 21],
+  ]);
+  expect(travelledAt(track, times, 0, 500)).toEqual(track);
 });

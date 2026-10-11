@@ -106,8 +106,8 @@ export default function NewTrailPage() {
           <input id="gpx" type="file" accept=".gpx,application/gpx+xml" onChange={readGpxFile} className={inputClass} />
           <span className="mt-1 block text-sm font-normal text-stone-500">
             Export it from Strava, Garmin, Komoot or any GPS tracking app used during the trip. No GPS file? Leave
-            this empty: after creating the trail, add a key point for each place the video reaches, and TrailCast
-            draws the route between them.
+            this empty: after creating the trail, let AI find the places the video passes (public videos), or add a
+            key point for each place yourself, and TrailCast draws the route between them.
           </span>
           {routeError && (
             <div className="mt-2">

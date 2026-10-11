@@ -44,4 +44,11 @@ export const api = {
   deletePoint: (id, pointId) => request(`/trails/${id}/points/${pointId}`, { method: 'DELETE' }),
   // style: 'roads', 'paths' or 'straight'
   drawRoute: (id, style) => request(`/trails/${id}/route`, { method: 'POST', body: { style } }),
+
+  // Building the route with AI
+  startAiRoute: (id, options) => request(`/trails/${id}/ai-route`, { method: 'POST', body: options }),
+  latestAiRoute: (id) => request(`/trails/${id}/ai-route`),
+  acceptAiRoute: (id, body) => request(`/trails/${id}/ai-route/accept`, { method: 'POST', body }),
+  getJob: (jobId) => request(`/jobs/${jobId}`),
+  cancelJob: (jobId) => request(`/jobs/${jobId}/cancel`, { method: 'POST' }),
 };

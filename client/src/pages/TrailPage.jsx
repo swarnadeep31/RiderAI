@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { api } from '../api.js';
 import { useAuth } from '../auth.jsx';
 import AddPointForm from '../components/AddPointForm.jsx';
+import AiRoutePanel, { HIDDEN_REASONS } from '../components/AiRoutePanel.jsx';
 import ErrorMessage from '../components/ErrorMessage.jsx';
 import KeyPointList from '../components/KeyPointList.jsx';
 import RoutePanel from '../components/RoutePanel.jsx';
@@ -10,7 +11,7 @@ import SaveOptions from '../components/SaveOptions.jsx';
 import TrailMap from '../components/TrailMap.jsx';
 import { useYouTubePlayer } from '../hooks/useYouTubePlayer.js';
 import { ACTIVITIES } from '../lib/activities.js';
-import { isGpxRoute, nearestIndex, positionAt } from '../lib/track.js';
+import { hiddenRangeAt, isGpxRoute, nearestIndex, positionAt } from '../lib/track.js';
 import { formatTime } from '../lib/time.js';
 
 function describeSync(videoStartsAt) {
@@ -34,6 +35,8 @@ export default function TrailPage() {
   const [pendingLocation, setPendingLocation] = useState(null);
   const [follow, setFollow] = useState(true);
   const [focus, setFocus] = useState(null);
+  // The AI's places on the map while the owner reviews them.
+  const [preview, setPreview] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,10 +66,13 @@ export default function TrailPage() {
   // Only the person who added the trail sees the Edit button and the creator tools.
   const isOwner = Boolean(user && trail.owner?._id === user._id);
   const editing = isOwner && searchParams.has('edit');
-  const position = positionAt(trail.track, trail.trackTimes, trail.videoStartsAt, video.currentTime);
+  // Where the rider is now (the map draws its own smoothly moving marker; this is for new key points).
+  const position = positionAt(trail.track, trail.trackTimes, trail.videoStartsAt, video.currentTime, trail.hiddenRanges);
   const activePoint = trail.points.findLast((p) => p.time <= video.currentTime + 0.5);
   const recorded = isGpxRoute(trail);
   const drawnRoute = trail.routeSource === 'keypoints' && trail.track.length > 1;
+  const aiRoute = drawnRoute && trail.points.some((p) => p.origin === 'ai');
+  const hidden = drawnRoute ? hiddenRangeAt(trail.hiddenRanges, video.currentTime) : null;
   // Recorded routes may need lining up with the video; drawn routes use video times already.
   const canSync = recorded && trail.trackTimes.length > 0;
 
@@ -159,11 +165,16 @@ export default function TrailPage() {
           <TrailMap
             trailId={trail._id}
             track={trail.track}
+            trackTimes={trail.trackTimes}
+            videoStartsAt={trail.videoStartsAt}
+            hiddenRanges={trail.hiddenRanges}
+            clock={video.clock}
             approximate={drawnRoute}
             points={trail.points}
-            position={position}
             activePointId={activePoint?._id}
             pendingLocation={pendingLocation}
+            preview={preview}
+            hiddenNote={hidden && `${HIDDEN_REASONS[hidden.reason]}: the map picks up again at ${formatTime(hidden.end)}`}
             focus={focus}
             follow={follow}
             onFollowChange={setFollow}
@@ -188,7 +199,9 @@ export default function TrailPage() {
                 )}
                 {drawnRoute && (
                   <p className="mt-1 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
-                    Approximate route, drawn between the key points
+                    {aiRoute
+                      ? 'AI-estimated route through the places in the video. Roads may differ.'
+                      : 'Approximate route, drawn between the key points'}
                   </p>
                 )}
               </div>
@@ -281,6 +294,19 @@ export default function TrailPage() {
                 <p className="text-sm text-stone-600">
                   This route has no times, so the map can't follow the video. Key points still work.
                 </p>
+              )}
+              {!recorded && (
+                <AiRoutePanel
+                  trail={trail}
+                  getDuration={video.getDuration}
+                  onSeek={video.seekTo}
+                  onPreview={setPreview}
+                  onAccepted={(updated) => {
+                    applyUpdate(updated);
+                    if (!updated.routeNotice) setNotice('Route drawn. Play the video to watch the blue dot follow it.');
+                    setFollow(true);
+                  }}
+                />
               )}
               {!recorded && (
                 <RoutePanel

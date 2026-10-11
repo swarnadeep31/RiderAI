@@ -29,7 +29,18 @@ export default function KeyPointList({ points, activePointId, editing, onSelect,
               </span>
               <span>
                 <span className="font-semibold">{point.name}</span>
-                <span className="ml-2 font-mono text-xs text-stone-500">{formatTime(point.time)}</span>
+                <span className="ml-2 font-mono text-xs text-stone-500">
+                  {formatTime(point.time)}
+                  {point.stayUntil ? `–${formatTime(point.stayUntil)}` : ''}
+                </span>
+                {point.origin === 'ai' && (
+                  <span
+                    className="ml-2 rounded bg-violet-100 px-1 text-xs font-medium text-violet-800"
+                    title={point.quote ? `Found by AI: “${point.quote}”` : 'Found by AI in the video'}
+                  >
+                    AI
+                  </span>
+                )}
                 {point.note && <span className="mt-0.5 block text-sm text-stone-600">{point.note}</span>}
               </span>
             </button>

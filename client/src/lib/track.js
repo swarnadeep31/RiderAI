@@ -7,21 +7,33 @@ export function isGpxRoute(trail) {
   return trail.track.length > 0 && trail.routeSource !== 'keypoints';
 }
 
+// Index of the last time at or before t (binary search), or -1 if t is before them all.
+export function indexAtOrBefore(times, t) {
+  if (!times.length || t < times[0]) return -1;
+  let lo = 0;
+  let hi = times.length - 1;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (times[mid] <= t) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo;
+}
+
+// The hidden part of the video (intro, montage...) at time t, if any.
+export function hiddenRangeAt(hiddenRanges, t) {
+  return hiddenRanges?.find((r) => t >= r.start && t < r.end) ?? null;
+}
+
 // Where the rider was `videoTime` seconds into the video, or null if the
-// video is outside the GPS recording (or the route has no times).
-export function positionAt(track, trackTimes, videoStartsAt, videoTime) {
+// video is outside the GPS recording, in a hidden part, or the route has no times.
+export function positionAt(track, trackTimes, videoStartsAt, videoTime, hiddenRanges = []) {
   if (!trackTimes?.length || trackTimes.length !== track.length) return null;
+  if (hiddenRangeAt(hiddenRanges, videoTime)) return null;
   const t = videoTime + videoStartsAt;
   if (t < trackTimes[0] || t > trackTimes.at(-1)) return null;
 
-  // Binary search for the last point recorded at or before t.
-  let lo = 0;
-  let hi = trackTimes.length - 1;
-  while (lo < hi) {
-    const mid = Math.ceil((lo + hi) / 2);
-    if (trackTimes[mid] <= t) lo = mid;
-    else hi = mid - 1;
-  }
+  const lo = indexAtOrBefore(trackTimes, t);
   if (lo === track.length - 1) return track[lo];
 
   // Move the right fraction of the way towards the next point.
@@ -29,6 +41,18 @@ export function positionAt(track, trackTimes, videoStartsAt, videoTime) {
   const f = span > 0 ? (t - trackTimes[lo]) / span : 0;
   const [a, b] = [track[lo], track[lo + 1]];
   return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+}
+
+// The part of the route already covered at video time t, ending exactly at
+// the rider's position (like the bold line in a cab app).
+export function travelledAt(track, trackTimes, videoStartsAt, videoTime) {
+  if (!trackTimes?.length || trackTimes.length !== track.length) return [];
+  const t = videoTime + videoStartsAt;
+  if (t >= trackTimes.at(-1)) return track;
+  const i = indexAtOrBefore(trackTimes, t);
+  if (i < 0) return [];
+  const here = positionAt(track, trackTimes, videoStartsAt, videoTime);
+  return here ? [...track.slice(0, i + 1), here] : track.slice(0, i + 1);
 }
 
 // Index of the route point closest to `location`.
