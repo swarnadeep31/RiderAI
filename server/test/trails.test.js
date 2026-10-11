@@ -178,3 +178,84 @@ test('unknown API routes answer with JSON', async () => {
   assert.equal(res.status, 404);
   assert.match(res.body.error, /No API route/);
 });
+
+describe('routes drawn from key points', () => {
+  const point = (time, name, lng) => ({ time, name, lat: 32.3, lng });
+
+  async function trailWithPoints(...points) {
+    const { _id } = await createTrail({ track: undefined, trackTimes: undefined });
+    for (const p of points) await alice.post(`/api/trails/${_id}/points`).send(p);
+    return _id;
+  }
+
+  test('an uploaded GPX route is marked as recorded', async () => {
+    assert.equal((await createTrail()).routeSource, 'gpx');
+    assert.equal((await createTrail({ track: undefined, trackTimes: undefined })).routeSource, undefined);
+  });
+
+  test('draws the route through the key points in video order, timed by the video', async () => {
+    const id = await trailWithPoints(point(600, 'C', 77.3), point(60, 'A', 77.1), point(300, 'B', 77.2));
+    const res = await alice.post(`/api/trails/${id}/route`).send({ style: 'straight' });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.routeSource, 'keypoints');
+    assert.equal(res.body.routeStyle, 'straight');
+    assert.deepEqual(res.body.track, [
+      [32.3, 77.1],
+      [32.3, 77.2],
+      [32.3, 77.3],
+    ]);
+    assert.deepEqual(res.body.trackTimes, [60, 300, 600]);
+    assert.equal(res.body.videoStartsAt, 0);
+    assert.equal(res.body.routeNotice, null);
+  });
+
+  test('without a routing key, roads fall back to straight lines with a notice', async () => {
+    const id = await trailWithPoints(point(0, 'A', 77.1), point(100, 'B', 77.2));
+    const res = await alice.post(`/api/trails/${id}/route`).send({ style: 'roads' });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.track.length, 2);
+    assert.match(res.body.routeNotice, /ORS_API_KEY/);
+  });
+
+  test('is redrawn when key points are added, moved or removed', async () => {
+    const id = await trailWithPoints(point(0, 'A', 77.1), point(100, 'B', 77.3));
+    await alice.post(`/api/trails/${id}/route`).send({ style: 'straight' });
+
+    const added = await alice.post(`/api/trails/${id}/points`).send(point(50, 'Middle', 77.2));
+    assert.equal(added.status, 201);
+    assert.deepEqual(added.body.trackTimes, [0, 50, 100]);
+
+    const middleId = added.body.points[1]._id;
+    const moved = await alice.patch(`/api/trails/${id}/points/${middleId}`).send({ time: 80 });
+    assert.deepEqual(moved.body.trackTimes, [0, 80, 100]);
+
+    await alice.delete(`/api/trails/${id}/points/${middleId}`);
+    const firstId = added.body.points[0]._id;
+    const oneLeft = await alice.delete(`/api/trails/${id}/points/${firstId}`);
+    assert.deepEqual(oneLeft.body.track, []);
+    assert.equal(oneLeft.body.routeSource, 'keypoints');
+  });
+
+  test('a recorded GPX route is never redrawn', async () => {
+    const { _id, track } = await createTrail();
+    const res = await alice.post(`/api/trails/${_id}/points`).send(point(10, 'A', 77.2));
+    assert.deepEqual(res.body.track, track);
+    assert.equal(res.body.routeSource, 'gpx');
+  });
+
+  test('needs two key points, a known style and the owner', async () => {
+    const id = await trailWithPoints(point(0, 'A', 77.1));
+    const tooFew = await alice.post(`/api/trails/${id}/route`).send({ style: 'straight' });
+    assert.equal(tooFew.status, 400);
+    assert.match(tooFew.body.error, /at least two key points/);
+
+    await alice.post(`/api/trails/${id}/points`).send(point(10, 'B', 77.2));
+    assert.equal((await alice.post(`/api/trails/${id}/route`).send({ style: 'flying' })).status, 400);
+    assert.equal((await bob.post(`/api/trails/${id}/route`).send({ style: 'straight' })).status, 403);
+  });
+});
+
+test('the config says whether roads can be followed', async () => {
+  const res = await request(app).get('/api/config');
+  assert.deepEqual(res.body, { roadRouting: false });
+});

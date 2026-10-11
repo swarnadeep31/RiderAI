@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { formatTime, parseTime } from '../lib/time.js';
 import ErrorMessage from './ErrorMessage.jsx';
+import PlaceSearch from './PlaceSearch.jsx';
 
-// The location comes from clicking the map, which the page passes in.
-export default function AddPointForm({ currentTime, location, onSave, onCancel }) {
+// The location comes from clicking the map or searching for a place; the page
+// keeps it so the map can show it.
+export default function AddPointForm({ currentTime, location, onSave, onCancel, onPickPlace }) {
   const [name, setName] = useState('');
   const [note, setNote] = useState('');
   const [timeText, setTimeText] = useState(formatTime(currentTime));
@@ -14,7 +16,7 @@ export default function AddPointForm({ currentTime, location, onSave, onCancel }
     event.preventDefault();
     const time = parseTime(timeText);
     if (time === null) return setError('Write the video time like 12:30.');
-    if (!location) return setError('Click the map to choose where this place is.');
+    if (!location) return setError('Search for the place, or click the map to choose where it is.');
     setSaving(true);
     setError(null);
     try {
@@ -30,9 +32,15 @@ export default function AddPointForm({ currentTime, location, onSave, onCancel }
       <h3 className="font-semibold">New key point</h3>
       <p className="text-sm text-stone-600">
         {location
-          ? `Location: ${location[0].toFixed(5)}, ${location[1].toFixed(5)}. Click the map to change it.`
-          : 'Click the map to choose where this place is.'}
+          ? `Location: ${location[0].toFixed(5)}, ${location[1].toFixed(5)}. Search or click the map to change it.`
+          : 'Where is it? Search for the place, or click the map.'}
       </p>
+      <PlaceSearch
+        onPick={(place) => {
+          if (!name) setName(place.name);
+          onPickPlace(place);
+        }}
+      />
       <div className="flex items-end gap-2">
         <label className="block text-sm font-medium">
           Video time

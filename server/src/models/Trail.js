@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 
 export const ACTIVITIES = ['ride', 'hike', 'climb', 'cycle', 'other'];
+// How a route drawn between key points travels: along roads, along footpaths, or in straight lines.
+export const ROUTE_STYLES = ['roads', 'paths', 'straight'];
 export const MAX_TRACK_POINTS = 20000;
 export const MAX_KEY_POINTS = 200;
 
@@ -58,6 +60,10 @@ const trailSchema = new mongoose.Schema(
     recordedAt: { type: Date }, // when the GPS recording started
     // How far into the GPS recording the video starts, in seconds.
     videoStartsAt: { type: Number, default: 0 },
+    // Where the route came from: a GPX recording, or drawn between the key points
+    // (then trackTimes are estimated video times, and the route is approximate).
+    routeSource: { type: String, enum: ['gpx', 'keypoints'] },
+    routeStyle: { type: String, enum: ROUTE_STYLES, default: 'roads' },
 
     points: {
       type: [keyPointSchema],

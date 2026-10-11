@@ -1,4 +1,6 @@
-import { Trail } from '../models/Trail.js';
+import { MAX_TRACK_POINTS, ROUTE_STYLES, Trail } from '../models/Trail.js';
+import { routeSegments } from '../services/routing.js';
+import { timedTrack } from '../utils/geo.js';
 import { httpError } from '../utils/httpError.js';
 import { parseYouTubeId } from '../utils/youtube.js';
 
@@ -33,15 +35,34 @@ async function findOwnTrail(req) {
   return trail;
 }
 
-async function sendTrail(res, trail, status = 200) {
+// routeNotice: a message for the user when drawing the route didn't go as asked.
+async function sendTrail(res, trail, { status = 200, routeNotice = null } = {}) {
   await trail.populate('owner', OWNER_FIELDS);
-  res.status(status).json(trail);
+  res.status(status).json({ ...trail.toJSON(), routeNotice });
 }
 
 function sortPoints(trail) {
   trail.points.sort((a, b) => a.time - b.time);
   trail.markModified('points');
 }
+
+// Draws the route through the key points in video order, with estimated times
+// so the map can follow the video. Returns a notice if it fell back to straight lines.
+async function drawRouteFromPoints(trail) {
+  const points = [...trail.points].sort((a, b) => a.time - b.time);
+  if (points.length < 2) {
+    trail.set({ track: [], trackTimes: [] });
+    return null;
+  }
+  const { segments, notice } = await routeSegments(points, trail.routeStyle);
+  const { track, trackTimes } = timedTrack(points, segments, MAX_TRACK_POINTS);
+  // The times are video times already, so the video and route need no lining up.
+  trail.set({ track, trackTimes, routeSource: 'keypoints', videoStartsAt: 0, recordedAt: undefined });
+  return notice;
+}
+
+// A route drawn from key points is redrawn whenever the key points change.
+const redrawIfDrawn = (trail) => (trail.routeSource === 'keypoints' ? drawRouteFromPoints(trail) : null);
 
 export async function listTrails(req, res) {
   // The route can be thousands of points, so leave it out of the list.
@@ -55,12 +76,14 @@ export async function listTrails(req, res) {
 }
 
 export async function createTrail(req, res) {
+  const fields = pick(req.body, TRAIL_FIELDS);
   const trail = await Trail.create({
-    ...pick(req.body, TRAIL_FIELDS),
+    ...fields,
     youtubeId: youtubeIdFrom(req.body),
     owner: req.user._id,
+    routeSource: fields.track?.length ? 'gpx' : undefined,
   });
-  await sendTrail(res, trail, 201);
+  await sendTrail(res, trail, { status: 201 });
 }
 
 export async function getTrail(req, res) {
@@ -69,7 +92,9 @@ export async function getTrail(req, res) {
 
 export async function updateTrail(req, res) {
   const trail = await findOwnTrail(req);
-  trail.set(pick(req.body, TRAIL_FIELDS));
+  const fields = pick(req.body, TRAIL_FIELDS);
+  trail.set(fields);
+  if (fields.track?.length) trail.routeSource = 'gpx';
   if (req.body?.youtubeUrl !== undefined) trail.youtubeId = youtubeIdFrom(req.body);
   await trail.save();
   await sendTrail(res, trail);
@@ -81,12 +106,26 @@ export async function deleteTrail(req, res) {
   res.status(204).end();
 }
 
+// Builds (or rebuilds) the route between the key points, for videos without a GPX file.
+export async function drawRoute(req, res) {
+  const trail = await findOwnTrail(req);
+  const style = req.body?.style ?? trail.routeStyle;
+  if (!ROUTE_STYLES.includes(style)) throw httpError(400, `The route style must be one of: ${ROUTE_STYLES.join(', ')}.`);
+  if (trail.points.length < 2) throw httpError(400, 'Add at least two key points first.');
+  trail.routeStyle = style;
+  const routeNotice = await drawRouteFromPoints(trail);
+  await trail.save();
+  await sendTrail(res, trail, { routeNotice });
+}
+
 export async function addPoint(req, res) {
   const trail = await findOwnTrail(req);
   trail.points.push(pick(req.body, POINT_FIELDS));
   sortPoints(trail);
+  await trail.validate(); // check the new point before spending time on the route
+  const routeNotice = await redrawIfDrawn(trail);
   await trail.save();
-  await sendTrail(res, trail, 201);
+  await sendTrail(res, trail, { status: 201, routeNotice });
 }
 
 export async function updatePoint(req, res) {
@@ -95,8 +134,10 @@ export async function updatePoint(req, res) {
   if (!point) throw httpError(404, 'Key point not found.');
   point.set(pick(req.body, POINT_FIELDS));
   sortPoints(trail);
+  await trail.validate();
+  const routeNotice = await redrawIfDrawn(trail);
   await trail.save();
-  await sendTrail(res, trail);
+  await sendTrail(res, trail, { routeNotice });
 }
 
 export async function deletePoint(req, res) {
@@ -104,6 +145,7 @@ export async function deletePoint(req, res) {
   const point = trail.points.id(req.params.pointId);
   if (!point) throw httpError(404, 'Key point not found.');
   point.deleteOne();
+  const routeNotice = await redrawIfDrawn(trail);
   await trail.save();
-  await sendTrail(res, trail);
+  await sendTrail(res, trail, { routeNotice });
 }

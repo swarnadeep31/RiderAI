@@ -18,8 +18,11 @@ that moment, and save the places to Google Maps, a GPS app or a printable trip s
   - The route is drawn on the map.
   - A blue dot follows the video while it plays (when the GPX file has times).
   - Numbered pins mark the key points. Clicking a pin or a list item jumps the video there.
-- **Creator tools:** add key points (pause the video, click the map, name it), line up the map with the video in two
-  clicks, delete points or the whole trail.
+- **Creator tools:** add key points (pause the video, search for the place by name or click the map), line up the
+  map with the video in two clicks, delete points or the whole trail.
+- **No GPS file? No problem:** add a key point each time the video reaches a new place, and TrailCast joins them into
+  a route along real roads or footpaths (or straight lines). The blue dot moves between the places as the video plays,
+  and the route is shown dashed and labelled "approximate". It redraws itself when key points change.
 - **Take it with you:** an "Open in Google Maps" link for every key point, GPX and KML downloads (KML imports into
   Google My Maps), and a printable trip sheet you can save as a PDF.
 - **Support the creator:** a button linking to the creator's Ko-fi, Buy Me a Coffee, Patreon or UPI page.
@@ -30,6 +33,8 @@ that moment, and save the places to Google Maps, a GPS app or a printable trip s
 | --- | --- | --- |
 | Video storage, streaming, live streams | YouTube (official embedded player) | Free |
 | Map | OpenStreetMap + Leaflet | Free |
+| Place search | OpenStreetMap Nominatim | Free (one search per second) |
+| Routes along roads and paths | OpenRouteService free plan | Free (2,000 routes a day; each route is worked out once, when saved) |
 | Database | MongoDB Atlas free tier | Free |
 | Hosting | Free tiers (Render, Railway, Vercel...) | Free |
 | Domain name | You, optional | ~$10/year |
@@ -64,6 +69,9 @@ If the in-memory database can't start on your system, use one of these instead.
 **Logins:** `.env.example` also explains `JWT_SECRET`, the secret that signs login sessions. While developing you can
 leave it empty; it must be set before TrailCast goes online.
 
+**Routes along roads (optional):** for routes drawn between key points to follow real roads and footpaths, get a free
+key at https://openrouteservice.org and set `ORS_API_KEY` in `server/.env`. Without it they're straight lines.
+
 **Try it out:** sign up, answer the welcome question, click "+ New trail", paste any YouTube riding video and upload `samples/sample-ride.gpx`. That file is
 a made-up 20-minute route near Manali with times, so the blue dot will move as the video plays (it won't match the
 real video, of course).
@@ -97,9 +105,10 @@ server/                  Express API + MongoDB (Mongoose)
   src/
     models/              What trails, users and feedback look like in the database, with validation rules
     controllers/         What each API request does
+    services/            Outside services: routes along roads (OpenRouteService), place search (Nominatim)
     routes/              Which URL goes to which controller
     middleware/          auth.js: login sessions; errorHandler.js: clear JSON error messages
-    utils/               YouTube link parsing and small helpers
+    utils/               YouTube link parsing, distances on the map, small helpers
   test/                  API tests against a real (in-memory) MongoDB
 samples/                 A sample GPX file to try
 ```
@@ -114,11 +123,14 @@ samples/                 A sample GPX file to try
 | GET | `/api/auth/me` | Anyone | The logged-in user, or `null` |
 | PUT | `/api/auth/onboarding` | Logged in | Save the welcome answers (`interests`, `referralSource`, `wishlist`) |
 | POST | `/api/feedback` | Logged in | Send feedback (`message`) |
+| GET | `/api/places?q=...` | Logged in | Find places by name |
+| GET | `/api/config` | Anyone | What the server can do (e.g. `roadRouting`) |
 | GET | `/api/trails` | Anyone | List trails (without their routes) |
 | GET | `/api/trails/:id` | Anyone | One trail with its route and key points |
 | POST | `/api/trails` | Logged in | Create a trail from `youtubeUrl`, `title` and optional route |
 | PATCH | `/api/trails/:id` | Owner | Change a trail (title, sync, support link...) |
 | DELETE | `/api/trails/:id` | Owner | Delete a trail |
+| POST | `/api/trails/:id/route` | Owner | Draw the route between the key points (`style`: `roads`, `paths` or `straight`) |
 | POST | `/api/trails/:id/points` | Owner | Add a key point |
 | PATCH | `/api/trails/:id/points/:pointId` | Owner | Change a key point |
 | DELETE | `/api/trails/:id/points/:pointId` | Owner | Delete a key point |
@@ -138,5 +150,6 @@ Logging in sets an httpOnly cookie, which the browser sends with every request a
 6. **Community:** follow creators, comments, viewers' saved places.
 7. **Donations in TrailCast itself:** only once there are real users, because it needs a payments company, identity
    checks and taxes.
-8. **Draw a route by hand** for creators who didn't record a GPX file.
+8. ~~Routes for videos without a GPX file, drawn between the key points~~ ✓
+   Later: read the chapters in a YouTube description ("12:30 Rohtang Pass") and suggest them as key points.
 9. **Log in with a phone number.**

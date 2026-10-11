@@ -1,6 +1,12 @@
 // Maths on the GPS route. A route is a list of [lat, lng] points, and
 // trackTimes holds the seconds since the recording started for each point.
 
+// True when the route is a real GPS recording (from a GPX file), not one drawn
+// between the key points.
+export function isGpxRoute(trail) {
+  return trail.track.length > 0 && trail.routeSource !== 'keypoints';
+}
+
 // Where the rider was `videoTime` seconds into the video, or null if the
 // video is outside the GPS recording (or the route has no times).
 export function positionAt(track, trackTimes, videoStartsAt, videoTime) {

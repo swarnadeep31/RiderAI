@@ -64,6 +64,7 @@ function MapEvents({ onMapClick, onUserMove }) {
 export default function TrailMap({
   trailId,
   track,
+  approximate,
   points,
   position,
   activePointId,
@@ -83,7 +84,13 @@ export default function TrailMap({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        {track.length > 1 && <Polyline positions={track} pathOptions={{ color: '#ea580c', weight: 4, opacity: 0.85 }} />}
+        {track.length > 1 && (
+          <Polyline
+            positions={track}
+            // A dashed line for routes drawn between key points: they're approximate.
+            pathOptions={{ color: '#ea580c', weight: 4, opacity: 0.85, dashArray: approximate ? '10 8' : undefined }}
+          />
+        )}
         {points.map((point, i) => (
           <Marker
             key={point._id}

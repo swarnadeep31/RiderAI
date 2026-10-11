@@ -30,6 +30,10 @@ export const api = {
   saveOnboarding: (answers) => request('/auth/onboarding', { method: 'PUT', body: answers }),
   sendFeedback: (message) => request('/feedback', { method: 'POST', body: { message } }),
 
+  // What the server can do (e.g. whether it can follow roads)
+  getConfig: () => request('/config'),
+  searchPlaces: (query) => request(`/places?q=${encodeURIComponent(query)}`),
+
   // Trails
   listTrails: () => request('/trails'),
   getTrail: (id) => request(`/trails/${id}`),
@@ -38,4 +42,6 @@ export const api = {
   deleteTrail: (id) => request(`/trails/${id}`, { method: 'DELETE' }),
   addPoint: (id, point) => request(`/trails/${id}/points`, { method: 'POST', body: point }),
   deletePoint: (id, pointId) => request(`/trails/${id}/points/${pointId}`, { method: 'DELETE' }),
+  // style: 'roads', 'paths' or 'straight'
+  drawRoute: (id, style) => request(`/trails/${id}/route`, { method: 'POST', body: { style } }),
 };

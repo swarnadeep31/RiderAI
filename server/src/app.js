@@ -4,7 +4,9 @@ import { loadUser } from './middleware/auth.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { authRouter } from './routes/auth.js';
 import { feedbackRouter } from './routes/feedback.js';
+import { placesRouter } from './routes/places.js';
 import { trailsRouter } from './routes/trails.js';
+import { roadRoutingAvailable } from './services/routing.js';
 
 export function createApp() {
   const app = express();
@@ -14,8 +16,11 @@ export function createApp() {
   app.use(loadUser);
 
   app.get('/api/health', (req, res) => res.json({ ok: true }));
+  // What this server can do, so the website can explain missing features.
+  app.get('/api/config', (req, res) => res.json({ roadRouting: roadRoutingAvailable() }));
   app.use('/api/auth', authRouter);
   app.use('/api/feedback', feedbackRouter);
+  app.use('/api/places', placesRouter);
   app.use('/api/trails', trailsRouter);
   app.use('/api', notFound);
 

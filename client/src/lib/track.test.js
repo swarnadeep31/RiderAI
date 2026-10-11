@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { boundsOf, nearestIndex, positionAt } from './track.js';
+import { boundsOf, isGpxRoute, nearestIndex, positionAt } from './track.js';
 
 const track = [
   [10, 20],
@@ -44,4 +44,11 @@ test('boundsOf', () => {
     [11, 21],
   ]);
   expect(boundsOf([])).toBeNull();
+});
+
+test('isGpxRoute', () => {
+  expect(isGpxRoute({ track, routeSource: 'gpx' })).toBe(true);
+  expect(isGpxRoute({ track })).toBe(true); // trails from before routes could be drawn
+  expect(isGpxRoute({ track, routeSource: 'keypoints' })).toBe(false);
+  expect(isGpxRoute({ track: [] })).toBe(false);
 });

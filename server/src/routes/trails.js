@@ -5,6 +5,7 @@ import {
   createTrail,
   deletePoint,
   deleteTrail,
+  drawRoute,
   getTrail,
   listTrails,
   updatePoint,
@@ -30,6 +31,7 @@ trailsRouter.get('/:id', getTrail);
 trailsRouter.post('/', requireUser, createTrail);
 trailsRouter.patch('/:id', requireUser, updateTrail);
 trailsRouter.delete('/:id', requireUser, deleteTrail);
+trailsRouter.post('/:id/route', requireUser, drawRoute);
 
 trailsRouter.post('/:id/points', requireUser, addPoint);
 trailsRouter.patch('/:id/points/:pointId', requireUser, updatePoint);

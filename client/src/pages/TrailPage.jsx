@@ -5,11 +5,12 @@ import { useAuth } from '../auth.jsx';
 import AddPointForm from '../components/AddPointForm.jsx';
 import ErrorMessage from '../components/ErrorMessage.jsx';
 import KeyPointList from '../components/KeyPointList.jsx';
+import RoutePanel from '../components/RoutePanel.jsx';
 import SaveOptions from '../components/SaveOptions.jsx';
 import TrailMap from '../components/TrailMap.jsx';
 import { useYouTubePlayer } from '../hooks/useYouTubePlayer.js';
 import { ACTIVITIES } from '../lib/activities.js';
-import { nearestIndex, positionAt } from '../lib/track.js';
+import { isGpxRoute, nearestIndex, positionAt } from '../lib/track.js';
 import { formatTime } from '../lib/time.js';
 
 function describeSync(videoStartsAt) {
@@ -64,7 +65,17 @@ export default function TrailPage() {
   const editing = isOwner && searchParams.has('edit');
   const position = positionAt(trail.track, trail.trackTimes, trail.videoStartsAt, video.currentTime);
   const activePoint = trail.points.findLast((p) => p.time <= video.currentTime + 0.5);
-  const canSync = trail.trackTimes.length > 0;
+  const recorded = isGpxRoute(trail);
+  const drawnRoute = trail.routeSource === 'keypoints' && trail.track.length > 1;
+  // Recorded routes may need lining up with the video; drawn routes use video times already.
+  const canSync = recorded && trail.trackTimes.length > 0;
+
+  // After any change, the server sends the updated trail, plus a message if
+  // redrawing the route didn't go as asked (e.g. no road-following key).
+  function applyUpdate(updated) {
+    setTrail(updated);
+    if (updated.routeNotice) setNotice(updated.routeNotice);
+  }
 
   function selectPoint(point) {
     video.seekTo(point.time);
@@ -83,14 +94,19 @@ export default function TrailPage() {
   }
 
   async function savePoint(point) {
-    setTrail(await api.addPoint(trail._id, point));
+    applyUpdate(await api.addPoint(trail._id, point));
     stopMapMode();
+  }
+
+  function pickPlace(place) {
+    setPendingLocation([place.lat, place.lng]);
+    setFocus({ location: [place.lat, place.lng] });
   }
 
   async function deletePoint(point) {
     if (!window.confirm(`Delete "${point.name}"?`)) return;
     try {
-      setTrail(await api.deletePoint(trail._id, point._id));
+      applyUpdate(await api.deletePoint(trail._id, point._id));
     } catch (err) {
       setNotice(err.message);
     }
@@ -143,6 +159,7 @@ export default function TrailPage() {
           <TrailMap
             trailId={trail._id}
             track={trail.track}
+            approximate={drawnRoute}
             points={trail.points}
             position={position}
             activePointId={activePoint?._id}
@@ -164,6 +181,16 @@ export default function TrailPage() {
                   {ACTIVITIES[trail.activity]}
                   {trail.owner && ` · by @${trail.owner.username}`}
                 </p>
+                {recorded && (
+                  <p className="mt-1 inline-block rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-800">
+                    Recorded GPS route
+                  </p>
+                )}
+                {drawnRoute && (
+                  <p className="mt-1 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+                    Approximate route, drawn between the key points
+                  </p>
+                )}
               </div>
               <div className="flex gap-2">
                 {trail.supportUrl && (
@@ -206,6 +233,7 @@ export default function TrailPage() {
                   location={pendingLocation}
                   onSave={savePoint}
                   onCancel={stopMapMode}
+                  onPickPlace={pickPlace}
                 />
               ) : (
                 <button
@@ -249,10 +277,20 @@ export default function TrailPage() {
                   )}
                 </div>
               )}
-              {trail.track.length > 0 && !canSync && (
+              {recorded && !canSync && (
                 <p className="text-sm text-stone-600">
                   This route has no times, so the map can't follow the video. Key points still work.
                 </p>
+              )}
+              {!recorded && (
+                <RoutePanel
+                  trail={trail}
+                  onDrawn={(updated) => {
+                    applyUpdate(updated);
+                    if (!updated.routeNotice) setNotice('Route drawn. Play the video to watch the blue dot follow it.');
+                    setFollow(true);
+                  }}
+                />
               )}
 
               <button type="button" onClick={deleteTrail} className="text-sm text-red-700 hover:underline">
