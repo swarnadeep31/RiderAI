@@ -2,3 +2,5 @@ node_modules/
 dist/
 .env
 .DS_Store
+# Output of the AI test script
+ai-results/
