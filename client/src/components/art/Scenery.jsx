@@ -138,16 +138,18 @@ export function HeroScene({ className = '' }) {
       ))}
 
       {/* A hiker taking in the view */}
-      <g transform="translate(176 474)" className="motion-safe:animate-float" style={{ animationDuration: '5s' }}>
-        <circle cx="0" cy="-30" r="4.5" fill="#15392e" />
-        <path
-          d="M0-25-3-12l4 5v7M-3-12l-4 12M1-23l6 6 4-1M11-18V0"
-          stroke="#15392e"
-          strokeWidth="3"
-          fill="none"
-          strokeLinecap="round"
-        />
-        <path d="M-2-24l-6-2-3 10 6 2z" fill="#f59e0b" />
+      <g transform="translate(176 474)">
+        <g className="motion-safe:animate-float" style={{ animationDuration: '5s' }}>
+          <circle cx="0" cy="-30" r="4.5" fill="#15392e" />
+          <path
+            d="M0-25-3-12l4 5v7M-3-12l-4 12M1-23l6 6 4-1M11-18V0"
+            stroke="#15392e"
+            strokeWidth="3"
+            fill="none"
+            strokeLinecap="round"
+          />
+          <path d="M-2-24l-6-2-3 10 6 2z" fill="#f59e0b" />
+        </g>
       </g>
 
       {/* The road, the route drawing itself along it, and pins */}
@@ -361,16 +363,18 @@ export function SummitScene({ className = '' }) {
         <path d="M0 0v-50" stroke="#1c1917" strokeWidth="3.5" strokeLinecap="round" />
         <path d="M1-50h32l-8 9 8 9H1z" fill="#ea580c" className="svg-left motion-safe:animate-flutter" />
       </g>
-      <g transform="translate(262 278)" className="motion-safe:animate-float">
-        <circle cx="0" cy="-28" r="5" fill="#15392e" />
-        <path
-          d="M0-23-3-10l5 4v8M-3-10l-6 11M1-21l8-6M7-27l3-8"
-          stroke="#15392e"
-          strokeWidth="3.4"
-          fill="none"
-          strokeLinecap="round"
-        />
-        <path d="M-2-22l-7-2-3 11 7 2z" fill="#f59e0b" />
+      <g transform="translate(262 278)">
+        <g className="motion-safe:animate-float">
+          <circle cx="0" cy="-28" r="5" fill="#15392e" />
+          <path
+            d="M0-23-3-10l5 4v8M-3-10l-6 11M1-21l8-6M7-27l3-8"
+            stroke="#15392e"
+            strokeWidth="3.4"
+            fill="none"
+            strokeLinecap="round"
+          />
+          <path d="M-2-22l-7-2-3 11 7 2z" fill="#f59e0b" />
+        </g>
       </g>
       <path d="M0 540c80-20 160-24 240-14s160 4 240-6v80H0z" fill="#2d6a50" />
       <Pine x={40} y={556} s={2} fill="#1d4f3c" />
