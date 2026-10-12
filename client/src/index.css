@@ -1,5 +1,8 @@
 @import 'tailwindcss';
 
+/* Night mode: the `dark` class on <html> (set by lib/theme.js). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* TrailCast's look: warm sand paper, pine forests, sunset orange and a morning sky. */
 @theme {
   --font-sans: 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, sans-serif;
@@ -21,6 +24,10 @@
   --color-sand-100: #fbf6ec;
   --color-sand-200: #f4e8d2;
   --color-sand-300: #e9d4ae;
+
+  /* Cards and headings, which change at night. */
+  --color-surface: #ffffff;
+  --color-ink: #0b201a;
 
   --animate-float: float 6s ease-in-out infinite;
   --animate-glow: glow 7s ease-in-out infinite;
@@ -130,7 +137,7 @@
   @apply btn bg-orange-600 text-white shadow-md shadow-orange-600/25 hover:-translate-y-0.5 hover:bg-orange-500 hover:shadow-lg hover:shadow-orange-600/30 focus-visible:ring-orange-300;
 }
 @utility btn-secondary {
-  @apply btn border border-stone-300 bg-white text-stone-800 hover:-translate-y-0.5 hover:border-stone-400 hover:shadow-md focus-visible:ring-stone-300;
+  @apply btn border border-stone-300 bg-surface text-stone-800 hover:-translate-y-0.5 hover:border-stone-400 hover:shadow-md focus-visible:ring-stone-300;
 }
 @utility btn-ghost {
   @apply btn text-stone-700 hover:bg-stone-900/5 focus-visible:ring-stone-300;
@@ -139,24 +146,24 @@
   @apply btn bg-violet-700 text-white shadow-md shadow-violet-700/25 hover:-translate-y-0.5 hover:bg-violet-600 focus-visible:ring-violet-300;
 }
 @utility card {
-  @apply rounded-3xl border border-stone-900/5 bg-white shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_24px_-12px_rgb(21_57_46/0.18)];
+  @apply rounded-3xl border border-stone-900/5 bg-surface shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_24px_-12px_rgb(21_57_46/0.18)];
 }
 @utility input {
-  @apply mt-1.5 block w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 font-normal text-stone-900 transition placeholder:text-stone-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-200 focus:outline-none;
+  @apply mt-1.5 block w-full rounded-xl border border-stone-300 bg-surface px-3.5 py-2.5 font-normal text-stone-900 transition placeholder:text-stone-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-200 focus:outline-none;
 }
 /* A compact text box, for forms inside panels. */
 @utility field {
-  @apply rounded-xl border border-stone-300 bg-white px-3 py-1.5 text-stone-900 transition placeholder:text-stone-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-200 focus:outline-none;
+  @apply rounded-xl border border-stone-300 bg-surface px-3 py-1.5 text-stone-900 transition placeholder:text-stone-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-200 focus:outline-none;
 }
 @utility eyebrow {
-  @apply inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs font-bold tracking-wide text-pine-700 uppercase shadow-sm ring-1 ring-pine-900/10 backdrop-blur;
+  @apply inline-flex items-center gap-2 rounded-full bg-surface/80 px-3 py-1 text-xs font-bold tracking-wide text-pine-700 uppercase dark:text-pine-300 shadow-sm ring-1 ring-pine-900/10 backdrop-blur;
 }
 @utility badge {
   @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
 }
 @utility skeleton {
   @apply motion-safe:animate-shimmer;
-  background: linear-gradient(90deg, #f1e9da 0px, #faf4ea 160px, #f1e9da 320px);
+  background: linear-gradient(90deg, var(--color-sand-200) 0px, var(--color-sand-100) 160px, var(--color-sand-200) 320px);
   background-size: 800px 100%;
 }
 /* SVG parts that scale or turn around their own middle (sun, flames, flags). */
@@ -171,6 +178,200 @@
 @utility svg-left {
   transform-box: fill-box;
   transform-origin: 0% 50%;
+}
+
+/* The illustrations' colours, by day and by night (see components/art/Scenery.jsx). */
+:root {
+  --sky-hero: linear-gradient(180deg, #bfe3f5 0%, #dcf0f7 38%, #fdebd3 78%, #fbdcb6 100%);
+  --sky-night: linear-gradient(180deg, #0a1230 0%, #18224b 42%, #352f62 76%, #533b62 100%);
+  --scene-far: #bcd3e4;
+  --scene-snow: #ffffff;
+  --scene-mid: #86b99a;
+  --scene-near: #4f9a74;
+  --scene-tree: #2f7356;
+  --scene-front: #2d6a50;
+  --scene-front-tree: #1d4f3c;
+  --scene-road-edge: #e7d2ad;
+  --scene-road: #f6e8cc;
+  --scene-page: #fbf6ec;
+  --scene-cloud: #ffffff;
+  --scene-figure: #15392e;
+  --scene-sky-top: #7dd3fc;
+  --scene-sky-middle: #e0f2fe;
+  --scene-sky-bottom: #fde7c7;
+}
+:root.dark {
+  color-scheme: dark;
+
+  /* Neutrals turn around: light paper becomes a night forest, dark text becomes moonlight. */
+  --color-stone-50: #131f1b;
+  --color-stone-100: #1d2c27;
+  --color-stone-200: #2a3b35;
+  --color-stone-300: #3a4d45;
+  --color-stone-400: #6f7a72;
+  --color-stone-500: #8f978e;
+  --color-stone-600: #b3b6ab;
+  --color-stone-700: #cfcfc4;
+  --color-stone-800: #e2e0d6;
+  --color-stone-900: #f1efe7;
+  --color-stone-950: #faf8f2;
+  --color-sand-50: #1c2b26;
+  --color-sand-100: #0f1a17;
+  --color-sand-200: #1d2c27;
+  --color-sand-300: #2a3b35;
+  --color-surface: #16231f;
+  --color-ink: #f4efe4;
+
+  /* Pale tints become deep ones; dark text shades become light (deep shades used as backgrounds stay). */
+  --color-orange-50: #2a1a10;
+  --color-orange-100: #3d2414;
+  --color-orange-200: #5c3518;
+  --color-orange-700: #fb923c;
+  --color-orange-800: #fdba74;
+  --color-orange-900: #fed7aa;
+  --color-amber-50: #2a2110;
+  --color-amber-100: #3a2c10;
+  --color-amber-200: #574114;
+  --color-amber-800: #fcd34d;
+  --color-amber-900: #fde68a;
+  --color-sky-50: #0f2230;
+  --color-sky-100: #12293a;
+  --color-sky-200: #1b3a52;
+  --color-sky-800: #7dd3fc;
+  --color-sky-900: #bae6fd;
+  --color-violet-50: #1f1736;
+  --color-violet-100: #2a1f4a;
+  --color-violet-200: #3b2d66;
+  --color-violet-800: #c4b5fd;
+  --color-violet-900: #ddd6fe;
+  --color-red-50: #2d1414;
+  --color-red-100: #3d1a1a;
+  --color-red-200: #5c2323;
+  --color-red-700: #fca5a5;
+  --color-red-800: #fecaca;
+  --color-green-50: #102a1c;
+  --color-green-100: #133520;
+  --color-green-800: #86efac;
+
+  --scene-far: #34416a;
+  --scene-snow: #c7d2fe;
+  --scene-mid: #2a4a45;
+  --scene-near: #1f3a33;
+  --scene-tree: #142a24;
+  --scene-front: #12241e;
+  --scene-front-tree: #0b1814;
+  --scene-road-edge: #4b4436;
+  --scene-road: #7d715c;
+  --scene-page: #0f1a17;
+  --scene-cloud: #8a96bb;
+  --scene-figure: #0a1410;
+  --scene-sky-top: #0a1230;
+  --scene-sky-middle: #26305e;
+  --scene-sky-bottom: #4a3a66;
+}
+
+/* Things that only show by day (the sun, birds) or by night (the moon, stars, campfire glow).
+   When the theme changes, the sun sets and the moon rises. */
+.day-only,
+.night-only {
+  transition:
+    opacity 0.9s ease,
+    transform 0.9s ease;
+}
+.night-only,
+.dark .day-only {
+  opacity: 0;
+  pointer-events: none;
+}
+.dark .night-only {
+  opacity: 1;
+  pointer-events: auto;
+}
+.dark .day-only {
+  transform: translateY(60px);
+}
+.night-only {
+  transform: translateY(-30px);
+}
+.dark .night-only {
+  transform: none;
+}
+.sky-night {
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+.dark .sky-night {
+  opacity: 1;
+}
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .star {
+    animation: twinkle var(--duration, 3s) ease-in-out infinite;
+    animation-delay: var(--delay, 0s);
+  }
+}
+
+/* The hidden switch: the sun (or moon) in the home page sky glows when pointed at. */
+.sun-switch {
+  transition: filter 0.3s ease;
+}
+.sun-switch:hover {
+  filter: drop-shadow(0 0 22px rgb(251 191 36 / 0.85));
+}
+.dark .sun-switch:hover {
+  filter: drop-shadow(0 0 22px rgb(199 210 254 / 0.9));
+}
+.sun-ring {
+  opacity: 0;
+}
+.sun-switch:focus-visible .sun-ring {
+  opacity: 1;
+}
+
+/* While switching day and night, everything fades instead of jumping. */
+/* (Not transforms: the map moves with them. The sun and moon have their own transition above.) */
+.theme-fade,
+.theme-fade *:not(.day-only, .night-only, .sky-night) {
+  transition:
+    background-color 0.8s ease,
+    border-color 0.8s ease,
+    color 0.8s ease,
+    fill 0.8s ease,
+    stop-color 0.8s ease !important;
+}
+
+/* The map at night: the tiles are turned dark; routes and pins keep their colours. */
+.dark .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9) saturate(0.5);
+}
+.dark .leaflet-container {
+  background: #1a2321;
+}
+.dark .leaflet-bar a,
+.dark .leaflet-bar a:hover {
+  background-color: var(--color-surface);
+  border-color: var(--color-stone-200);
+  color: var(--color-stone-800);
+}
+.dark .leaflet-control-attribution {
+  background: rgb(22 35 31 / 0.85);
+  color: var(--color-stone-600);
+}
+.dark .leaflet-control-attribution a {
+  color: var(--color-sky-800);
+}
+
+/* Clouds are thin at night, so the stars show. */
+.dark .cloud {
+  opacity: 0.35;
 }
 
 /* Clouds sail across the hero sky. */

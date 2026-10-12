@@ -57,11 +57,12 @@ export default function NewTrailPage() {
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
       <div className="card overflow-hidden motion-safe:animate-fade-up">
-        <div className="relative" style={{ background: 'linear-gradient(180deg, #bfe3f5 0%, #fdebd3 100%)' }}>
-          <HeroScene className="h-48 w-full sm:h-60" />
-          <div className="absolute inset-x-0 top-0 p-6 sm:p-8">
-            <h1 className="text-3xl font-extrabold text-pine-950 sm:text-4xl">Add a trail</h1>
-            <p className="mt-1 max-w-md font-medium text-pine-900/80">
+        <div className="relative" style={{ background: 'var(--sky-hero)' }}>
+          <div className="sky-night absolute inset-0" style={{ background: 'var(--sky-night)' }} aria-hidden="true" />
+          <HeroScene className="relative h-48 w-full sm:h-60" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 p-6 sm:p-8">
+            <h1 className="text-3xl font-extrabold text-ink sm:text-4xl">Add a trail</h1>
+            <p className="mt-1 max-w-md font-medium text-ink/80">
               Your video stays on YouTube. TrailCast adds the map: the route, and the places you mark.
             </p>
           </div>
@@ -100,7 +101,7 @@ export default function NewTrailPage() {
                     onChange={update('activity')}
                     className="peer sr-only"
                   />
-                  <span className="flex h-full flex-col items-center gap-1.5 rounded-2xl border-2 border-stone-200 bg-white px-2 py-3 text-center text-sm font-semibold text-stone-700 transition hover:-translate-y-0.5 hover:border-orange-300 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-800 peer-focus-visible:ring-4 peer-focus-visible:ring-orange-200">
+                  <span className="flex h-full flex-col items-center gap-1.5 rounded-2xl border-2 border-stone-200 bg-surface px-2 py-3 text-center text-sm font-semibold text-stone-700 transition hover:-translate-y-0.5 hover:border-orange-300 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-800 peer-focus-visible:ring-4 peer-focus-visible:ring-orange-200">
                     <Icon name={ACTIVITY_STYLE[value].icon} className="h-7 w-7" />
                     {label}
                   </span>
@@ -121,7 +122,7 @@ export default function NewTrailPage() {
             />
           </label>
 
-          <div className="rounded-2xl border-2 border-dashed border-pine-200 bg-pine-50/60 p-4">
+          <div className="rounded-2xl border-2 border-dashed border-pine-200 bg-pine-50/60 dark:border-pine-700 dark:bg-pine-900/30 p-4">
             <label htmlFor="gpx" className={`${labelClass} flex items-center gap-2`}>
               <Icon name="satellite" className="h-5 w-5 text-pine-600" />
               GPS route <span className="font-normal text-stone-500">(optional, a .gpx file)</span>
@@ -144,7 +145,7 @@ export default function NewTrailPage() {
               </div>
             )}
             {route && (
-              <p className="mt-2 rounded-xl bg-white px-3 py-2 text-sm font-medium text-pine-800 shadow-sm">
+              <p className="mt-2 rounded-xl bg-surface px-3 py-2 text-sm font-medium text-pine-800 shadow-sm dark:text-pine-300">
                 {route.track.length.toLocaleString()} GPS points
                 {route.trackTimes.length > 0
                   ? `, recorded over ${formatDuration(route.trackTimes.at(-1))}. The map will be able to follow the video.`

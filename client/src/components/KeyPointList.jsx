@@ -35,7 +35,7 @@ export default function KeyPointList({ points, activePointId, editing, onSelect,
                 {i + 1}
               </span>
               <span className="pt-1">
-                <span className="font-semibold text-pine-950">{point.name}</span>
+                <span className="font-semibold text-ink">{point.name}</span>
                 <span className="ml-2 rounded-full bg-stone-100 px-2 py-0.5 font-mono text-xs text-stone-600">
                   {formatTime(point.time)}
                   {point.stayUntil ? `–${formatTime(point.stayUntil)}` : ''}

@@ -35,7 +35,7 @@ export default function RoutePanel({ trail, onDrawn }) {
 
   return (
     <div className="space-y-2 text-sm">
-      <h3 className="font-display text-base font-bold text-pine-950">No GPS file? Draw the route from your key points</h3>
+      <h3 className="font-display text-base font-bold text-ink">No GPS file? Draw the route from your key points</h3>
       {trail.points.length < 2 ? (
         <p className="text-stone-600">
           Add a key point each time the video reaches a new place (where it starts, the next town, the pass...).

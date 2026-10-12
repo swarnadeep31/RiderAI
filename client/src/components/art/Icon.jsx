@@ -90,6 +90,13 @@ const PATHS = {
       <path d="M7 14h10v6.5H7z" />
     </>
   ),
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4" />
+    </>
+  ),
+  moon: <path d="M20 14.5A8 8 0 1 1 9.5 4 6.5 6.5 0 0 0 20 14.5z" />,
   arrowRight: <path d="M5 12h14m-6-6 6 6-6 6" />,
   arrowDown: <path d="M12 5v14m-6-6 6 6 6-6" />,
   check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
@@ -129,7 +136,7 @@ export default function Icon({ name, className = 'h-5 w-5', strokeWidth = 1.8 })
 // Each activity's icon and colours, used on cards, badges and choices.
 export const ACTIVITY_STYLE = {
   ride: { icon: 'ride', badge: 'bg-orange-100 text-orange-800', solid: 'bg-orange-500' },
-  hike: { icon: 'hike', badge: 'bg-pine-100 text-pine-800', solid: 'bg-pine-500' },
+  hike: { icon: 'hike', badge: 'bg-pine-100 text-pine-800 dark:bg-pine-900/80 dark:text-pine-300', solid: 'bg-pine-500' },
   climb: { icon: 'climb', badge: 'bg-sky-100 text-sky-800', solid: 'bg-sky-500' },
   cycle: { icon: 'cycle', badge: 'bg-amber-100 text-amber-800', solid: 'bg-amber-500' },
   other: { icon: 'compass', badge: 'bg-stone-200 text-stone-700', solid: 'bg-stone-500' },

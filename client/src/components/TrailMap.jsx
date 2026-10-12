@@ -12,7 +12,7 @@ const iconCache = new Map();
 function numberIcon(number, active) {
   const key = `${number}:${active}`;
   if (!iconCache.has(key)) {
-    const colour = active ? 'bg-orange-600 ring-4 ring-orange-300' : 'bg-stone-800';
+    const colour = active ? 'bg-orange-600 ring-4 ring-orange-300' : 'bg-pine-800';
     iconCache.set(
       key,
       L.divIcon({
@@ -244,13 +244,13 @@ export default function TrailMap({
       </MapContainer>
 
       {hiddenNote && (
-        <p className="absolute top-3 left-14 z-[1000] rounded-lg bg-white/95 px-3 py-1.5 text-sm shadow-md">{hiddenNote}</p>
+        <p className="absolute top-3 left-14 z-[1000] rounded-lg bg-surface/95 px-3 py-1.5 text-sm shadow-md">{hiddenNote}</p>
       )}
       {playable && !follow && (
         <button
           type="button"
           onClick={() => onFollowChange?.(true)}
-          className="absolute right-3 bottom-6 z-[1000] rounded-lg bg-white px-3 py-1.5 text-sm font-semibold shadow-md hover:bg-stone-100"
+          className="absolute right-3 bottom-6 z-[1000] rounded-lg bg-surface px-3 py-1.5 text-sm font-semibold shadow-md hover:bg-stone-100"
         >
           Follow the video
         </button>

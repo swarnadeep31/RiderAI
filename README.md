@@ -32,6 +32,10 @@ that moment, and save the places to Google Maps, a GPS app or a printable trip s
   The same video is never analysed (or paid for) twice, and daily and monthly limits stop runaway bills.
 - **Take it with you:** an "Open in Google Maps" link for every key point, GPX and KML downloads (KML imports into
   Google My Maps), and a printable trip sheet you can save as a PDF.
+- **Day and night:** the site follows the device's light or dark setting. The switch is hidden in the scenery:
+  click the sun in the home page sky to watch it set (the moon and stars come out, campfires glow), and the moon to
+  bring the morning back. A small sun/moon in the footer does the same on every page. The choice is remembered, and
+  the printable trip sheet always stays light.
 - **Support the creator:** a button linking to the creator's Ko-fi, Buy Me a Coffee, Patreon or UPI page.
 
 ## Why it costs (almost) nothing to run
@@ -136,6 +140,7 @@ client/                  React website (Vite, Tailwind CSS, Leaflet)
       track.js             where the rider is at a given video time, and the part already covered
       exports.js           GPX/KML files and Google Maps / YouTube links
       time.js              12:30 <-> 750 seconds
+      theme.js             day/night mode: follows the device until the visitor clicks the sun or moon
     api.js               All calls to the server
     auth.jsx             Knows who is logged in, for every page (useAuth)
 server/                  Express API + MongoDB (Mongoose)

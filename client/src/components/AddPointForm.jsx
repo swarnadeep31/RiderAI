@@ -29,7 +29,7 @@ export default function AddPointForm({ currentTime, location, onSave, onCancel, 
 
   return (
     <form onSubmit={submit} className="card space-y-3 p-4">
-      <h3 className="text-lg font-bold text-pine-950">New key point</h3>
+      <h3 className="text-lg font-bold text-ink">New key point</h3>
       <p className="text-sm text-stone-600">
         {location
           ? `Location: ${location[0].toFixed(5)}, ${location[1].toFixed(5)}. Search or click the map to change it.`

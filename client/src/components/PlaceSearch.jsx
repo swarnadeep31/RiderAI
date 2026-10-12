@@ -60,7 +60,7 @@ export default function PlaceSearch({ onPick }) {
         <p className="text-sm text-stone-600">No places found. Try another spelling, or click the map instead.</p>
       )}
       {results?.length > 0 && (
-        <ul className="divide-y divide-stone-100 overflow-hidden rounded-xl border border-stone-200 bg-white">
+        <ul className="divide-y divide-stone-100 overflow-hidden rounded-xl border border-stone-200 bg-surface">
           {results.map((place) => (
             <li key={`${place.lat},${place.lng}`}>
               <button type="button" onClick={() => pick(place)} className="block w-full px-2 py-1.5 text-left hover:bg-orange-50">

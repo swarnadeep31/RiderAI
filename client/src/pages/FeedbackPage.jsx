@@ -27,7 +27,7 @@ export default function FeedbackPage() {
     return (
       <main className="mx-auto max-w-xl px-4 py-12 text-center">
         <CampScene className="mx-auto w-full max-w-sm drop-shadow-xl motion-safe:animate-fade-up" />
-        <h1 className="mt-8 text-4xl font-extrabold text-pine-950">Thank you!</h1>
+        <h1 className="mt-8 text-4xl font-extrabold text-ink">Thank you!</h1>
         <p className="mt-2 text-stone-600">
           Your feedback helps decide what TrailCast does next. We read every message by the campfire.
         </p>
@@ -41,7 +41,7 @@ export default function FeedbackPage() {
   return (
     <main className="mx-auto max-w-xl px-4 py-10">
       <div className="card p-6 motion-safe:animate-fade-up sm:p-8">
-        <h1 className="text-3xl font-extrabold text-pine-950">Tell us what you think</h1>
+        <h1 className="text-3xl font-extrabold text-ink">Tell us what you think</h1>
         <p className="mt-1 text-stone-600">
           What works, what's confusing, what videos or features you'd like to see next.
         </p>

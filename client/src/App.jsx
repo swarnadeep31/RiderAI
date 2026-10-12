@@ -2,7 +2,9 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Link, Outlet, Route, Routes, useLocation } from 'react-router';
 import { AuthProvider, useAuth } from './auth.jsx';
 import RequireAuth from './components/RequireAuth.jsx';
+import Icon from './components/art/Icon.jsx';
 import { CampScene, FooterCamp, FooterRidge, LogoMark } from './components/art/Scenery.jsx';
+import { toggleTheme, useTheme } from './lib/theme.js';
 import AccountPage from './pages/AccountPage.jsx';
 import FeedbackPage from './pages/FeedbackPage.jsx';
 import HomePage from './pages/HomePage.jsx';
@@ -16,7 +18,7 @@ const TrailPage = lazy(() => import('./pages/TrailPage.jsx'));
 const PrintPage = lazy(() => import('./pages/PrintPage.jsx'));
 
 function PageLoading() {
-  return <p className="px-4 py-16 text-center font-semibold text-pine-700">Loading...</p>;
+  return <p className="px-4 py-16 text-center font-semibold text-pine-700 dark:text-pine-300">Loading...</p>;
 }
 
 function HeaderLinks() {
@@ -57,6 +59,23 @@ function HeaderLinks() {
   );
 }
 
+// The small day/night switch tucked into the footer (the big one is the sun on the home page).
+function DayNightSwitch() {
+  const night = useTheme() === 'dark';
+  const label = night ? 'Switch to day mode' : 'Switch to night mode';
+  return (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      aria-label={label}
+      title={night ? 'Bring back the morning' : 'Watch the sunset'}
+      className="flex h-8 w-8 items-center justify-center rounded-full text-pine-300 transition hover:rotate-12 hover:bg-white/10 hover:text-amber-300 focus-visible:ring-4 focus-visible:ring-amber-300/40 focus-visible:outline-none"
+    >
+      <Icon name={night ? 'sun' : 'moon'} className="h-4 w-4" />
+    </button>
+  );
+}
+
 function Layout() {
   return (
     <div className="flex min-h-screen flex-col">
@@ -64,7 +83,7 @@ function Layout() {
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2.5">
           <Link to="/" className="group flex items-center gap-2.5">
             <LogoMark className="h-9 w-9 transition group-hover:-rotate-6" />
-            <span className="font-display text-xl font-extrabold tracking-tight text-pine-900">
+            <span className="font-display text-xl font-extrabold tracking-tight text-ink">
               Trail<span className="text-orange-600">Cast</span>
             </span>
           </Link>
@@ -87,7 +106,7 @@ function Layout() {
               Made for people who&apos;d rather be outside. Videos stay on YouTube; maps by OpenStreetMap contributors.
             </p>
           </div>
-          <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold">
+          <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-semibold">
             <Link to="/" className="hover:text-white">
               Explore trails
             </Link>
@@ -97,6 +116,7 @@ function Layout() {
             <Link to="/feedback" className="text-amber-300 hover:text-amber-200">
               Send feedback
             </Link>
+            <DayNightSwitch />
           </nav>
         </div>
       </footer>
@@ -108,7 +128,7 @@ function NotFound() {
   return (
     <main className="mx-auto max-w-xl px-4 py-16 text-center">
       <CampScene className="mx-auto w-full max-w-sm drop-shadow-xl" />
-      <h1 className="mt-8 text-3xl font-extrabold text-pine-900">This trail doesn&apos;t exist (yet)</h1>
+      <h1 className="mt-8 text-3xl font-extrabold text-ink">This trail doesn&apos;t exist (yet)</h1>
       <p className="mt-2 text-stone-600">Looks like we wandered off the map. Let&apos;s head back to camp.</p>
       <Link to="/" className="btn-primary mt-6">
         Back to all trails

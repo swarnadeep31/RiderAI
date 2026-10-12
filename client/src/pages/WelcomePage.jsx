@@ -44,10 +44,10 @@ export default function WelcomePage() {
   return (
     <main className="mx-auto max-w-2xl px-4 py-10">
       <div className="card overflow-hidden motion-safe:animate-fade-up">
-        <div className="flex flex-col items-center gap-5 bg-linear-to-b from-orange-50 to-white px-6 pt-8 pb-2 text-center sm:flex-row sm:text-left">
+        <div className="flex flex-col items-center gap-5 bg-linear-to-b from-orange-50 to-surface px-6 pt-8 pb-2 text-center sm:flex-row sm:text-left">
           <CampScene className="w-40 shrink-0 drop-shadow-lg" />
           <div>
-            <h1 className="text-3xl font-extrabold text-pine-950">Welcome to TrailCast, @{user.username}!</h1>
+            <h1 className="text-3xl font-extrabold text-ink">Welcome to TrailCast, @{user.username}!</h1>
             <p className="mt-1 text-stone-600">
               Pull up a log by the fire. A few quick questions so we can make TrailCast better for you.
             </p>
@@ -56,7 +56,7 @@ export default function WelcomePage() {
 
         <form onSubmit={submit} className="space-y-8 p-6 sm:p-8">
           <fieldset>
-            <legend className="font-display text-lg font-bold text-pine-950">What will you use TrailCast for?</legend>
+            <legend className="font-display text-lg font-bold text-ink">What will you use TrailCast for?</legend>
             <p className="text-sm text-stone-500">Pick as many as you like.</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {Object.entries(INTERESTS).map(([value, label]) => (
@@ -67,7 +67,7 @@ export default function WelcomePage() {
                     onChange={() => toggleInterest(value)}
                     className="peer sr-only"
                   />
-                  <span className="inline-flex items-center gap-2 rounded-full border-2 border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition select-none hover:-translate-y-0.5 hover:border-orange-300 peer-checked:border-orange-600 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:shadow-md peer-checked:shadow-orange-600/30 peer-focus-visible:ring-4 peer-focus-visible:ring-orange-200">
+                  <span className="inline-flex items-center gap-2 rounded-full border-2 border-stone-200 bg-surface px-4 py-2 text-sm font-semibold text-stone-700 transition select-none hover:-translate-y-0.5 hover:border-orange-300 peer-checked:border-orange-600 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:shadow-md peer-checked:shadow-orange-600/30 peer-focus-visible:ring-4 peer-focus-visible:ring-orange-200">
                     <Icon name={INTEREST_ICON[value]} className="h-4 w-4" />
                     {label}
                   </span>
@@ -77,7 +77,7 @@ export default function WelcomePage() {
           </fieldset>
 
           <label className="block">
-            <span className="font-display text-lg font-bold text-pine-950">How did you hear about TrailCast?</span>{' '}
+            <span className="font-display text-lg font-bold text-ink">How did you hear about TrailCast?</span>{' '}
             <span className="text-sm text-stone-500">(optional)</span>
             <select value={referralSource} onChange={(e) => setReferralSource(e.target.value)} className="input mt-2">
               <option value="">Choose one</option>
@@ -90,7 +90,7 @@ export default function WelcomePage() {
           </label>
 
           <label className="block">
-            <span className="font-display text-lg font-bold text-pine-950">
+            <span className="font-display text-lg font-bold text-ink">
               What kind of videos or routes would you like to see here?
             </span>{' '}
             <span className="text-sm text-stone-500">(optional)</span>

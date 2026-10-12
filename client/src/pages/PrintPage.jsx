@@ -16,6 +16,16 @@ export default function PrintPage() {
     api.getTrail(id).then(setTrail, (err) => setError(err.message));
   }, [id]);
 
+  // The trip sheet is for paper, so it stays light even at night.
+  useEffect(() => {
+    const root = document.documentElement;
+    const wasDark = root.classList.contains('dark');
+    root.classList.remove('dark');
+    return () => {
+      if (wasDark) root.classList.add('dark');
+    };
+  }, []);
+
   if (error) return <ErrorMessage>{error}</ErrorMessage>;
   if (!trail) return <p className="p-8 text-stone-500">Loading...</p>;
 

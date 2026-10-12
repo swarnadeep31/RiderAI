@@ -17,16 +17,16 @@ export default function AccountPage() {
       <section className="card overflow-hidden motion-safe:animate-fade-up">
         <div className="h-24 bg-linear-to-r from-sky-200 via-orange-100 to-amber-200" />
         <div className="-mt-12 px-6 pb-6">
-          <span className="flex h-24 w-24 items-center justify-center rounded-full border-4 border-white bg-pine-700 font-display text-4xl font-extrabold text-white uppercase shadow-lg">
+          <span className="flex h-24 w-24 items-center justify-center rounded-full border-4 border-surface bg-pine-700 font-display text-4xl font-extrabold text-white uppercase shadow-lg">
             {user.username[0]}
           </span>
-          <h1 className="mt-3 text-3xl font-extrabold text-pine-950">@{user.username}</h1>
+          <h1 className="mt-3 text-3xl font-extrabold text-ink">@{user.username}</h1>
           <p className="text-stone-600">{user.email}</p>
         </div>
       </section>
 
       <section className="card p-6">
-        <h2 className="text-lg font-bold text-pine-950">You use TrailCast for</h2>
+        <h2 className="text-lg font-bold text-ink">You use TrailCast for</h2>
         {user.interests.length > 0 ? (
           <>
             <p className="sr-only">{user.interests.map((i) => INTERESTS[i]).join(', ')}</p>

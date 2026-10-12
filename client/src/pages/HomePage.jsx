@@ -27,13 +27,13 @@ const STEPS = [
     icon: 'route',
     title: 'Put the route on the map',
     text: 'Upload the GPS file, let AI spot the places in the video, or tap them on the map yourself.',
-    colour: 'bg-violet-100 text-violet-700',
+    colour: 'bg-violet-100 text-violet-800',
   },
   {
     icon: 'pin',
     title: 'Everyone rides along',
     text: 'Viewers see where you are at every moment, and save your stops to Google Maps, a GPS or a trip sheet.',
-    colour: 'bg-pine-100 text-pine-700',
+    colour: 'bg-pine-100 text-pine-700 dark:bg-pine-900/70 dark:text-pine-300',
   },
 ];
 
@@ -45,7 +45,7 @@ function TrailCard({ trail, index }) {
         to={`/trails/${trail._id}`}
         className="card group block h-full overflow-hidden p-2 transition duration-300 hover:-translate-y-1.5 hover:shadow-[0_20px_40px_-16px_rgb(21_57_46/0.35)]"
       >
-        <div className="relative overflow-hidden rounded-2xl bg-pine-100">
+        <div className="relative overflow-hidden rounded-2xl bg-pine-100 dark:bg-pine-900">
           <img
             src={`https://i.ytimg.com/vi/${trail.youtubeId}/hqdefault.jpg`}
             alt=""
@@ -64,7 +64,7 @@ function TrailCard({ trail, index }) {
           )}
         </div>
         <div className="px-2 pt-3 pb-2">
-          <h2 className="text-lg leading-snug font-bold text-pine-950 group-hover:text-orange-700">{trail.title}</h2>
+          <h2 className="text-lg leading-snug font-bold text-ink group-hover:text-orange-700">{trail.title}</h2>
           <p className="mt-1 flex items-center gap-1.5 text-sm text-stone-500">
             <Icon name="pin" className="h-4 w-4 shrink-0 text-orange-500" />
             <span>
@@ -106,17 +106,16 @@ export default function HomePage() {
   return (
     <main>
       {/* Hero: the landscape fills the background on wide screens and sits under the text on phones. */}
-      <section
-        className="relative overflow-hidden lg:min-h-[760px]"
-        style={{ background: 'linear-gradient(180deg, #bfe3f5 0%, #dcf0f7 38%, #fdebd3 78%, #fbdcb6 100%)' }}
-      >
-        <div className="relative z-10 mx-auto max-w-7xl px-4 pt-12 pb-6 sm:pt-16 lg:pt-20 lg:pb-60">
-          <div className="max-w-2xl">
+      <section className="relative overflow-hidden lg:min-h-[760px]" style={{ background: 'var(--sky-hero)' }}>
+        <div className="sky-night absolute inset-0" style={{ background: 'var(--sky-night)' }} aria-hidden="true" />
+        {/* The text column lets clicks through to the sun, which is the hidden day/night switch. */}
+        <div className="relative z-10 mx-auto max-w-7xl px-4 pt-12 pb-6 sm:pt-16 lg:pointer-events-none lg:pt-20 lg:pb-60">
+          <div className="max-w-2xl lg:pointer-events-auto">
             <p className="eyebrow motion-safe:animate-fade-up">
               <Icon name="globe" className="h-4 w-4 text-orange-600" /> For everyone who&apos;d rather be outside
             </p>
             <h1
-              className="mt-5 text-5xl leading-[0.95] font-extrabold text-pine-950 motion-safe:animate-fade-up sm:text-6xl lg:text-7xl"
+              className="mt-5 text-5xl leading-[0.95] font-extrabold text-ink motion-safe:animate-fade-up sm:text-6xl lg:text-7xl"
               style={{ animationDelay: '80ms' }}
             >
               Watch the adventure.{' '}
@@ -157,10 +156,10 @@ export default function HomePage() {
 
       {/* Who it's for */}
       <section className="border-b border-stone-900/5 bg-sand-100">
-        <ul className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-8 gap-y-3 px-4 py-6 text-sm font-semibold text-pine-800">
+        <ul className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-8 gap-y-3 px-4 py-6 text-sm font-semibold text-pine-800 dark:text-pine-300">
           {MADE_FOR.map(([icon, label]) => (
             <li key={label} className="flex items-center gap-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-orange-600 shadow-sm">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-surface text-orange-600 shadow-sm">
                 <Icon name={icon} />
               </span>
               {label}
@@ -171,9 +170,7 @@ export default function HomePage() {
 
       {/* How it works */}
       <section className="mx-auto max-w-7xl px-4 py-16">
-        <h2 className="text-center text-3xl font-extrabold text-pine-950 sm:text-4xl">
-          From video to trail map in minutes
-        </h2>
+        <h2 className="text-center text-3xl font-extrabold text-ink sm:text-4xl">From video to trail map in minutes</h2>
         <ol className="mt-10 grid gap-6 md:grid-cols-3">
           {STEPS.map((step, i) => (
             <li key={step.title} className="card relative p-6 text-center">
@@ -183,7 +180,7 @@ export default function HomePage() {
                 <Icon name={step.icon} className="h-8 w-8" />
               </span>
               <span className="absolute top-4 left-4 font-display text-sm font-extrabold text-stone-300">0{i + 1}</span>
-              <h3 className="mt-4 text-xl font-bold text-pine-950">{step.title}</h3>
+              <h3 className="mt-4 text-xl font-bold text-ink">{step.title}</h3>
               <p className="mt-2 text-stone-600">{step.text}</p>
             </li>
           ))}
@@ -194,7 +191,7 @@ export default function HomePage() {
       <section id="trails" className="mx-auto max-w-7xl scroll-mt-20 px-4">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="text-3xl font-extrabold text-pine-950 sm:text-4xl">Fresh from the trail</h2>
+            <h2 className="text-3xl font-extrabold text-ink sm:text-4xl">Fresh from the trail</h2>
             <p className="mt-1 text-stone-600">The latest rides, treks and climbs. Press play and follow along.</p>
           </div>
           {trails?.length > 0 && (
@@ -214,7 +211,7 @@ export default function HomePage() {
         {trails?.length === 0 && (
           <div className="card flex flex-col items-center px-6 py-12 text-center">
             <CampScene className="w-full max-w-xs" />
-            <p className="mt-6 font-display text-2xl font-bold text-pine-950">No trails yet.</p>
+            <p className="mt-6 font-display text-2xl font-bold text-ink">No trails yet.</p>
             <p className="mt-1 text-stone-600">The campfire&apos;s lit. Be the first to share an adventure.</p>
             <Link to="/new" className="btn-primary mt-5">
               Add the first one

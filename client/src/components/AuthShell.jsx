@@ -15,7 +15,7 @@ export default function AuthShell({ title, subtitle, children, footer }) {
       <div className="card self-center overflow-hidden motion-safe:animate-fade-up">
         <SummitScene className="h-28 w-full lg:hidden" />
         <div className="p-6 sm:p-10">
-          <h1 className="text-3xl font-extrabold text-pine-950">{title}</h1>
+          <h1 className="text-3xl font-extrabold text-ink">{title}</h1>
           {subtitle && <p className="mt-1.5 text-stone-600">{subtitle}</p>}
           {children}
           {footer && (

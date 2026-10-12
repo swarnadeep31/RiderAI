@@ -66,7 +66,7 @@ export default function TrailPage() {
   }
   if (!trail) {
     return (
-      <p className="flex items-center justify-center gap-2 px-4 py-16 font-semibold text-pine-700">
+      <p className="flex items-center justify-center gap-2 px-4 py-16 font-semibold text-pine-700 dark:text-pine-300">
         <Icon name="pin" className="h-6 w-6 text-orange-500 motion-safe:animate-bounce" /> Loading trail...
       </p>
     );
@@ -164,7 +164,7 @@ export default function TrailPage() {
         <div className="lg:col-start-1 lg:row-start-1">
           <div
             ref={video.containerRef}
-            className="aspect-video w-full overflow-hidden rounded-3xl bg-pine-950 shadow-xl ring-4 shadow-pine-900/25 ring-white"
+            className="aspect-video w-full overflow-hidden rounded-3xl bg-pine-950 shadow-xl ring-4 shadow-pine-900/25 ring-surface"
           />
           {video.error && (
             <div className="mt-2">
@@ -173,7 +173,7 @@ export default function TrailPage() {
           )}
         </div>
 
-        <div className="isolate h-[55vh] overflow-hidden rounded-3xl shadow-xl ring-4 shadow-pine-900/20 ring-white lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-[calc(100vh-7rem)] lg:self-start">
+        <div className="isolate h-[55vh] overflow-hidden rounded-3xl shadow-xl ring-4 shadow-pine-900/20 ring-surface lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-[calc(100vh-7rem)] lg:self-start">
           <TrailMap
             trailId={trail._id}
             track={trail.track}
@@ -200,7 +200,7 @@ export default function TrailPage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <ActivityBadge activity={trail.activity} />
-                <h1 className="mt-2 text-3xl leading-tight font-extrabold text-pine-950 sm:text-4xl">{trail.title}</h1>
+                <h1 className="mt-2 text-3xl leading-tight font-extrabold text-ink sm:text-4xl">{trail.title}</h1>
                 {trail.owner && (
                   <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-stone-600">
                     <span
@@ -213,7 +213,7 @@ export default function TrailPage() {
                   </p>
                 )}
                 {recorded && (
-                  <p className="badge mt-3 bg-pine-100 text-pine-800">
+                  <p className="badge mt-3 bg-pine-100 text-pine-800 dark:bg-pine-900/70 dark:text-pine-300">
                     <Icon name="satellite" className="h-3.5 w-3.5" />
                     Recorded GPS route
                   </p>
@@ -260,8 +260,8 @@ export default function TrailPage() {
           )}
 
           {editing && (
-            <section className="card space-y-5 border-2 border-orange-200 bg-linear-to-b from-orange-50 to-white p-5">
-              <h2 className="flex items-center gap-2 text-xl font-bold text-pine-950">
+            <section className="card space-y-5 border-2 border-orange-200 bg-linear-to-b from-orange-50 to-surface p-5">
+              <h2 className="flex items-center gap-2 text-xl font-bold text-ink">
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-600 text-white">
                   <Icon name="edit" className="h-4 w-4" />
                 </span>
@@ -350,7 +350,7 @@ export default function TrailPage() {
           )}
 
           <section className="space-y-3">
-            <h2 className="flex items-center gap-2 text-2xl font-extrabold text-pine-950">
+            <h2 className="flex items-center gap-2 text-2xl font-extrabold text-ink">
               <Icon name="pin" className="h-6 w-6 text-orange-500" /> Key points
             </h2>
             <KeyPointList
@@ -363,8 +363,8 @@ export default function TrailPage() {
           </section>
 
           {(trail.points.length > 0 || trail.track.length > 0) && (
-            <section className="card space-y-3 bg-linear-to-br from-white to-sky-50 p-5">
-              <h2 className="flex items-center gap-2 text-2xl font-extrabold text-pine-950">
+            <section className="card space-y-3 bg-linear-to-br from-surface to-sky-50 p-5">
+              <h2 className="flex items-center gap-2 text-2xl font-extrabold text-ink">
                 <Icon name="map" className="h-6 w-6 text-sky-600" /> Take this trail with you
               </h2>
               <SaveOptions trail={trail} />

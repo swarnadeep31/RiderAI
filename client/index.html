@@ -6,6 +6,17 @@
     <meta name="description" content="Adventure videos with the map beside them." />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>TrailCast</title>
+    <script>
+      // Day or night before the page draws, so it never flashes (see src/lib/theme.js).
+      // The trip sheet is for paper, so it stays light.
+      (function () {
+        try {
+          var saved = localStorage.getItem('trailcast-theme');
+          var dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (dark && !/\/print\/?$/.test(location.pathname)) document.documentElement.classList.add('dark');
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
