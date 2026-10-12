@@ -128,8 +128,9 @@ client/                  React website (Vite, Tailwind CSS, Leaflet)
     components/          Pieces used by the pages: the map (with the gliding marker), key point list,
                          add-point form, route panel, AI route panel (start, progress, review),
                          RequireAuth (makes a page logged-in only)
+      art/               The hand-drawn SVG illustrations (hero landscape, summit, campsite, logo) and icons
     hooks/               useYouTubePlayer: puts a YouTube player on the page and reports its time,
-                         with a clock the map reads 60 times a second
+                         with a clock the map reads 60 times a second; useReducedMotion
     lib/                 Plain functions, each with a .test.js next to it:
       gpx.js               read GPX files in the browser
       track.js             where the rider is at a given video time, and the part already covered

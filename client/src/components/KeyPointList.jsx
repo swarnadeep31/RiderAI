@@ -1,21 +1,28 @@
 import { googleMapsUrl } from '../lib/exports.js';
+import Icon from './art/Icon.jsx';
 import { formatTime } from '../lib/time.js';
 
 export default function KeyPointList({ points, activePointId, editing, onSelect, onDelete }) {
   if (points.length === 0) {
     return (
-      <p className="text-sm text-stone-500">
+      <p className="card flex items-center gap-3 p-5 text-sm text-stone-600">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-100 text-orange-600">
+          <Icon name="pin" />
+        </span>
         {editing ? 'No key points yet. Add the places you talk about in the video.' : 'No key points marked yet.'}
       </p>
     );
   }
 
   return (
-    <ol className="divide-y divide-stone-200 overflow-hidden rounded-xl border border-stone-200 bg-white">
+    <ol className="card divide-y divide-stone-100 overflow-hidden">
       {points.map((point, i) => {
         const active = point._id === activePointId;
         return (
-          <li key={point._id} className={`flex items-start gap-3 p-3 ${active ? 'bg-orange-50' : ''}`}>
+          <li
+            key={point._id}
+            className={`flex items-start gap-3 p-3.5 transition-colors ${active ? 'bg-orange-50' : 'hover:bg-sand-50'}`}
+          >
             <button
               type="button"
               onClick={() => onSelect(point)}
@@ -23,13 +30,13 @@ export default function KeyPointList({ points, activePointId, editing, onSelect,
               title="Jump to this moment"
             >
               <span
-                className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${active ? 'bg-orange-600' : 'bg-stone-800'}`}
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-display text-sm font-bold text-white shadow-sm transition ${active ? 'scale-110 bg-orange-600 ring-4 ring-orange-200' : 'bg-pine-800'}`}
               >
                 {i + 1}
               </span>
-              <span>
-                <span className="font-semibold">{point.name}</span>
-                <span className="ml-2 font-mono text-xs text-stone-500">
+              <span className="pt-1">
+                <span className="font-semibold text-pine-950">{point.name}</span>
+                <span className="ml-2 rounded-full bg-stone-100 px-2 py-0.5 font-mono text-xs text-stone-600">
                   {formatTime(point.time)}
                   {point.stayUntil ? `–${formatTime(point.stayUntil)}` : ''}
                 </span>
@@ -48,8 +55,9 @@ export default function KeyPointList({ points, activePointId, editing, onSelect,
               href={googleMapsUrl(point.lat, point.lng)}
               target="_blank"
               rel="noopener noreferrer"
-              className="shrink-0 text-sm font-medium text-orange-700 hover:underline"
+              className="flex shrink-0 items-center gap-1 pt-1 text-sm font-semibold text-orange-700 hover:underline"
             >
+              <Icon name="pin" className="h-4 w-4" />
               Google Maps ↗
             </a>
             {editing && (
@@ -57,7 +65,7 @@ export default function KeyPointList({ points, activePointId, editing, onSelect,
                 type="button"
                 onClick={() => onDelete(point)}
                 aria-label={`Delete ${point.name}`}
-                className="shrink-0 px-1 text-stone-400 hover:text-red-600"
+                className="shrink-0 px-1 pt-1 text-stone-400 hover:text-red-600"
               >
                 ✕
               </button>

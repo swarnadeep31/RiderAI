@@ -1,17 +1,23 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Link, Outlet, Route, Routes, useLocation } from 'react-router';
 import { AuthProvider, useAuth } from './auth.jsx';
 import RequireAuth from './components/RequireAuth.jsx';
+import { CampScene, FooterCamp, FooterRidge, LogoMark } from './components/art/Scenery.jsx';
 import AccountPage from './pages/AccountPage.jsx';
 import FeedbackPage from './pages/FeedbackPage.jsx';
 import HomePage from './pages/HomePage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import NewTrailPage from './pages/NewTrailPage.jsx';
-import PrintPage from './pages/PrintPage.jsx';
 import SignupPage from './pages/SignupPage.jsx';
-import TrailPage from './pages/TrailPage.jsx';
 import WelcomePage from './pages/WelcomePage.jsx';
 
-const buttonClass = 'whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-semibold';
+// The map library is big, so the pages with a map load when first opened.
+const TrailPage = lazy(() => import('./pages/TrailPage.jsx'));
+const PrintPage = lazy(() => import('./pages/PrintPage.jsx'));
+
+function PageLoading() {
+  return <p className="px-4 py-16 text-center font-semibold text-pine-700">Loading...</p>;
+}
 
 function HeaderLinks() {
   const { user, loading } = useAuth();
@@ -22,23 +28,30 @@ function HeaderLinks() {
     const onAuthPage = ['/login', '/signup'].includes(location.pathname);
     const next = onAuthPage ? location.search : `?next=${encodeURIComponent(location.pathname + location.search)}`;
     return (
-      <div className="flex items-center gap-2">
-        <Link to={`/login${next}`} className={`${buttonClass} hover:bg-stone-100`}>
+      <div className="flex items-center gap-1.5 sm:gap-2">
+        <Link to={`/login${next}`} className="btn-ghost">
           Log in
         </Link>
-        <Link to={`/signup${next}`} className={`${buttonClass} bg-orange-600 text-white hover:bg-orange-700`}>
+        <Link to={`/signup${next}`} className="btn-primary">
           Sign up
         </Link>
       </div>
     );
   }
   return (
-    <div className="flex items-center gap-2">
-      <Link to="/new" className={`${buttonClass} bg-orange-600 text-white hover:bg-orange-700`}>
+    <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+      <Link to="/new" className="btn-primary">
         + New trail
       </Link>
-      <Link to="/account" className={`${buttonClass} max-w-28 truncate hover:bg-stone-100 sm:max-w-48`}>
-        @{user.username}
+      <Link to="/account" className="btn-ghost min-w-0 gap-2 px-1.5 sm:max-w-52 sm:pr-4">
+        <span
+          aria-hidden="true"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-pine-700 font-display text-sm text-white uppercase"
+        >
+          {user.username[0]}
+        </span>
+        {/* Phones show just the round letter; screen readers still hear the username. */}
+        <span className="sr-only sm:not-sr-only sm:truncate">@{user.username}</span>
       </Link>
     </div>
   );
@@ -46,12 +59,14 @@ function HeaderLinks() {
 
 function Layout() {
   return (
-    <div className="flex min-h-screen flex-col bg-stone-50 text-stone-900">
-      <header className="border-b border-stone-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
-          <Link to="/" className="flex items-center gap-2 text-lg font-bold tracking-tight">
-            <img src="/favicon.svg" alt="" className="h-7 w-7" />
-            TrailCast
+    <div className="flex min-h-screen flex-col">
+      <header className="sticky top-0 z-[1100] border-b border-stone-900/5 bg-sand-100/85 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2.5">
+          <Link to="/" className="group flex items-center gap-2.5">
+            <LogoMark className="h-9 w-9 transition group-hover:-rotate-6" />
+            <span className="font-display text-xl font-extrabold tracking-tight text-pine-900">
+              Trail<span className="text-orange-600">Cast</span>
+            </span>
           </Link>
           <HeaderLinks />
         </div>
@@ -59,10 +74,31 @@ function Layout() {
       <div className="flex-1">
         <Outlet />
       </div>
-      <footer className="border-t border-stone-200 py-4 text-center text-sm text-stone-500">
-        <Link to="/feedback" className="underline hover:text-stone-800">
-          Send feedback
-        </Link>
+      <footer className="relative mt-24 bg-pine-900 text-pine-100">
+        <FooterRidge className="absolute bottom-full left-0 h-16 w-full sm:h-24" />
+        <FooterCamp className="absolute right-[6%] bottom-full h-14 sm:h-20" />
+        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-10 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <Link to="/" className="flex items-center gap-2.5">
+              <LogoMark className="h-8 w-8" />
+              <span className="font-display text-lg font-extrabold text-white">TrailCast</span>
+            </Link>
+            <p className="mt-2 max-w-sm text-sm text-pine-200">
+              Made for people who&apos;d rather be outside. Videos stay on YouTube; maps by OpenStreetMap contributors.
+            </p>
+          </div>
+          <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold">
+            <Link to="/" className="hover:text-white">
+              Explore trails
+            </Link>
+            <Link to="/new" className="hover:text-white">
+              Share a trip
+            </Link>
+            <Link to="/feedback" className="text-amber-300 hover:text-amber-200">
+              Send feedback
+            </Link>
+          </nav>
+        </div>
       </footer>
     </div>
   );
@@ -70,9 +106,11 @@ function Layout() {
 
 function NotFound() {
   return (
-    <main className="mx-auto max-w-7xl px-4 py-16 text-center">
-      <h1 className="text-2xl font-bold">Page not found</h1>
-      <Link to="/" className="mt-4 inline-block text-orange-700 underline">
+    <main className="mx-auto max-w-xl px-4 py-16 text-center">
+      <CampScene className="mx-auto w-full max-w-sm drop-shadow-xl" />
+      <h1 className="mt-8 text-3xl font-extrabold text-pine-900">This trail doesn&apos;t exist (yet)</h1>
+      <p className="mt-2 text-stone-600">Looks like we wandered off the map. Let&apos;s head back to camp.</p>
+      <Link to="/" className="btn-primary mt-6">
         Back to all trails
       </Link>
     </main>
@@ -120,10 +158,24 @@ export default function App() {
                 </RequireAuth>
               }
             />
-            <Route path="trails/:id" element={<TrailPage />} />
+            <Route
+              path="trails/:id"
+              element={
+                <Suspense fallback={<PageLoading />}>
+                  <TrailPage />
+                </Suspense>
+              }
+            />
             <Route path="*" element={<NotFound />} />
           </Route>
-          <Route path="trails/:id/print" element={<PrintPage />} />
+          <Route
+            path="trails/:id/print"
+            element={
+              <Suspense fallback={<PageLoading />}>
+                <PrintPage />
+              </Suspense>
+            }
+          />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router';
 import { useAuth } from '../auth.jsx';
+import AuthShell from '../components/AuthShell.jsx';
 import ErrorMessage from '../components/ErrorMessage.jsx';
 import { safeNext } from '../lib/redirect.js';
 
-const inputClass = 'mt-1 block w-full rounded-md border border-stone-300 bg-white px-3 py-2';
+const labelClass = 'block text-sm font-semibold text-stone-800';
 
 export default function SignupPage() {
   const { user, signup } = useAuth();
@@ -32,12 +33,20 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="mx-auto max-w-md px-4 py-10">
-      <h1 className="text-2xl font-bold">Create your TrailCast account</h1>
-      <p className="mt-1 text-stone-600">Share your rides and treks with the map beside them.</p>
-
+    <AuthShell
+      title="Create your TrailCast account"
+      subtitle="Share your rides and treks with the map beside them. It's free."
+      footer={
+        <>
+          Already have an account?{' '}
+          <Link to={`/login?next=${encodeURIComponent(next)}`} className="font-semibold text-orange-700 underline">
+            Log in
+          </Link>
+        </>
+      }
+    >
       <form onSubmit={submit} className="mt-6 space-y-4">
-        <label className="block font-medium">
+        <label className={labelClass}>
           Email
           <input
             type="email"
@@ -45,10 +54,10 @@ export default function SignupPage() {
             autoComplete="email"
             value={form.email}
             onChange={update('email')}
-            className={inputClass}
+            className="input"
           />
         </label>
-        <label className="block font-medium">
+        <label className={labelClass}>
           Username
           <input
             required
@@ -59,13 +68,13 @@ export default function SignupPage() {
             value={form.username}
             onChange={update('username')}
             placeholder="mountain_rider"
-            className={inputClass}
+            className="input"
           />
           <span className="mt-1 block text-sm font-normal text-stone-500">
             3 to 30 letters, numbers or _. Shown on the trails you add.
           </span>
         </label>
-        <label className="block font-medium">
+        <label className={labelClass}>
           Password
           <input
             type="password"
@@ -74,27 +83,16 @@ export default function SignupPage() {
             autoComplete="new-password"
             value={form.password}
             onChange={update('password')}
-            className={inputClass}
+            className="input"
           />
           <span className="mt-1 block text-sm font-normal text-stone-500">At least 8 characters.</span>
         </label>
 
         {error && <ErrorMessage>{error}</ErrorMessage>}
-        <button
-          type="submit"
-          disabled={saving}
-          className="w-full rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
-        >
+        <button type="submit" disabled={saving} className="btn-primary w-full py-3 text-base">
           {saving ? 'Creating your account...' : 'Sign up'}
         </button>
       </form>
-
-      <p className="mt-6 text-center text-sm text-stone-600">
-        Already have an account?{' '}
-        <Link to={`/login?next=${encodeURIComponent(next)}`} className="font-semibold text-orange-700 underline">
-          Log in
-        </Link>
-      </p>
-    </main>
+    </AuthShell>
   );
 }

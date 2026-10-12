@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { formatTime, parseTime } from '../lib/time.js';
+import Icon from './art/Icon.jsx';
 import ErrorMessage from './ErrorMessage.jsx';
 import PlaceSearch from './PlaceSearch.jsx';
 
@@ -138,7 +139,7 @@ function HiddenRangeRow({ range, onChange, onRemove }) {
         value={range.reason}
         onChange={(e) => onChange({ reason: e.target.value })}
         aria-label="Why this part is skipped"
-        className="rounded-md border border-stone-300 bg-white px-1 py-0.5"
+        className="field px-2 py-1"
       >
         {Object.entries(HIDDEN_REASONS).map(([value, label]) => (
           <option key={value} value={value}>
@@ -146,9 +147,9 @@ function HiddenRangeRow({ range, onChange, onRemove }) {
           </option>
         ))}
       </select>
-      <input value={start} onChange={(e) => setStart(e.target.value)} onBlur={commit} aria-label="Skip from" className="w-20 rounded-md border border-stone-300 px-1 py-0.5 font-mono" />
+      <input value={start} onChange={(e) => setStart(e.target.value)} onBlur={commit} aria-label="Skip from" className="field w-20 px-2 py-1 font-mono" />
       to
-      <input value={end} onChange={(e) => setEnd(e.target.value)} onBlur={commit} aria-label="Skip until" className="w-20 rounded-md border border-stone-300 px-1 py-0.5 font-mono" />
+      <input value={end} onChange={(e) => setEnd(e.target.value)} onBlur={commit} aria-label="Skip until" className="field w-20 px-2 py-1 font-mono" />
       <button type="button" onClick={onRemove} aria-label="Stop skipping this part" className="px-1 text-stone-400 hover:text-red-600">
         ✕
       </button>
@@ -252,7 +253,9 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
 
   return (
     <div className="space-y-2 text-sm">
-      <h3 className="font-semibold">Let AI find the places in the video</h3>
+      <h3 className="flex items-center gap-1.5 font-display text-base font-bold text-violet-900">
+        <Icon name="sparkles" className="h-4 w-4" /> Let AI find the places in the video
+      </h3>
       {!available && (
         <p className="text-stone-600">
           This server has no Gemini key yet (GEMINI_API_KEY in server/.env), so the AI route builder is off.
@@ -293,8 +296,8 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
             disabled={busy}
             className={
               job?.state === 'accepted'
-                ? 'rounded-lg border border-stone-300 bg-white px-3 py-1.5 font-medium hover:bg-stone-100 disabled:opacity-50'
-                : 'rounded-lg bg-violet-700 px-3 py-1.5 font-semibold text-white hover:bg-violet-800 disabled:opacity-50'
+                ? 'btn-secondary'
+                : 'btn-ai'
             }
           >
             {busy ? 'Starting...' : job?.state === 'accepted' ? 'Analyse the video again' : 'Build the route with AI'}
@@ -303,7 +306,7 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
       )}
 
       {running && (
-        <div className="space-y-2 rounded-lg bg-white p-3">
+        <div className="card space-y-2 p-4">
           <p className="font-medium">
             {job.state === 'queued' ? 'Waiting to start...' : `${STAGES[job.stage]}...`}
             {job.state === 'running' && job.progress?.total > 1 && (
@@ -320,7 +323,7 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
       )}
 
       {reviewing && (
-        <div className="space-y-3 rounded-lg bg-white p-3">
+        <div className="card space-y-3 p-4">
           <div>
             <p className="font-medium">
               Check the places the AI found{job.videoTitle && <> in “{job.videoTitle}”</>}
@@ -337,7 +340,7 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
           {places.length === 0 ? (
             <p className="text-stone-600">The AI found no places in this video. Add key points by hand instead.</p>
           ) : (
-            <ol className="max-h-[28rem] divide-y divide-stone-200 overflow-y-auto rounded-md border border-stone-200">
+            <ol className="max-h-[28rem] divide-y divide-stone-100 overflow-y-auto rounded-xl border border-stone-200">
               {places.map((place) => (
                 <CandidateRow key={place.id} place={place} onChange={(changes) => updatePlace(place.id, changes)} onSeek={onSeek} />
               ))}
@@ -367,7 +370,7 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
               type="button"
               onClick={accept}
               disabled={busy || tickedCount < 2}
-              className="rounded-lg bg-violet-700 px-3 py-1.5 font-semibold text-white hover:bg-violet-800 disabled:opacity-50"
+              className="btn-ai"
             >
               {busy ? 'Drawing the route...' : `Use ${tickedCount} places and draw the route`}
             </button>

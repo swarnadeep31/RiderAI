@@ -44,13 +44,13 @@ export default function PlaceSearch({ onPick }) {
           }}
           placeholder="Search for a place, e.g. Rohtang Pass"
           aria-label="Search for a place"
-          className="min-w-0 flex-1 rounded-md border border-stone-300 px-2 py-1"
+          className="field min-w-0 flex-1"
         />
         <button
           type="button"
           onClick={search}
           disabled={searching || query.trim().length < 2}
-          className="rounded-md border border-stone-300 px-3 py-1 text-sm font-medium hover:bg-stone-100 disabled:opacity-50"
+          className="btn-secondary py-1.5"
         >
           {searching ? 'Searching...' : 'Search'}
         </button>
@@ -60,7 +60,7 @@ export default function PlaceSearch({ onPick }) {
         <p className="text-sm text-stone-600">No places found. Try another spelling, or click the map instead.</p>
       )}
       {results?.length > 0 && (
-        <ul className="divide-y divide-stone-200 rounded-md border border-stone-200">
+        <ul className="divide-y divide-stone-100 overflow-hidden rounded-xl border border-stone-200 bg-white">
           {results.map((place) => (
             <li key={`${place.lat},${place.lng}`}>
               <button type="button" onClick={() => pick(place)} className="block w-full px-2 py-1.5 text-left hover:bg-orange-50">

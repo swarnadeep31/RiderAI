@@ -1,5 +1,220 @@
 @import 'tailwindcss';
 
+/* TrailCast's look: warm sand paper, pine forests, sunset orange and a morning sky. */
+@theme {
+  --font-sans: 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque Variable', ui-sans-serif, system-ui, sans-serif;
+
+  --color-pine-50: #eff8f3;
+  --color-pine-100: #d8eee2;
+  --color-pine-200: #b3dcc7;
+  --color-pine-300: #84c3a5;
+  --color-pine-400: #52a37f;
+  --color-pine-500: #318764;
+  --color-pine-600: #236c50;
+  --color-pine-700: #1d5642;
+  --color-pine-800: #194536;
+  --color-pine-900: #15392e;
+  --color-pine-950: #0b201a;
+
+  --color-sand-50: #fdfbf7;
+  --color-sand-100: #fbf6ec;
+  --color-sand-200: #f4e8d2;
+  --color-sand-300: #e9d4ae;
+
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-glow: glow 7s ease-in-out infinite;
+  --animate-fade-up: fade-up 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-pop: pop 0.6s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+  --animate-flutter: flutter 1.6s ease-in-out infinite;
+  --animate-flicker: flicker 0.9s ease-in-out infinite alternate;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-wiggle: wiggle 2.4s ease-in-out infinite;
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+  @keyframes glow {
+    0%,
+    100% {
+      opacity: 0.5;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.9;
+      transform: scale(1.08);
+    }
+  }
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes pop {
+    0% {
+      opacity: 0;
+      transform: translateY(12px) scale(0.4);
+    }
+    100% {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes flutter {
+    0%,
+    100% {
+      transform: skewY(0deg) scaleX(1);
+    }
+    50% {
+      transform: skewY(-10deg) scaleX(0.85);
+    }
+  }
+  @keyframes flicker {
+    from {
+      transform: scaleY(0.85) scaleX(1.05);
+      opacity: 0.85;
+    }
+    to {
+      transform: scaleY(1.12) scaleX(0.95);
+      opacity: 1;
+    }
+  }
+  @keyframes shimmer {
+    from {
+      background-position: -400px 0;
+    }
+    to {
+      background-position: 400px 0;
+    }
+  }
+  @keyframes wiggle {
+    0%,
+    100% {
+      transform: rotate(-6deg);
+    }
+    50% {
+      transform: rotate(6deg);
+    }
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-sand-100 font-sans text-stone-900 antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-display tracking-tight;
+  }
+  ::selection {
+    @apply bg-orange-200 text-stone-900;
+  }
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold whitespace-nowrap transition duration-200 focus-visible:ring-4 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50;
+}
+@utility btn-primary {
+  @apply btn bg-orange-600 text-white shadow-md shadow-orange-600/25 hover:-translate-y-0.5 hover:bg-orange-500 hover:shadow-lg hover:shadow-orange-600/30 focus-visible:ring-orange-300;
+}
+@utility btn-secondary {
+  @apply btn border border-stone-300 bg-white text-stone-800 hover:-translate-y-0.5 hover:border-stone-400 hover:shadow-md focus-visible:ring-stone-300;
+}
+@utility btn-ghost {
+  @apply btn text-stone-700 hover:bg-stone-900/5 focus-visible:ring-stone-300;
+}
+@utility btn-ai {
+  @apply btn bg-violet-700 text-white shadow-md shadow-violet-700/25 hover:-translate-y-0.5 hover:bg-violet-600 focus-visible:ring-violet-300;
+}
+@utility card {
+  @apply rounded-3xl border border-stone-900/5 bg-white shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_24px_-12px_rgb(21_57_46/0.18)];
+}
+@utility input {
+  @apply mt-1.5 block w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 font-normal text-stone-900 transition placeholder:text-stone-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-200 focus:outline-none;
+}
+/* A compact text box, for forms inside panels. */
+@utility field {
+  @apply rounded-xl border border-stone-300 bg-white px-3 py-1.5 text-stone-900 transition placeholder:text-stone-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-200 focus:outline-none;
+}
+@utility eyebrow {
+  @apply inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs font-bold tracking-wide text-pine-700 uppercase shadow-sm ring-1 ring-pine-900/10 backdrop-blur;
+}
+@utility badge {
+  @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+}
+@utility skeleton {
+  @apply motion-safe:animate-shimmer;
+  background: linear-gradient(90deg, #f1e9da 0px, #faf4ea 160px, #f1e9da 320px);
+  background-size: 800px 100%;
+}
+/* SVG parts that scale or turn around their own middle (sun, flames, flags). */
+@utility svg-center {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@utility svg-bottom {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+@utility svg-left {
+  transform-box: fill-box;
+  transform-origin: 0% 50%;
+}
+
+/* Clouds sail across the hero sky. */
+@keyframes cloud-drift {
+  from {
+    transform: translateX(-360px);
+  }
+  to {
+    transform: translateX(1800px);
+  }
+}
+@keyframes route-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes bird-flap {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.4);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cloud {
+    animation: cloud-drift var(--duration, 90s) linear infinite;
+    animation-delay: var(--delay, 0s);
+  }
+  .route-draw {
+    stroke-dasharray: 1;
+    animation: route-draw 3.2s 0.4s cubic-bezier(0.5, 0, 0.3, 1) both;
+  }
+  .bird {
+    animation: bird-flap 0.9s ease-in-out infinite;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+}
+
 @media print {
   .no-print {
     display: none !important;

@@ -2,15 +2,17 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { api } from '../api.js';
 import { useAuth } from '../auth.jsx';
+import ActivityBadge from '../components/ActivityBadge.jsx';
 import AddPointForm from '../components/AddPointForm.jsx';
 import AiRoutePanel, { HIDDEN_REASONS } from '../components/AiRoutePanel.jsx';
+import Icon from '../components/art/Icon.jsx';
+import { CampScene } from '../components/art/Scenery.jsx';
 import ErrorMessage from '../components/ErrorMessage.jsx';
 import KeyPointList from '../components/KeyPointList.jsx';
 import RoutePanel from '../components/RoutePanel.jsx';
 import SaveOptions from '../components/SaveOptions.jsx';
 import TrailMap from '../components/TrailMap.jsx';
 import { useYouTubePlayer } from '../hooks/useYouTubePlayer.js';
-import { ACTIVITIES } from '../lib/activities.js';
 import { hiddenRangeAt, isGpxRoute, nearestIndex, positionAt } from '../lib/track.js';
 import { formatTime } from '../lib/time.js';
 
@@ -53,15 +55,22 @@ export default function TrailPage() {
 
   if (loadError) {
     return (
-      <main className="mx-auto max-w-7xl space-y-4 px-4 py-8">
+      <main className="mx-auto max-w-xl space-y-6 px-4 py-12 text-center">
+        <CampScene className="mx-auto w-full max-w-sm drop-shadow-xl" />
         <ErrorMessage>{loadError}</ErrorMessage>
-        <Link to="/" className="text-orange-700 underline">
+        <Link to="/" className="btn-primary">
           Back to all trails
         </Link>
       </main>
     );
   }
-  if (!trail) return <p className="px-4 py-8 text-stone-500">Loading trail...</p>;
+  if (!trail) {
+    return (
+      <p className="flex items-center justify-center gap-2 px-4 py-16 font-semibold text-pine-700">
+        <Icon name="pin" className="h-6 w-6 text-orange-500 motion-safe:animate-bounce" /> Loading trail...
+      </p>
+    );
+  }
 
   // Only the person who added the trail sees the Edit button and the creator tools.
   const isOwner = Boolean(user && trail.owner?._id === user._id);
@@ -153,7 +162,10 @@ export default function TrailPage() {
       {/* Phones: video, map, details. Wide screens: video and details on the left, map on the right. */}
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="lg:col-start-1 lg:row-start-1">
-          <div ref={video.containerRef} className="aspect-video w-full overflow-hidden rounded-xl bg-black" />
+          <div
+            ref={video.containerRef}
+            className="aspect-video w-full overflow-hidden rounded-3xl bg-pine-950 shadow-xl ring-4 shadow-pine-900/25 ring-white"
+          />
           {video.error && (
             <div className="mt-2">
               <ErrorMessage>{video.error}</ErrorMessage>
@@ -161,7 +173,7 @@ export default function TrailPage() {
           )}
         </div>
 
-        <div className="h-[55vh] overflow-hidden rounded-xl border border-stone-200 lg:sticky lg:top-4 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-[calc(100vh-6rem)] lg:self-start">
+        <div className="isolate h-[55vh] overflow-hidden rounded-3xl shadow-xl ring-4 shadow-pine-900/20 ring-white lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-[calc(100vh-7rem)] lg:self-start">
           <TrailMap
             trailId={trail._id}
             track={trail.track}
@@ -186,33 +198,38 @@ export default function TrailPage() {
         <div className="space-y-6 lg:col-start-1 lg:row-start-2">
           <section>
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h1 className="text-2xl font-bold">{trail.title}</h1>
-                <p className="text-sm text-stone-500">
-                  {ACTIVITIES[trail.activity]}
-                  {trail.owner && ` · by @${trail.owner.username}`}
-                </p>
+              <div className="min-w-0">
+                <ActivityBadge activity={trail.activity} />
+                <h1 className="mt-2 text-3xl leading-tight font-extrabold text-pine-950 sm:text-4xl">{trail.title}</h1>
+                {trail.owner && (
+                  <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-stone-600">
+                    <span
+                      aria-hidden="true"
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-pine-700 font-display text-xs text-white uppercase"
+                    >
+                      {trail.owner.username[0]}
+                    </span>
+                    <span>by @{trail.owner.username}</span>
+                  </p>
+                )}
                 {recorded && (
-                  <p className="mt-1 inline-block rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-800">
+                  <p className="badge mt-3 bg-pine-100 text-pine-800">
+                    <Icon name="satellite" className="h-3.5 w-3.5" />
                     Recorded GPS route
                   </p>
                 )}
                 {drawnRoute && (
-                  <p className="mt-1 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+                  <p className={`badge mt-3 ${aiRoute ? 'bg-violet-100 text-violet-800' : 'bg-amber-100 text-amber-900'}`}>
+                    <Icon name={aiRoute ? 'sparkles' : 'route'} className="h-3.5 w-3.5 shrink-0" />
                     {aiRoute
                       ? 'AI-estimated route through the places in the video. Roads may differ.'
                       : 'Approximate route, drawn between the key points'}
                   </p>
                 )}
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {trail.supportUrl && (
-                  <a
-                    href={trail.supportUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-lg bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700"
-                  >
+                  <a href={trail.supportUrl} target="_blank" rel="noopener noreferrer" className="btn-primary">
                     ♥ Support the creator
                   </a>
                 )}
@@ -224,21 +241,32 @@ export default function TrailPage() {
                       setNotice(null);
                       setSearchParams(editing ? {} : { edit: '1' });
                     }}
-                    className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium hover:bg-stone-100"
+                    className="btn-secondary"
                   >
+                    <Icon name={editing ? 'check' : 'edit'} className="h-4 w-4" />
                     {editing ? 'Done editing' : 'Edit'}
                   </button>
                 )}
               </div>
             </div>
-            {trail.description && <p className="mt-3 whitespace-pre-line text-stone-700">{trail.description}</p>}
+            {trail.description && <p className="mt-4 text-lg whitespace-pre-line text-stone-700">{trail.description}</p>}
           </section>
 
-          {notice && <p className="rounded-lg bg-stone-100 px-3 py-2 text-sm">{notice}</p>}
+          {notice && (
+            <p className="flex items-start gap-2 rounded-2xl bg-pine-900 px-4 py-3 text-sm font-medium text-pine-50 shadow-lg motion-safe:animate-fade-up">
+              <Icon name="compass" className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+              {notice}
+            </p>
+          )}
 
           {editing && (
-            <section className="space-y-4 rounded-xl border border-orange-200 bg-orange-50 p-4">
-              <h2 className="font-semibold">Creator tools</h2>
+            <section className="card space-y-5 border-2 border-orange-200 bg-linear-to-b from-orange-50 to-white p-5">
+              <h2 className="flex items-center gap-2 text-xl font-bold text-pine-950">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-600 text-white">
+                  <Icon name="edit" className="h-4 w-4" />
+                </span>
+                Creator tools
+              </h2>
 
               {mapMode === 'add' ? (
                 <AddPointForm
@@ -249,11 +277,7 @@ export default function TrailPage() {
                   onPickPlace={pickPlace}
                 />
               ) : (
-                <button
-                  type="button"
-                  onClick={startAddingPoint}
-                  className="rounded-lg bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700"
-                >
+                <button type="button" onClick={startAddingPoint} className="btn-primary">
                   + Add a key point at {formatTime(video.currentTime)}
                 </button>
               )}
@@ -282,7 +306,7 @@ export default function TrailPage() {
                           setMapMode('sync');
                         }}
                         disabled={mapMode !== null}
-                        className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 font-medium hover:bg-stone-100 disabled:opacity-50"
+                        className="btn-secondary"
                       >
                         Sync at {formatTime(video.currentTime)}
                       </button>
@@ -325,8 +349,10 @@ export default function TrailPage() {
             </section>
           )}
 
-          <section className="space-y-2">
-            <h2 className="text-lg font-semibold">Key points</h2>
+          <section className="space-y-3">
+            <h2 className="flex items-center gap-2 text-2xl font-extrabold text-pine-950">
+              <Icon name="pin" className="h-6 w-6 text-orange-500" /> Key points
+            </h2>
             <KeyPointList
               points={trail.points}
               activePointId={activePoint?._id}
@@ -337,8 +363,10 @@ export default function TrailPage() {
           </section>
 
           {(trail.points.length > 0 || trail.track.length > 0) && (
-            <section className="space-y-2">
-              <h2 className="text-lg font-semibold">Take this trail with you</h2>
+            <section className="card space-y-3 bg-linear-to-br from-white to-sky-50 p-5">
+              <h2 className="flex items-center gap-2 text-2xl font-extrabold text-pine-950">
+                <Icon name="map" className="h-6 w-6 text-sky-600" /> Take this trail with you
+              </h2>
               <SaveOptions trail={trail} />
             </section>
           )}

@@ -28,8 +28,8 @@ export default function AddPointForm({ currentTime, location, onSave, onCancel, 
   }
 
   return (
-    <form onSubmit={submit} className="space-y-3 rounded-lg bg-white p-3 shadow-sm">
-      <h3 className="font-semibold">New key point</h3>
+    <form onSubmit={submit} className="card space-y-3 p-4">
+      <h3 className="text-lg font-bold text-pine-950">New key point</h3>
       <p className="text-sm text-stone-600">
         {location
           ? `Location: ${location[0].toFixed(5)}, ${location[1].toFixed(5)}. Search or click the map to change it.`
@@ -42,23 +42,23 @@ export default function AddPointForm({ currentTime, location, onSave, onCancel, 
         }}
       />
       <div className="flex items-end gap-2">
-        <label className="block text-sm font-medium">
+        <label className="block text-sm font-semibold text-stone-800">
           Video time
           <input
             value={timeText}
             onChange={(e) => setTimeText(e.target.value)}
-            className="mt-1 block w-24 rounded-md border border-stone-300 px-2 py-1 font-mono"
+            className="field mt-1 block w-24 font-mono"
           />
         </label>
         <button
           type="button"
           onClick={() => setTimeText(formatTime(currentTime))}
-          className="rounded-md border border-stone-300 px-2 py-1 text-sm hover:bg-stone-100"
+          className="btn-secondary px-3 py-1.5"
         >
           Use current time ({formatTime(currentTime)})
         </button>
       </div>
-      <label className="block text-sm font-medium">
+      <label className="block text-sm font-semibold text-stone-800">
         Name
         <input
           required
@@ -66,10 +66,10 @@ export default function AddPointForm({ currentTime, location, onSave, onCancel, 
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Rohtang Pass viewpoint"
-          className="mt-1 block w-full rounded-md border border-stone-300 px-2 py-1"
+          className="field mt-1 block w-full"
         />
       </label>
-      <label className="block text-sm font-medium">
+      <label className="block text-sm font-semibold text-stone-800">
         Note <span className="font-normal text-stone-500">(optional)</span>
         <textarea
           maxLength={1000}
@@ -77,7 +77,7 @@ export default function AddPointForm({ currentTime, location, onSave, onCancel, 
           onChange={(e) => setNote(e.target.value)}
           rows={2}
           placeholder="Fuel pump, tea stall, best photo spot..."
-          className="mt-1 block w-full rounded-md border border-stone-300 px-2 py-1"
+          className="field mt-1 block w-full"
         />
       </label>
       {error && <ErrorMessage>{error}</ErrorMessage>}
@@ -85,11 +85,11 @@ export default function AddPointForm({ currentTime, location, onSave, onCancel, 
         <button
           type="submit"
           disabled={saving}
-          className="rounded-md bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+          className="btn-primary"
         >
           {saving ? 'Saving...' : 'Save key point'}
         </button>
-        <button type="button" onClick={onCancel} className="rounded-md px-3 py-1.5 text-sm hover:bg-stone-100">
+        <button type="button" onClick={onCancel} className="btn-ghost">
           Cancel
         </button>
       </div>
