@@ -33,18 +33,26 @@ export async function signedUpAgent(name = 'alice') {
   return agent;
 }
 
-// A stand-in for an outside service (OpenRouteService, Nominatim). `handle`
-// gets each request and its parsed JSON body, and returns [status, body].
+// A stand-in for an outside service (OpenRouteService, Nominatim, Gemini).
+// `handle` gets each request and its parsed JSON body, and returns
+// [status, body] or [status, body, headers].
 export async function startFakeService(handle) {
   const { createServer } = await import('node:http');
   const requests = [];
   const server = createServer(async (req, res) => {
-    let raw = '';
-    for await (const chunk of req) raw += chunk;
-    const request = { method: req.method, url: req.url, headers: req.headers, body: raw ? JSON.parse(raw) : null };
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const raw = Buffer.concat(chunks);
+    let body = null;
+    try {
+      body = raw.length ? JSON.parse(raw) : null;
+    } catch {
+      body = { bytes: raw.length }; // an uploaded file, not JSON
+    }
+    const request = { method: req.method, url: req.url, headers: req.headers, body };
     requests.push(request);
-    const [status, body] = await handle(request);
-    res.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(body));
+    const [status, reply, headers = {}] = await handle(request);
+    res.writeHead(status, { 'Content-Type': 'application/json', ...headers }).end(JSON.stringify(reply));
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   return {

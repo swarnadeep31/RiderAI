@@ -90,8 +90,17 @@ full answer in `server/ai-results/`:
 npm run try-ai -w server -- https://www.youtube.com/watch?v=VIDEO_ID
 npm run try-ai -w server -- https://www.youtube.com/watch?v=VIDEO_ID --high       # read sign boards closely (~3x the cost)
 npm run try-ai -w server -- https://www.youtube.com/watch?v=VIDEO_ID --geocode    # also find the places on the map
+npm run try-ai -w server -- https://www.youtube.com/watch?v=VIDEO_ID --fps 0.5    # 1 frame every 2 s: fewer picture tokens
+npm run try-ai -w server -- ride.mp4 --no-audio                                   # a video file, sent without its sound
 npm run try-ai -w server -- --list-models                                         # which Gemini models your key can use
 ```
+
+The cost section lists the tokens for the picture (VIDEO) and the sound (AUDIO) separately, so you can see what each
+one costs. To save tokens, send fewer frames with `--fps`, or leave the sound out with `--no-audio`. `--no-audio` only
+works with a video file on your computer, such as your own ride: Gemini fetches YouTube links itself, sound included.
+The script shrinks the file with [FFmpeg](https://ffmpeg.org/download.html) first (480 lines, 1 frame a second), so
+it uploads quickly, then deletes it from Gemini afterwards. Without sound, Gemini only has sign boards, milestones and
+on-screen text to go on, so compare the places found with and without it.
 
 Gemini can only watch **public** YouTube videos. On the free tier, Google may use what you send to improve its
 products; on a paid plan it doesn't.
@@ -107,7 +116,7 @@ real video, of course).
 | `npm run dev` | Starts the API and the website, reloading when you change code |
 | `npm test` | Runs the server and client tests |
 | `npm run build` | Builds the website for production into `client/dist/` |
-| `npm run try-ai -w server -- <youtube-link>` | Asks Gemini about one video and prints the places and the cost |
+| `npm run try-ai -w server -- <youtube-link or video file>` | Asks Gemini about one video and prints the places and the cost |
 
 ## How the code is organised
 
@@ -133,7 +142,8 @@ server/                  Express API + MongoDB (Mongoose)
     models/              What trails, users, feedback and AI jobs look like in the database, with validation rules
     controllers/         What each API request does
     services/            Outside services: routes along roads (OpenRouteService), place search (Nominatim),
-                         Gemini, YouTube's video check (oEmbed)
+                         Gemini (including uploading a video file), YouTube's video check (oEmbed),
+                         FFmpeg (shrinking a video file and removing its sound)
     aiRoute/             The AI route builder: the job's stages, cleaning Gemini's answers, finding the places
                          on the map, working out the cost
     jobs/worker.js       Runs AI jobs in the background, one at a time; a job continues where it stopped after

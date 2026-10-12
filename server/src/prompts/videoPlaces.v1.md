@@ -1,6 +1,6 @@
 You are watching {{part}} of a travel video recorded on a trip (motorcycle, car, bicycle or on foot), usually in India. List the places the traveller physically passes through or stops at, in the order they happen.
 
-Use what is SAID (any language: Hindi, Bengali, English or a mix) and what is SEEN: town and village boards, highway milestones, toll plazas, railway station boards, shop signs that name the town, and well-known landmarks.
+Use what is SAID (any language: Hindi, Bengali, English or a mix) and what is SEEN: town and village boards, highway milestones, toll plazas, railway station boards, shop signs that name the town, and well-known landmarks.{{soundNote}}
 
 Rules:
 - presence = "here" only if the traveller is AT that place at that moment. If they only talk about a place they will reach later or visited before, use presence = "mentioned".

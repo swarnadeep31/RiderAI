@@ -1,6 +1,7 @@
-// Asks Gemini to watch (part of) a public YouTube video and list the places
-// the traveller passes through. Gemini reads the video from YouTube itself;
-// TrailCast never downloads it.
+// Asks Gemini to watch (part of) a video and list the places the traveller
+// passes through. For a public YouTube video, Gemini reads it from YouTube
+// itself and TrailCast never downloads it. A video file on this computer is
+// uploaded first (uploadVideo), which is how a copy without sound can be sent.
 import { readFileSync } from 'node:fs';
 import { GoogleGenAI, MediaResolution } from '@google/genai';
 import { aiConfig } from '../config.js';
@@ -47,10 +48,13 @@ export const PLACES_SCHEMA = {
   },
 };
 
-export function buildPrompt({ clipStart, clipEnd, wholeVideo }) {
+export function buildPrompt({ clipStart, clipEnd, wholeVideo, noAudio = false }) {
   const part = wholeVideo ? 'all' : `the part from ${formatClock(clipStart)} to ${formatClock(clipEnd)}`;
   const timeNote = wholeVideo ? '' : ', counted from the start of the whole video';
-  return PROMPT.replace('{{part}}', part).replace('{{timeNote}}', timeNote);
+  const soundNote = noAudio
+    ? ' This copy of the video has NO SOUND: use only what you see, including subtitles and other text on screen.'
+    : '';
+  return PROMPT.replace('{{part}}', part).replace('{{timeNote}}', timeNote).replace('{{soundNote}}', soundNote);
 }
 
 function client() {
@@ -81,24 +85,33 @@ function explain(err) {
   return new GeminiError(`Couldn't reach Gemini. (${detail})`, { retryable: true });
 }
 
-// clipStart/clipEnd in seconds. Leave them out to send the whole video.
-export async function extractPlaces({ youtubeId, clipStart = 0, clipEnd = null, model, highDetail, thinkingLevel }) {
+// The video: either `youtubeId` (a public YouTube video) or `file` (one
+// uploaded with uploadVideo). clipStart/clipEnd in seconds: leave them out to
+// send the whole video. fps: frames Gemini looks at per second (default 1;
+// 0.5 = one frame every 2 seconds, half the picture tokens). noAudio: the file
+// has no sound, so the prompt says to rely on what is seen.
+export async function extractPlaces({ youtubeId, file, clipStart = 0, clipEnd = null, model, highDetail, thinkingLevel, fps, noAudio = false }) {
   const config = aiConfig();
   model ??= config.model;
   highDetail ??= config.highDetail;
   thinkingLevel ??= config.thinkingLevel;
   const wholeVideo = clipStart === 0 && clipEnd === null;
 
-  const videoPart = { fileData: { fileUri: `https://www.youtube.com/watch?v=${youtubeId}` } };
-  if (!wholeVideo) {
-    videoPart.videoMetadata = { startOffset: `${Math.floor(clipStart)}s`, ...(clipEnd !== null && { endOffset: `${Math.ceil(clipEnd)}s` }) };
-  }
+  const videoPart = {
+    fileData: file ? { fileUri: file.uri, mimeType: file.mimeType } : { fileUri: `https://www.youtube.com/watch?v=${youtubeId}` },
+  };
+  const videoMetadata = {
+    ...(!wholeVideo && { startOffset: `${Math.floor(clipStart)}s` }),
+    ...(!wholeVideo && clipEnd !== null && { endOffset: `${Math.ceil(clipEnd)}s` }),
+    ...(fps && fps !== 1 && { fps }),
+  };
+  if (Object.keys(videoMetadata).length) videoPart.videoMetadata = videoMetadata;
 
   let response;
   try {
     response = await client().models.generateContent({
       model,
-      contents: [{ role: 'user', parts: [videoPart, { text: buildPrompt({ clipStart, clipEnd, wholeVideo }) }] }],
+      contents: [{ role: 'user', parts: [videoPart, { text: buildPrompt({ clipStart, clipEnd, wholeVideo, noAudio }) }] }],
       config: {
         responseMimeType: 'application/json',
         responseJsonSchema: PLACES_SCHEMA,
@@ -118,4 +131,34 @@ export async function extractPlaces({ youtubeId, clipStart = 0, clipEnd = null, 
     throw new GeminiError('Gemini answered, but not with the JSON we asked for.', { retryable: true });
   }
   return { data, raw, usage: response.usageMetadata ?? {}, model };
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Uploads a video file to Gemini (kept there for up to 48 hours, or until
+// deleteUploadedVideo) and waits until Gemini has processed it.
+export async function uploadVideo(path, { mimeType = 'video/mp4', pollMs = 5000, timeoutMs = 15 * 60 * 1000 } = {}) {
+  const ai = client();
+  let file;
+  try {
+    file = await ai.files.upload({ file: path, config: { mimeType } });
+    const giveUpAt = Date.now() + timeoutMs;
+    while (file.state === 'PROCESSING') {
+      if (Date.now() > giveUpAt) throw new GeminiError('Gemini took too long to process the uploaded video.', { retryable: true });
+      await sleep(pollMs);
+      file = await ai.files.get({ name: file.name });
+    }
+  } catch (err) {
+    throw err instanceof GeminiError ? err : explain(err);
+  }
+  if (file.state === 'FAILED') throw new GeminiError("Gemini couldn't process the uploaded video.");
+  return { name: file.name, uri: file.uri, mimeType: file.mimeType ?? mimeType };
+}
+
+export async function deleteUploadedVideo(name) {
+  try {
+    await client().files.delete({ name });
+  } catch {
+    // Not worth failing over: Gemini deletes uploads after 48 hours anyway.
+  }
 }
