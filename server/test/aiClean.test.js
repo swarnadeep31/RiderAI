@@ -1,0 +1,108 @@
+import assert from 'node:assert/strict';
+import { describe, test } from 'node:test';
+import { cleanClip, mergeClips, mergeHiddenRanges, planClips } from '../src/aiRoute/clean.js';
+import { parseClock } from '../src/utils/time.js';
+
+const place = (time, name, extra = {}) => ({ time, name, presence: 'here', evidence: 'sign', confidence: 0.9, ...extra });
+
+test('parseClock', () => {
+  assert.equal(parseClock('1:02:05'), 3725);
+  assert.equal(parseClock('12:30'), 750);
+  assert.equal(parseClock(90), 90);
+  assert.equal(parseClock('soon'), null);
+  assert.equal(parseClock(-1), null);
+});
+
+describe('cleanClip', () => {
+  test('keeps good places and drops malformed ones', () => {
+    const { places } = cleanClip(
+      {
+        places: [
+          place('1:30', ' Howrah ', { region: 'West Bengal', quote: 'Howrah station', alt_names: ['Haora'] }),
+          place('not a time', 'Nowhere'),
+          place('2:00', ''),
+          { time: '3:00', name: 'Odd values', presence: 'maybe', evidence: 'dream', confidence: 7 },
+        ],
+        hidden_ranges: [{ start: '0:00', end: '1:20', reason: 'intro' }, { start: '5:00', end: '4:00', reason: 'recap' }],
+      },
+      { start: 0, end: 1800 },
+      1800,
+    );
+    assert.deepEqual(
+      places.map((p) => [p.time, p.name, p.presence, p.evidence, p.confidence]),
+      [
+        [90, 'Howrah', 'here', 'sign', 0.9],
+        [180, 'Odd values', 'mentioned', 'speech', 1],
+      ],
+    );
+    assert.deepEqual(places[0].altNames, ['Haora']);
+  });
+
+  test('turns clip times into whole-video times', () => {
+    const clip = { start: 3540, end: 7140 };
+    // Times inside the clip's length: counted from the clip's start.
+    const relative = cleanClip({ places: [place('5:00', 'A')], hidden_ranges: [] }, clip, 7200);
+    assert.equal(relative.places[0].time, 3840);
+    // Times beyond the clip's length: already whole-video times.
+    const absolute = cleanClip({ places: [place('1:10:00', 'B')], hidden_ranges: [] }, clip, 7200);
+    assert.equal(absolute.places[0].time, 4200);
+  });
+
+  test('clamps times to the video and ignores stops that end before they start', () => {
+    const { places } = cleanClip({ places: [place('40:00', 'Late', { stay_until: '1:00' })], hidden_ranges: [] }, { start: 0, end: 1800 }, 1800);
+    assert.equal(places[0].time, 1800);
+    assert.equal(places[0].stayUntil, null);
+  });
+});
+
+describe('mergeClips', () => {
+  const clip = (places, hiddenRanges = []) => ({ places, hiddenRanges });
+  const p = (time, name, extra = {}) => ({ time, name, presence: 'here', evidence: 'sign', confidence: 0.9, stayUntil: null, region: '', altNames: [], quote: '', ...extra });
+
+  test('the same place in two overlapping clips is kept once', () => {
+    const { candidates } = mergeClips([clip([p(3570, 'Durgapur', { confidence: 0.6 })]), clip([p(3600, 'durgapur', { confidence: 0.95 })])], { minConfidence: 0.5 });
+    assert.equal(candidates.length, 1);
+    assert.equal(candidates[0].confidence, 0.95);
+    assert.equal(candidates[0].time, 3570);
+  });
+
+  test('repeated mentions in a row become one stop', () => {
+    const { candidates } = mergeClips([clip([p(540, 'Durgapur'), p(600, 'Durgapur'), p(660, 'Durgapur'), p(960, 'Asansol')])], { minConfidence: 0.5 });
+    assert.deepEqual(candidates.map((c) => [c.name, c.time, c.stayUntil]), [
+      ['Durgapur', 540, 660],
+      ['Asansol', 960, null],
+    ]);
+  });
+
+  test('only confident places the traveller is at start ticked', () => {
+    const { candidates } = mergeClips(
+      [clip([p(10, 'Here'), p(20, 'Unsure', { confidence: 0.3 }), p(30, 'Leh', { presence: 'mentioned' })])],
+      { minConfidence: 0.5 },
+    );
+    assert.deepEqual(candidates.map((c) => c.checked), [true, false, false]);
+    assert.deepEqual(candidates[1].flags, ['low_confidence']);
+  });
+
+  test('hidden ranges are merged', () => {
+    assert.deepEqual(
+      mergeHiddenRanges([
+        { start: 100, end: 200, reason: 'montage' },
+        { start: 0, end: 90, reason: 'intro' },
+        { start: 150, end: 260, reason: 'montage' },
+      ]),
+      [
+        { start: 0, end: 90, reason: 'intro' },
+        { start: 100, end: 260, reason: 'montage' },
+      ],
+    );
+  });
+});
+
+test('planClips splits long videos with a minute of overlap', () => {
+  assert.deepEqual(planClips(1800, 60), [{ start: 0, end: 1800 }]);
+  assert.deepEqual(planClips(9000, 60), [
+    { start: 0, end: 3600 },
+    { start: 3540, end: 7140 },
+    { start: 7080, end: 9000 },
+  ]);
+});

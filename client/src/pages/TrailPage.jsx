@@ -1,0 +1,377 @@
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { api } from '../api.js';
+import { useAuth } from '../auth.jsx';
+import ActivityBadge from '../components/ActivityBadge.jsx';
+import AddPointForm from '../components/AddPointForm.jsx';
+import AiRoutePanel, { HIDDEN_REASONS } from '../components/AiRoutePanel.jsx';
+import Icon from '../components/art/Icon.jsx';
+import { CampScene } from '../components/art/Scenery.jsx';
+import ErrorMessage from '../components/ErrorMessage.jsx';
+import KeyPointList from '../components/KeyPointList.jsx';
+import RoutePanel from '../components/RoutePanel.jsx';
+import SaveOptions from '../components/SaveOptions.jsx';
+import TrailMap from '../components/TrailMap.jsx';
+import { useYouTubePlayer } from '../hooks/useYouTubePlayer.js';
+import { hiddenRangeAt, isGpxRoute, nearestIndex, positionAt } from '../lib/track.js';
+import { formatTime } from '../lib/time.js';
+
+function describeSync(videoStartsAt) {
+  if (videoStartsAt === 0) return 'The video and the GPS recording start at the same moment.';
+  return videoStartsAt > 0
+    ? `The video starts ${formatTime(videoStartsAt)} into the GPS recording.`
+    : `The GPS recording starts ${formatTime(-videoStartsAt)} into the video.`;
+}
+
+export default function TrailPage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { user } = useAuth();
+
+  const [trail, setTrail] = useState(null);
+  const [loadError, setLoadError] = useState(null);
+  const [notice, setNotice] = useState(null);
+  // What clicking the map does while editing: null, 'add' (place a key point) or 'sync'.
+  const [mapMode, setMapMode] = useState(null);
+  const [pendingLocation, setPendingLocation] = useState(null);
+  const [follow, setFollow] = useState(true);
+  const [focus, setFocus] = useState(null);
+  // The AI's places on the map while the owner reviews them.
+  const [preview, setPreview] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.getTrail(id).then(
+      (loaded) => !cancelled && setTrail(loaded),
+      (err) => !cancelled && setLoadError(err.message),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  const video = useYouTubePlayer(trail?.youtubeId);
+
+  if (loadError) {
+    return (
+      <main className="mx-auto max-w-xl space-y-6 px-4 py-12 text-center">
+        <CampScene className="mx-auto w-full max-w-sm drop-shadow-xl" />
+        <ErrorMessage>{loadError}</ErrorMessage>
+        <Link to="/" className="btn-primary">
+          Back to all trails
+        </Link>
+      </main>
+    );
+  }
+  if (!trail) {
+    return (
+      <p className="flex items-center justify-center gap-2 px-4 py-16 font-semibold text-pine-700 dark:text-pine-300">
+        <Icon name="pin" className="h-6 w-6 text-orange-500 motion-safe:animate-bounce" /> Loading trail...
+      </p>
+    );
+  }
+
+  // Only the person who added the trail sees the Edit button and the creator tools.
+  const isOwner = Boolean(user && trail.owner?._id === user._id);
+  const editing = isOwner && searchParams.has('edit');
+  // Where the rider is now (the map draws its own smoothly moving marker; this is for new key points).
+  const position = positionAt(trail.track, trail.trackTimes, trail.videoStartsAt, video.currentTime, trail.hiddenRanges);
+  const activePoint = trail.points.findLast((p) => p.time <= video.currentTime + 0.5);
+  const recorded = isGpxRoute(trail);
+  const drawnRoute = trail.routeSource === 'keypoints' && trail.track.length > 1;
+  const aiRoute = drawnRoute && trail.points.some((p) => p.origin === 'ai');
+  const hidden = drawnRoute ? hiddenRangeAt(trail.hiddenRanges, video.currentTime) : null;
+  // Recorded routes may need lining up with the video; drawn routes use video times already.
+  const canSync = recorded && trail.trackTimes.length > 0;
+
+  // After any change, the server sends the updated trail, plus a message if
+  // redrawing the route didn't go as asked (e.g. no road-following key).
+  function applyUpdate(updated) {
+    setTrail(updated);
+    if (updated.routeNotice) setNotice(updated.routeNotice);
+  }
+
+  function selectPoint(point) {
+    video.seekTo(point.time);
+    setFocus({ location: [point.lat, point.lng] });
+  }
+
+  function startAddingPoint() {
+    video.pause();
+    setPendingLocation(position);
+    setMapMode('add');
+  }
+
+  function stopMapMode() {
+    setMapMode(null);
+    setPendingLocation(null);
+  }
+
+  async function savePoint(point) {
+    applyUpdate(await api.addPoint(trail._id, point));
+    stopMapMode();
+  }
+
+  function pickPlace(place) {
+    setPendingLocation([place.lat, place.lng]);
+    setFocus({ location: [place.lat, place.lng] });
+  }
+
+  async function deletePoint(point) {
+    if (!window.confirm(`Delete "${point.name}"?`)) return;
+    try {
+      applyUpdate(await api.deletePoint(trail._id, point._id));
+    } catch (err) {
+      setNotice(err.message);
+    }
+  }
+
+  // The creator clicked where they were at this moment of the video: the
+  // nearest route point tells us how the video and GPS clocks line up.
+  async function syncAt(location) {
+    const index = nearestIndex(trail.track, location);
+    const videoStartsAt = Math.round((trail.trackTimes[index] - video.currentTime) * 10) / 10;
+    try {
+      setTrail(await api.updateTrail(trail._id, { videoStartsAt }));
+      setNotice('Synced. Play the video to check the blue dot follows it.');
+      setFollow(true);
+      stopMapMode();
+    } catch (err) {
+      setNotice(err.message);
+    }
+  }
+
+  function handleMapClick(location) {
+    if (mapMode === 'add') setPendingLocation(location);
+    if (mapMode === 'sync') syncAt(location);
+  }
+
+  async function deleteTrail() {
+    if (!window.confirm('Delete this whole trail? This cannot be undone.')) return;
+    try {
+      await api.deleteTrail(trail._id);
+      navigate('/');
+    } catch (err) {
+      setNotice(err.message);
+    }
+  }
+
+  return (
+    <main className="mx-auto max-w-7xl px-4 py-6">
+      {/* Phones: video, map, details. Wide screens: video and details on the left, map on the right. */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="lg:col-start-1 lg:row-start-1">
+          <div
+            ref={video.containerRef}
+            className="aspect-video w-full overflow-hidden rounded-3xl bg-pine-950 shadow-xl ring-4 shadow-pine-900/25 ring-surface"
+          />
+          {video.error && (
+            <div className="mt-2">
+              <ErrorMessage>{video.error}</ErrorMessage>
+            </div>
+          )}
+        </div>
+
+        <div className="isolate h-[55vh] overflow-hidden rounded-3xl shadow-xl ring-4 shadow-pine-900/20 ring-surface lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-[calc(100vh-7rem)] lg:self-start">
+          <TrailMap
+            trailId={trail._id}
+            track={trail.track}
+            trackTimes={trail.trackTimes}
+            videoStartsAt={trail.videoStartsAt}
+            hiddenRanges={trail.hiddenRanges}
+            clock={video.clock}
+            approximate={drawnRoute}
+            points={trail.points}
+            activePointId={activePoint?._id}
+            pendingLocation={pendingLocation}
+            preview={preview}
+            hiddenNote={hidden && `${HIDDEN_REASONS[hidden.reason]}: the map picks up again at ${formatTime(hidden.end)}`}
+            focus={focus}
+            follow={follow}
+            onFollowChange={setFollow}
+            onPointClick={selectPoint}
+            onMapClick={mapMode ? handleMapClick : null}
+          />
+        </div>
+
+        <div className="space-y-6 lg:col-start-1 lg:row-start-2">
+          <section>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <ActivityBadge activity={trail.activity} />
+                <h1 className="mt-2 text-3xl leading-tight font-extrabold text-ink sm:text-4xl">{trail.title}</h1>
+                {trail.owner && (
+                  <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-stone-600">
+                    <span
+                      aria-hidden="true"
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-pine-700 font-display text-xs text-white uppercase"
+                    >
+                      {trail.owner.username[0]}
+                    </span>
+                    <span>by @{trail.owner.username}</span>
+                  </p>
+                )}
+                {recorded && (
+                  <p className="badge mt-3 bg-pine-100 text-pine-800 dark:bg-pine-900/70 dark:text-pine-300">
+                    <Icon name="satellite" className="h-3.5 w-3.5" />
+                    Recorded GPS route
+                  </p>
+                )}
+                {drawnRoute && (
+                  <p className={`badge mt-3 ${aiRoute ? 'bg-violet-100 text-violet-800' : 'bg-amber-100 text-amber-900'}`}>
+                    <Icon name={aiRoute ? 'sparkles' : 'route'} className="h-3.5 w-3.5 shrink-0" />
+                    {aiRoute
+                      ? 'AI-estimated route through the places in the video. Roads may differ.'
+                      : 'Approximate route, drawn between the key points'}
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {trail.supportUrl && (
+                  <a href={trail.supportUrl} target="_blank" rel="noopener noreferrer" className="btn-primary">
+                    ♥ Support the creator
+                  </a>
+                )}
+                {isOwner && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      stopMapMode();
+                      setNotice(null);
+                      setSearchParams(editing ? {} : { edit: '1' });
+                    }}
+                    className="btn-secondary"
+                  >
+                    <Icon name={editing ? 'check' : 'edit'} className="h-4 w-4" />
+                    {editing ? 'Done editing' : 'Edit'}
+                  </button>
+                )}
+              </div>
+            </div>
+            {trail.description && <p className="mt-4 text-lg whitespace-pre-line text-stone-700">{trail.description}</p>}
+          </section>
+
+          {notice && (
+            <p className="flex items-start gap-2 rounded-2xl bg-pine-900 px-4 py-3 text-sm font-medium text-pine-50 shadow-lg motion-safe:animate-fade-up">
+              <Icon name="compass" className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+              {notice}
+            </p>
+          )}
+
+          {editing && (
+            <section className="card space-y-5 border-2 border-orange-200 bg-linear-to-b from-orange-50 to-surface p-5">
+              <h2 className="flex items-center gap-2 text-xl font-bold text-ink">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-600 text-white">
+                  <Icon name="edit" className="h-4 w-4" />
+                </span>
+                Creator tools
+              </h2>
+
+              {mapMode === 'add' ? (
+                <AddPointForm
+                  currentTime={video.currentTime}
+                  location={pendingLocation}
+                  onSave={savePoint}
+                  onCancel={stopMapMode}
+                  onPickPlace={pickPlace}
+                />
+              ) : (
+                <button type="button" onClick={startAddingPoint} className="btn-primary">
+                  + Add a key point at {formatTime(video.currentTime)}
+                </button>
+              )}
+
+              {canSync && (
+                <div className="space-y-2 text-sm">
+                  <h3 className="font-semibold">Line up the map with the video</h3>
+                  <p className="text-stone-700">{describeSync(trail.videoStartsAt)}</p>
+                  {mapMode === 'sync' ? (
+                    <p className="font-medium text-orange-800">
+                      Now click the spot on the route where you were at {formatTime(video.currentTime)} in the video.{' '}
+                      <button type="button" onClick={stopMapMode} className="underline">
+                        Cancel
+                      </button>
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-stone-600">
+                        If the blue dot is ahead of or behind the video: pause at a moment you can find on the map (a
+                        bridge, a junction, the start), then press Sync and click that spot on the route.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          video.pause();
+                          setMapMode('sync');
+                        }}
+                        disabled={mapMode !== null}
+                        className="btn-secondary"
+                      >
+                        Sync at {formatTime(video.currentTime)}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+              {recorded && !canSync && (
+                <p className="text-sm text-stone-600">
+                  This route has no times, so the map can't follow the video. Key points still work.
+                </p>
+              )}
+              {!recorded && (
+                <AiRoutePanel
+                  trail={trail}
+                  getDuration={video.getDuration}
+                  onSeek={video.seekTo}
+                  onPreview={setPreview}
+                  onAccepted={(updated) => {
+                    applyUpdate(updated);
+                    if (!updated.routeNotice) setNotice('Route drawn. Play the video to watch the blue dot follow it.');
+                    setFollow(true);
+                  }}
+                />
+              )}
+              {!recorded && (
+                <RoutePanel
+                  trail={trail}
+                  onDrawn={(updated) => {
+                    applyUpdate(updated);
+                    if (!updated.routeNotice) setNotice('Route drawn. Play the video to watch the blue dot follow it.');
+                    setFollow(true);
+                  }}
+                />
+              )}
+
+              <button type="button" onClick={deleteTrail} className="text-sm text-red-700 hover:underline">
+                Delete this trail
+              </button>
+            </section>
+          )}
+
+          <section className="space-y-3">
+            <h2 className="flex items-center gap-2 text-2xl font-extrabold text-ink">
+              <Icon name="pin" className="h-6 w-6 text-orange-500" /> Key points
+            </h2>
+            <KeyPointList
+              points={trail.points}
+              activePointId={activePoint?._id}
+              editing={editing}
+              onSelect={selectPoint}
+              onDelete={deletePoint}
+            />
+          </section>
+
+          {(trail.points.length > 0 || trail.track.length > 0) && (
+            <section className="card space-y-3 bg-linear-to-br from-surface to-sky-50 p-5">
+              <h2 className="flex items-center gap-2 text-2xl font-extrabold text-ink">
+                <Icon name="map" className="h-6 w-6 text-sky-600" /> Take this trail with you
+              </h2>
+              <SaveOptions trail={trail} />
+            </section>
+          )}
+        </div>
+      </div>
+    </main>
+  );
+}
