@@ -50,6 +50,11 @@ that moment, and save the places to Google Maps, a GPS app or a printable trip s
   ("one day we'll ride to Leh") start unticked, and places that would send the route far off its way are flagged.
   The same video is never analysed (or paid for) twice, and daily and monthly limits stop runaway bills. Places
   where the rider spent the night come ticked as overnight stops, so they count towards the riding days.
+- **AI route builder from a video file:** instead of the YouTube link, the owner can upload the same video from their
+  computer. TrailCast then chooses what Gemini gets: picture and sound, the picture only, or **only the sound** (what's
+  said: about a third of the tokens, good for vlogs where the rider names the places). It also works for private and
+  unlisted videos. The file has to be the same length as the YouTube video, so the places line up. It's cut and
+  shrunk with FFmpeg, sent to Gemini piece by piece, and deleted from TrailCast and Gemini when the analysis ends.
 - **Take it with you:** an "Open in Google Maps" link for every key point, GPX and KML downloads (KML imports into
   Google My Maps), and a printable trip sheet you can save as a PDF.
 - **Day and night:** the site follows the device's light or dark setting. The switch is hidden in the scenery:
@@ -124,6 +129,7 @@ npm run try-ai -w server -- https://www.youtube.com/watch?v=VIDEO_ID --high     
 npm run try-ai -w server -- https://www.youtube.com/watch?v=VIDEO_ID --geocode    # also find the places on the map
 npm run try-ai -w server -- https://www.youtube.com/watch?v=VIDEO_ID --fps 0.5    # 1 frame every 2 s: fewer picture tokens
 npm run try-ai -w server -- ride.mp4 --no-audio                                   # a video file, sent without its sound
+npm run try-ai -w server -- ride.mp4 --sound-only                                 # only the sound of a video file: what's said
 npm run try-ai -w server -- --list-models                                         # which Gemini models your key can use
 ```
 
@@ -132,7 +138,10 @@ one costs. To save tokens, send fewer frames with `--fps`, or leave the sound ou
 works with a video file on your computer, such as your own ride: Gemini fetches YouTube links itself, sound included.
 The script shrinks the file with [FFmpeg](https://ffmpeg.org/download.html) first (480 lines, 1 frame a second), so
 it uploads quickly, then deletes it from Gemini afterwards. Without sound, Gemini only has sign boards, milestones and
-on-screen text to go on, so compare the places found with and without it.
+on-screen text to go on, so compare the places found with and without it. `--sound-only` does the opposite: it sends
+only the sound (what's said), which takes about a third of the tokens. The app offers the same three choices when the
+owner uploads the video file. The cost estimate uses one price for every kind of input, so check Google's pricing page
+if sound is priced differently for your model.
 
 Gemini can only watch **public** YouTube videos. On the free tier, Google may use what you send to improve its
 products; on a paid plan it doesn't.
@@ -230,6 +239,7 @@ samples/                 A sample GPX file to try
 | PATCH | `/api/trails/:id/points/:pointId` | Owner | Change a key point (also `stopKind`: `break` or `overnight`) |
 | DELETE | `/api/trails/:id/points/:pointId` | Owner | Delete a key point |
 | POST | `/api/trails/:id/ai-route` | Owner | Start an AI analysis (`durationSec`, optional `highDetail`, `fresh`). Reuses an earlier analysis of the same video unless `fresh` |
+| POST | `/api/trails/:id/ai-route/upload` | Owner | Start an AI analysis from a video file: the request body is the file, its name in the `X-File-Name` header; query `mode` (`full`, `picture` or `sound`), `durationSec` (the YouTube video's length, to check it's the same video), optional `highDetail` |
 | GET | `/api/trails/:id/ai-route` | Owner | The trail's latest AI analysis, or `null` |
 | POST | `/api/trails/:id/ai-route/accept` | Owner | Turn the reviewed places into key points and draw the route (`jobId`, `places`, `hiddenRanges`) |
 | GET | `/api/jobs/:id` | Job owner | How an analysis is going, and its places once done |

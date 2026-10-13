@@ -1,3 +1,4 @@
+import { rm } from 'node:fs/promises';
 import { Job } from '../models/Job.js';
 import { httpError } from '../utils/httpError.js';
 import { jobView } from './aiRouteController.js';
@@ -16,8 +17,11 @@ export async function getJob(req, res) {
 export async function cancelJob(req, res) {
   const job = await findOwnJob(req);
   if (!['queued', 'running'].includes(job.state)) throw httpError(409, 'This analysis has already finished.');
+  const wasWaiting = job.state === 'queued';
   job.state = 'cancelled';
   job.lockedUntil = new Date(0);
   await job.save();
+  // An uploaded file that was still waiting isn't needed (a running analysis deletes its own when it stops).
+  if (wasWaiting && job.uploadPath) await rm(job.uploadPath, { force: true });
   res.json(jobView(job));
 }

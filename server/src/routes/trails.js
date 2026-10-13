@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { acceptAiRoute, latestAiRoute, startAiRoute } from '../controllers/aiRouteController.js';
+import { acceptAiRoute, latestAiRoute, startAiRoute, uploadAiVideo } from '../controllers/aiRouteController.js';
 import {
   addPoint,
   createTrail,
@@ -36,6 +36,8 @@ trailsRouter.post('/:id/enrich', requireUser, enrichNow);
 // Building the route with AI (owner only): start, check the latest, accept the reviewed places.
 trailsRouter.get('/:id/ai-route', requireUser, latestAiRoute);
 trailsRouter.post('/:id/ai-route', requireUser, startAiRoute);
+// ...or from a video file the owner uploads (the request body is the file).
+trailsRouter.post('/:id/ai-route/upload', requireUser, uploadAiVideo);
 trailsRouter.post('/:id/ai-route/accept', requireUser, acceptAiRoute);
 
 trailsRouter.post('/:id/points', requireUser, addPoint);

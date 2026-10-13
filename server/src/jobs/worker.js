@@ -3,7 +3,7 @@
 // in MongoDB, so nothing is lost when the server restarts or a free host sleeps.
 import { randomUUID } from 'node:crypto';
 import { Job } from '../models/Job.js';
-import { defaultServices, JobCancelled, runJob } from '../aiRoute/pipeline.js';
+import { defaultServices, JobCancelled, removeOldUploads, runJob } from '../aiRoute/pipeline.js';
 import { defaultEnrichServices, runEnrichJob } from '../routeExtras/enrich.js';
 
 const LEASE_MS = 2 * 60 * 1000;
@@ -52,6 +52,7 @@ export async function processNextJob(services = {}) {
 }
 
 export function startWorker({ intervalMs = 2000 } = {}) {
+  removeOldUploads().catch((err) => console.error('Could not tidy old uploads:', err.message));
   let busy = false;
   const timer = setInterval(async () => {
     if (busy) return;

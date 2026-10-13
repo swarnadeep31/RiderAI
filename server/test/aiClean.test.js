@@ -57,6 +57,12 @@ describe('cleanClip', () => {
     assert.deepEqual(places.map((p) => p.stopKind), ['overnight', null, null]);
   });
 
+  test('a clip sent as its own file always counts from the clip start', () => {
+    // 70:00 is longer than the clip, so it would look like a whole-video time without being told.
+    const { places } = cleanClip({ places: [place('70:00', 'C')], hidden_ranges: [] }, { start: 3540, end: 7140 }, 9000, { relative: true });
+    assert.equal(places[0].time, 3540 + 4200);
+  });
+
   test('clamps times to the video and ignores stops that end before they start', () => {
     const { places } = cleanClip({ places: [place('40:00', 'Late', { stay_until: '1:00' })], hidden_ranges: [] }, { start: 0, end: 1800 }, 1800);
     assert.equal(places[0].time, 1800);

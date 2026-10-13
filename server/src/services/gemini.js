@@ -51,12 +51,15 @@ export const PLACES_SCHEMA = {
   },
 };
 
-export function buildPrompt({ clipStart, clipEnd, wholeVideo, noAudio = false }) {
+export function buildPrompt({ clipStart, clipEnd, wholeVideo, noAudio = false, soundOnly = false }) {
   const part = wholeVideo ? 'all' : `the part from ${formatClock(clipStart)} to ${formatClock(clipEnd)}`;
   const timeNote = wholeVideo ? '' : ', counted from the start of the whole video';
-  const soundNote = noAudio
-    ? ' This copy of the video has NO SOUND: use only what you see, including subtitles and other text on screen.'
-    : '';
+  let soundNote = '';
+  if (noAudio) soundNote = ' This copy of the video has NO SOUND: use only what you see, including subtitles and other text on screen.';
+  if (soundOnly) {
+    soundNote =
+      ' You only have the SOUND of this video, no picture: use what is said. Evidence is "speech" unless a sign or milestone is read out.';
+  }
   return PROMPT.replace('{{part}}', part).replace('{{timeNote}}', timeNote).replace('{{soundNote}}', soundNote);
 }
 
@@ -92,8 +95,9 @@ function explain(err) {
 // uploaded with uploadVideo). clipStart/clipEnd in seconds: leave them out to
 // send the whole video. fps: frames Gemini looks at per second (default 1;
 // 0.5 = one frame every 2 seconds, half the picture tokens). noAudio: the file
-// has no sound, so the prompt says to rely on what is seen.
-export async function extractPlaces({ youtubeId, file, clipStart = 0, clipEnd = null, model, highDetail, thinkingLevel, fps, noAudio = false }) {
+// has no sound, so the prompt says to rely on what is seen. soundOnly: the
+// file is only the sound, so the prompt says to rely on what is said.
+export async function extractPlaces({ youtubeId, file, clipStart = 0, clipEnd = null, model, highDetail, thinkingLevel, fps, noAudio = false, soundOnly = false }) {
   const config = aiConfig();
   model ??= config.model;
   highDetail ??= config.highDetail;
@@ -114,7 +118,7 @@ export async function extractPlaces({ youtubeId, file, clipStart = 0, clipEnd = 
   try {
     response = await client().models.generateContent({
       model,
-      contents: [{ role: 'user', parts: [videoPart, { text: buildPrompt({ clipStart, clipEnd, wholeVideo, noAudio }) }] }],
+      contents: [{ role: 'user', parts: [videoPart, { text: buildPrompt({ clipStart, clipEnd, wholeVideo, noAudio, soundOnly }) }] }],
       config: {
         responseMimeType: 'application/json',
         responseJsonSchema: PLACES_SCHEMA,

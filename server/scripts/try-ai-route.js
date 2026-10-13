@@ -9,14 +9,15 @@
 //   npm run try-ai -w server -- <youtube-link> --model gemini-3.1-flash-lite
 //   npm run try-ai -w server -- <youtube-link> --geocode         (also find the places on the map)
 //   npm run try-ai -w server -- ride.mp4 --no-audio             (a video file on this computer, sent without sound)
+//   npm run try-ai -w server -- ride.mp4 --sound-only           (only its sound: what's said; the cheapest)
 //   npm run try-ai -w server -- --list-models
 //
 // A video file is shrunk with FFmpeg first (smaller picture, 1 frame a second,
-// and no sound with --no-audio), uploaded to Gemini, and deleted from Gemini
+// and no sound with --no-audio; or just the sound with --sound-only), uploaded to Gemini, and deleted from Gemini
 // afterwards. YouTube links are read by Gemini straight from YouTube, sound
 // included: to try without sound, use a file of the video (e.g. your own).
 import { existsSync } from 'node:fs';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -26,7 +27,7 @@ import { summarizeUsage } from '../src/aiRoute/cost.js';
 import { geocodeCandidates } from '../src/aiRoute/geocode.js';
 import { aiConfig } from '../src/config.js';
 import { deleteUploadedVideo, extractPlaces, PROMPT_VERSION, uploadVideo } from '../src/services/gemini.js';
-import { prepareVideo, probeVideo } from '../src/services/videoFile.js';
+import { extractSound, prepareVideo, probeVideo } from '../src/services/videoFile.js';
 import { checkVideo } from '../src/services/youtubeInfo.js';
 import { formatClock, parseClock } from '../src/utils/time.js';
 import { parseYouTubeId } from '../src/utils/youtube.js';
@@ -40,6 +41,7 @@ const { positionals, values } = parseArgs({
     end: { type: 'string' },
     fps: { type: 'string' },
     'no-audio': { type: 'boolean', default: false },
+    'sound-only': { type: 'boolean', default: false },
     geocode: { type: 'boolean', default: false },
     'list-models': { type: 'boolean', default: false },
   },
@@ -65,7 +67,7 @@ const fail = (message) => {
   process.exit(1);
 };
 const USAGE =
-  'Usage: npm run try-ai -w server -- <youtube-link | video-file> [--no-audio] [--fps 0.5] [--high] [--start 0 --end 1800] [--model name] [--geocode]';
+  'Usage: npm run try-ai -w server -- <youtube-link | video-file> [--no-audio | --sound-only] [--fps 0.5] [--high] [--start 0 --end 1800] [--model name] [--geocode]';
 
 // npm runs this script inside server/, so read file paths from where npm was started.
 const input = positionals[0];
@@ -77,6 +79,11 @@ if (!isFile && !youtubeId) fail(input ? `"${input}" is neither a YouTube link no
 const fps = values.fps === undefined ? undefined : Number(values.fps);
 if (fps !== undefined && !(fps > 0 && fps <= 24)) fail('--fps must be more than 0 and at most 24 (e.g. 0.5 = one frame every 2 seconds).');
 const noAudio = values['no-audio'];
+const soundOnly = values['sound-only'];
+if (noAudio && soundOnly) fail('Use --no-audio or --sound-only, not both.');
+if (soundOnly && !isFile) {
+  fail("--sound-only needs a video file: Gemini fetches YouTube links itself, picture included.\nUse a file of the video, e.g. npm run try-ai -w server -- ride.mp4 --sound-only");
+}
 if (noAudio && !isFile) {
   fail(
     "--no-audio needs a video file. Gemini fetches YouTube links itself, sound included, and can't be told to skip it.\n" +
@@ -100,25 +107,30 @@ if (isFile) {
     `File: ${basename(filePath)} (${formatClock(original.durationSec)}, ${original.width}×${original.height}, ` +
       `${original.hasAudio ? 'with sound' : 'no sound'}, ${mb(original.sizeBytes)})`,
   );
-  process.stdout.write(`Making a smaller copy${noAudio ? ' without sound' : ''} with FFmpeg...`);
-  preparedPath = join(tmpdir(), `trailcast-${Date.now()}.mp4`);
-  let prepared;
+  if (soundOnly && !original.hasAudio) fail('This file has no sound, so --sound-only has nothing to send.');
+  process.stdout.write(soundOnly ? 'Taking out the sound with FFmpeg...' : `Making a smaller copy${noAudio ? ' without sound' : ''} with FFmpeg...`);
+  preparedPath = join(tmpdir(), `trailcast-${Date.now()}.${soundOnly ? 'm4a' : 'mp4'}`);
   try {
-    prepared = await prepareVideo(filePath, preparedPath, { noAudio, maxHeight: values.high ? 720 : 480, fps: Math.max(1, fps ?? 1) });
+    if (soundOnly) {
+      await extractSound(filePath, preparedPath);
+      process.stdout.write(` ${mb((await stat(preparedPath)).size)}, sound only\n`);
+    } else {
+      const prepared = await prepareVideo(filePath, preparedPath, { noAudio, maxHeight: values.high ? 720 : 480, fps: Math.max(1, fps ?? 1) });
+      process.stdout.write(` ${mb(prepared.sizeBytes)}, ${prepared.width}×${prepared.height}, ${prepared.hasAudio ? 'with sound' : 'no sound'}\n`);
+    }
   } catch (err) {
     await rm(preparedPath, { force: true });
     fail(`\n${err.message}`);
   }
-  process.stdout.write(` ${mb(prepared.sizeBytes)}, ${prepared.width}×${prepared.height}, ${prepared.hasAudio ? 'with sound' : 'no sound'}\n`);
-  process.stdout.write('Uploading to Gemini and waiting for it to process the video...');
+  process.stdout.write('Uploading to Gemini and waiting for it to process the file...');
   try {
-    upload = await uploadVideo(preparedPath);
+    upload = await uploadVideo(preparedPath, { mimeType: soundOnly ? 'audio/mp4' : 'video/mp4' });
   } catch (err) {
     await rm(preparedPath, { force: true });
     fail(`\nUpload failed: ${err.message}`);
   }
   process.stdout.write(' done\n');
-  video = { title: basename(filePath), author: 'a file on this computer', durationSec: original.durationSec, noAudio };
+  video = { title: basename(filePath), author: 'a file on this computer', durationSec: original.durationSec, noAudio, soundOnly };
 } else {
   video = await checkVideo(youtubeId);
   if (!video.ok) fail(`Can't use this video: ${video.reason}`);
@@ -131,7 +143,7 @@ const clipEnd = values.end ? parseClock(values.end) : null;
 const model = values.model ?? config.model;
 console.log(
   `Model: ${model} · detail: ${values.high ? 'high' : 'normal'} · thinking: ${config.thinkingLevel || 'model default'} · ` +
-    `frames: ${fps ?? 1}/s · sound: ${noAudio ? 'removed' : 'yes'} · ` +
+    (soundOnly ? 'sound only (no picture) · ' : `frames: ${fps ?? 1}/s · sound: ${noAudio ? 'removed' : 'yes'} · `) +
     `part: ${clipEnd === null && clipStart === 0 ? 'whole video' : `${formatClock(clipStart)}–${clipEnd === null ? 'end' : formatClock(clipEnd)}`}`,
 );
 console.log('Asking Gemini... (a 30-minute video usually takes a minute or two)\n');
@@ -159,7 +171,7 @@ let result;
 try {
   for (let attempt = 0; !result; attempt++) {
     try {
-      result = await extractPlaces({ youtubeId, file: upload, clipStart, clipEnd, model, highDetail: values.high, fps, noAudio });
+      result = await extractPlaces({ youtubeId, file: upload, clipStart, clipEnd, model, highDetail: values.high, fps, noAudio, soundOnly });
     } catch (err) {
       if (!err.retryable || attempt >= waits.length) {
         console.error(`Gemini failed: ${err.message}`);
@@ -212,12 +224,12 @@ console.log(`  Output tokens: ${usage.outputTokens.toLocaleString()} (of which t
 console.log(`  Cost: $${usage.costUsd.toFixed(4)} ≈ ₹${inr.toFixed(2)} (+18% GST ≈ ₹${(inr * 1.18).toFixed(2)}) at paid rates; ₹0 on the free tier`);
 
 await mkdir('ai-results', { recursive: true });
-const settingsTag = [values.high ? 'high' : 'normal', noAudio && 'nosound', fps && fps !== 1 && `fps${fps}`].filter(Boolean).join('-');
+const settingsTag = [values.high ? 'high' : 'normal', noAudio && 'nosound', soundOnly && 'soundonly', fps && fps !== 1 && `fps${fps}`].filter(Boolean).join('-');
 const file = `ai-results/${sourceName}-${model}-${settingsTag}-${Date.now()}.json`;
 await writeFile(
   file,
   JSON.stringify(
-    { source: youtubeId ? `https://www.youtube.com/watch?v=${youtubeId}` : basename(filePath), video, model, promptVersion: PROMPT_VERSION, highDetail: values.high, fps: fps ?? 1, noAudio, clipStart, clipEnd, seconds: Number(seconds), usage: result.usage, raw: result.raw, candidates, hiddenRanges },
+    { source: youtubeId ? `https://www.youtube.com/watch?v=${youtubeId}` : basename(filePath), video, model, promptVersion: PROMPT_VERSION, highDetail: values.high, fps: fps ?? 1, noAudio, soundOnly, clipStart, clipEnd, seconds: Number(seconds), usage: result.usage, raw: result.raw, candidates, hiddenRanges },
     null,
     2,
   ),

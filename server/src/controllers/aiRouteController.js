@@ -1,8 +1,16 @@
 // Starting an AI analysis of a trail's video, and accepting its reviewed places.
+import { createHash, randomUUID } from 'node:crypto';
+import { createWriteStream } from 'node:fs';
+import { mkdir, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { Transform } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { aiConfig } from '../config.js';
-import { Job } from '../models/Job.js';
+import { Job, MEDIA_MODES } from '../models/Job.js';
 import { PROMPT_VERSION } from '../services/gemini.js';
+import { probeVideo } from '../services/videoFile.js';
 import { httpError } from '../utils/httpError.js';
+import { formatClock } from '../utils/time.js';
 import { drawRouteFromPoints, findOwnTrail, saveTrail, sendTrail } from './trailsController.js';
 
 // What the browser sees of a job (not the raw Gemini answers).
@@ -18,6 +26,8 @@ export function jobView(job) {
     videoTitle: job.videoTitle ?? '',
     model: job.model,
     highDetail: job.highDetail,
+    source: job.source ?? 'youtube',
+    mediaMode: job.mediaMode ?? 'full',
     reused: Boolean(job.reusedFrom),
     costUsd: job.usage?.costUsd ?? 0,
     createdAt: job.createdAt,
@@ -32,47 +42,32 @@ const startOfMonthUtc = () => {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 };
 
-export async function startAiRoute(req, res) {
-  const config = aiConfig();
+// The checks before any analysis: the server can do it, the trail is the
+// user's and has no GPS route, and nothing is running for it already.
+async function trailReadyForAi(req, config) {
   if (!config.apiKey) throw httpError(503, "AI route building isn't set up on this server yet (GEMINI_API_KEY in server/.env).");
   const trail = await findOwnTrail(req);
   if (hasRecordedRoute(trail)) throw httpError(409, "This trail already has the rider's GPS route.");
+  if (await Job.exists({ type: 'ai-route', trail: trail._id, state: { $in: ['queued', 'running'] } })) {
+    throw httpError(409, 'An analysis is already running for this trail.');
+  }
+  return trail;
+}
 
-  const durationSec = Number(req.body?.durationSec);
+function checkDuration(value, config) {
+  const durationSec = Number(value);
   if (!Number.isFinite(durationSec) || durationSec <= 0) {
     throw httpError(400, "The video's length is missing. Wait for the video to load, then try again.");
   }
   if (durationSec > config.maxVideoMinutes * 60) {
     throw httpError(400, `Videos longer than ${config.maxVideoMinutes / 60} hours aren't supported yet.`);
   }
-  if (await Job.exists({ type: 'ai-route', trail: trail._id, state: { $in: ['queued', 'running'] } })) {
-    throw httpError(409, 'An analysis is already running for this trail.');
-  }
+  return durationSec;
+}
 
-  const highDetail = typeof req.body?.highDetail === 'boolean' ? req.body.highDetail : config.highDetail;
-  const settings = { type: 'ai-route', youtubeId: trail.youtubeId, model: config.model, promptVersion: PROMPT_VERSION, highDetail };
-
-  // Someone already analysed this video with the same settings: reuse it, free.
-  if (!req.body?.fresh) {
-    const previous = await Job.findOne({ ...settings, state: { $in: ['needs_review', 'accepted'] } }).sort({ createdAt: -1 });
-    if (previous?.result?.candidates) {
-      const job = await Job.create({
-        ...settings,
-        trail: trail._id,
-        user: req.user._id,
-        durationSec,
-        videoTitle: previous.videoTitle,
-        state: 'needs_review',
-        stage: 'review',
-        result: previous.result,
-        reusedFrom: previous._id,
-      });
-      return res.status(201).json(jobView(job));
-    }
-  }
-
-  // Limits that stop a runaway bill.
-  const today = await Job.countDocuments({ type: 'ai-route', user: req.user._id, createdAt: { $gte: startOfTodayUtc() }, reusedFrom: null });
+// Limits that stop a runaway bill.
+async function checkLimits(user, config) {
+  const today = await Job.countDocuments({ type: 'ai-route', user: user._id, createdAt: { $gte: startOfTodayUtc() }, reusedFrom: null });
   if (today >= config.jobsPerUserPerDay) {
     throw httpError(429, `You can run ${config.jobsPerUserPerDay} AI analyses a day. Please try again tomorrow.`);
   }
@@ -83,9 +78,139 @@ export async function startAiRoute(req, res) {
   if ((month?.spent ?? 0) >= config.monthlyBudgetUsd) {
     throw httpError(429, "This month's AI budget is used up. Please try again next month.");
   }
+}
 
+// An earlier analysis with the same settings, given again for free.
+async function reuse(previous, { trail, user, durationSec }) {
+  if (!previous?.result?.candidates) return null;
+  const { type, source, mediaMode, youtubeId, fileHash, model, promptVersion, highDetail, videoTitle, result } = previous;
+  return Job.create({
+    type,
+    source,
+    mediaMode,
+    youtubeId,
+    fileHash,
+    model,
+    promptVersion,
+    highDetail,
+    videoTitle,
+    result,
+    trail: trail._id,
+    user: user._id,
+    durationSec,
+    state: 'needs_review',
+    stage: 'review',
+    reusedFrom: previous._id,
+  });
+}
+
+const highDetailFrom = (value, config) => (typeof value === 'boolean' ? value : value === 'true' ? true : value === 'false' ? false : config.highDetail);
+const READY = { $in: ['needs_review', 'accepted'] };
+
+export async function startAiRoute(req, res) {
+  const config = aiConfig();
+  const trail = await trailReadyForAi(req, config);
+  const durationSec = checkDuration(req.body?.durationSec, config);
+  const highDetail = highDetailFrom(req.body?.highDetail, config);
+  const settings = { type: 'ai-route', youtubeId: trail.youtubeId, model: config.model, promptVersion: PROMPT_VERSION, highDetail };
+
+  // Someone already analysed this video with the same settings: reuse it, free.
+  if (!req.body?.fresh) {
+    const previous = await Job.findOne({ ...settings, source: { $ne: 'upload' }, state: READY }).sort({ createdAt: -1 });
+    const reused = await reuse(previous, { trail, user: req.user, durationSec });
+    if (reused) return res.status(201).json(jobView(reused));
+  }
+
+  await checkLimits(req.user, config);
   const job = await Job.create({ ...settings, trail: trail._id, user: req.user._id, durationSec });
   res.status(202).json(jobView(job));
+}
+
+// Saves the uploaded file (the request body) to `path`, stopping at
+// `maxBytes`, and returns its size and fingerprint (SHA-256).
+async function receiveFile(req, path, maxBytes) {
+  const hash = createHash('sha256');
+  let bytes = 0;
+  const count = new Transform({
+    transform(chunk, encoding, done) {
+      bytes += chunk.length;
+      if (bytes > maxBytes) return done(httpError(413, `The file is too big: the most this server takes is ${Math.round(maxBytes / 1048576)} MB.`));
+      hash.update(chunk);
+      done(null, chunk);
+    },
+  });
+  await pipeline(req, count, createWriteStream(path));
+  return { bytes, fileHash: hash.digest('hex') };
+}
+
+// Starts an analysis from a video file the owner uploads: the same video as
+// on YouTube, from their own computer. Unlike a YouTube link, TrailCast can
+// then choose what Gemini gets: picture and sound ('full'), the picture only,
+// or only the sound (what's said: the cheapest, but no sign boards). The file
+// waits on the server until the analysis ends, then it's deleted.
+// Query: mode, durationSec (the YouTube video's length, to check it's the
+// same video), highDetail. The X-File-Name header: the file's name.
+export async function uploadAiVideo(req, res) {
+  const config = aiConfig();
+  const trail = await trailReadyForAi(req, config);
+  const mediaMode = req.query.mode ?? 'full';
+  if (!MEDIA_MODES.includes(mediaMode)) throw httpError(400, `The mode must be one of: ${MEDIA_MODES.join(', ')}.`);
+  const youtubeSec = checkDuration(req.query.durationSec, config);
+  const maxBytes = config.maxUploadMb * 1048576;
+  if (Number(req.headers['content-length']) > maxBytes) {
+    throw httpError(413, `The file is too big: the most this server takes is ${config.maxUploadMb} MB.`);
+  }
+  await checkLimits(req.user, config);
+
+  await mkdir(config.uploadDir, { recursive: true });
+  const uploadPath = join(config.uploadDir, `${randomUUID()}.video`);
+  let keep = false;
+  try {
+    const { bytes, fileHash } = await receiveFile(req, uploadPath, maxBytes);
+    if (bytes === 0) throw httpError(400, 'No file arrived. Choose the video file and try again.');
+    let info;
+    try {
+      info = await probeVideo(uploadPath);
+    } catch (err) {
+      if (/not installed/.test(err.message)) throw httpError(503, "This server can't read video files yet (FFmpeg isn't installed).");
+      throw httpError(400, "That doesn't look like a video file. Try an .mp4, .mov or .mkv file.");
+    }
+    if (mediaMode !== 'picture' && !info.hasAudio) {
+      throw httpError(400, 'This file has no sound. Choose "Picture only" to use it.');
+    }
+    // The places' times must line up with the YouTube video, so it has to be the same edit.
+    const tolerance = Math.max(5, youtubeSec * 0.02);
+    if (Math.abs(info.durationSec - youtubeSec) > tolerance) {
+      throw httpError(
+        400,
+        `This file is ${formatClock(info.durationSec)} long, but the YouTube video is ${formatClock(youtubeSec)}. ` +
+          'Upload the same video you put on YouTube, so the places line up with it.',
+      );
+    }
+    const durationSec = checkDuration(info.durationSec, config);
+    const highDetail = highDetailFrom(req.query.highDetail, config);
+    let videoTitle = 'Uploaded video';
+    try {
+      videoTitle = decodeURIComponent(req.get('x-file-name') ?? '').slice(0, 200) || videoTitle;
+    } catch {
+      // A name that isn't properly encoded: keep the plain title.
+    }
+    const settings = { type: 'ai-route', source: 'upload', mediaMode, youtubeId: trail.youtubeId, fileHash, model: config.model, promptVersion: PROMPT_VERSION, highDetail };
+
+    // The same file was analysed the same way before: reuse it, free.
+    const previous = await Job.findOne({ ...settings, state: READY }).sort({ createdAt: -1 });
+    const reused = await reuse(previous, { trail, user: req.user, durationSec });
+    if (reused) {
+      await rm(uploadPath, { force: true });
+      return res.status(201).json(jobView(reused));
+    }
+
+    const job = await Job.create({ ...settings, uploadPath, videoTitle, trail: trail._id, user: req.user._id, durationSec });
+    keep = true;
+    res.status(202).json(jobView(job));
+  } finally {
+    if (!keep) await rm(uploadPath, { force: true });
+  }
 }
 
 // The latest analysis of this trail, so the page can pick up where it was.

@@ -21,14 +21,15 @@ function clipOffset(times, clip) {
 }
 
 // One clip's answer -> { places, hiddenRanges } in whole-video seconds.
-export function cleanClip(answer, clip, duration) {
+// relative: the clip was sent as its own file, so its times surely count from the clip's start.
+export function cleanClip(answer, clip, duration, { relative = false } = {}) {
   const rawPlaces = Array.isArray(answer?.places) ? answer.places : [];
   const rawHidden = Array.isArray(answer?.hidden_ranges) ? answer.hidden_ranges : [];
   const allTimes = [
     ...rawPlaces.map((p) => parseClock(p?.time)),
     ...rawHidden.flatMap((r) => [parseClock(r?.start), parseClock(r?.end)]),
   ].filter((t) => t !== null);
-  const offset = clipOffset(allTimes, clip);
+  const offset = relative ? clip.start : clipOffset(allTimes, clip);
   const toVideoTime = (value) => {
     const t = parseClock(value);
     return t === null ? null : Math.min(Math.max(t + offset, 0), duration);

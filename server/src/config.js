@@ -1,5 +1,7 @@
 // Settings for the AI route builder, read from the environment (server/.env).
 // Read on every call, so tests can change them.
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 function number(name, fallback) {
   const raw = process.env[name];
@@ -23,6 +25,9 @@ export function aiConfig() {
     // Waits (seconds) before retrying a failed Gemini call.
     retryDelays: (process.env.AI_RETRY_DELAYS || '30,120,600').split(',').map(Number),
     inrPerUsd: number('AI_INR_PER_USD', 88),
+    // Video files uploaded for the AI wait here until their analysis ends.
+    uploadDir: process.env.AI_UPLOAD_DIR || join(tmpdir(), 'trailcast-uploads'),
+    maxUploadMb: number('AI_MAX_UPLOAD_MB', 2048),
   };
 }
 

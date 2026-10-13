@@ -9,6 +9,11 @@ import mongoose from 'mongoose';
 export const JOB_TYPES = ['ai-route', 'route-enrich'];
 export const JOB_STATES = ['queued', 'running', 'needs_review', 'accepted', 'done', 'failed', 'cancelled'];
 export const JOB_STAGES = ['check', 'extract', 'clean', 'geocode', 'review', 'elevation', 'services', 'stats'];
+// What an AI analysis watches: the YouTube video (Gemini fetches it itself),
+// or a video file the owner uploaded, sent as picture and sound ('full'),
+// picture only, or sound only (what's said: the cheapest).
+export const AI_SOURCES = ['youtube', 'upload'];
+export const MEDIA_MODES = ['full', 'picture', 'sound'];
 
 const clipSchema = new mongoose.Schema(
   {
@@ -46,6 +51,12 @@ const jobSchema = new mongoose.Schema(
     promptVersion: String,
     highDetail: { type: Boolean, default: false },
     videoTitle: String,
+    source: { type: String, enum: AI_SOURCES, default: 'youtube' },
+    mediaMode: { type: String, enum: MEDIA_MODES, default: 'full' },
+    // upload: where the file waits on the server (deleted when the analysis
+    // ends), and a fingerprint so the same file is never paid for twice.
+    uploadPath: String,
+    fileHash: String,
 
     state: { type: String, enum: JOB_STATES, default: 'queued' },
     stage: { type: String, enum: JOB_STAGES, default: 'check' },

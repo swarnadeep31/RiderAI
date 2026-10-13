@@ -54,6 +54,29 @@ export const api = {
   startAiRoute: (id, options) => request(`/trails/${id}/ai-route`, { method: 'POST', body: options }),
   latestAiRoute: (id) => request(`/trails/${id}/ai-route`),
   acceptAiRoute: (id, body) => request(`/trails/${id}/ai-route/accept`, { method: 'POST', body }),
+  // A video file from the owner's computer instead of the YouTube link. options:
+  // { mode: 'full' | 'picture' | 'sound', durationSec, highDetail }. onProgress gets 0 to 1.
+  uploadAiVideo: (id, file, { mode, durationSec, highDetail }, onProgress) =>
+    new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const query = new URLSearchParams({ mode, durationSec: String(durationSec), highDetail: String(highDetail) });
+      xhr.open('POST', `/api/trails/${id}/ai-route/upload?${query}`);
+      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+      xhr.setRequestHeader('X-File-Name', encodeURIComponent(file.name));
+      xhr.upload.onprogress = (event) => event.lengthComputable && onProgress?.(event.loaded / event.total);
+      xhr.onload = () => {
+        let data = null;
+        try {
+          data = JSON.parse(xhr.responseText);
+        } catch {
+          // Not JSON: explained below.
+        }
+        if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+        else reject(new Error(data?.error ?? `The upload failed (${xhr.status}).`));
+      };
+      xhr.onerror = () => reject(new Error("Can't reach the TrailCast server. Is it running?"));
+      xhr.send(file);
+    }),
   getJob: (jobId) => request(`/jobs/${jobId}`),
   cancelJob: (jobId) => request(`/jobs/${jobId}/cancel`, { method: 'POST' }),
 };
