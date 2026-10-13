@@ -27,6 +27,10 @@ that moment, and save the places to Google Maps, a GPS app or a printable trip s
     map too); click to watch from there. Heights come from the GPX file, from OpenRouteService for routes drawn
     along roads and footpaths, or from OpenRouteService's elevation service for everything else. The trip sheet
     lists the passes and summits on the way.
+  - Trip stats under the title: distance, riding days, the highest point (named after the nearest key point; click
+    it to watch that moment) and the total climb. Riding days come from the GPS recording (a stop of 6 hours or
+    more counts as a night), from key points marked "Stayed the night here", or from the creator. A number that
+    isn't known isn't shown, and hovering a chip says how it was worked out. Trail cards show the distance and days.
 - **Creator tools:** add key points (pause the video, search for the place by name or click the map), line up the
   map with the video in two clicks, delete points or the whole trail.
 - **No GPS file? No problem:** add a key point each time the video reaches a new place, and TrailCast joins them into
@@ -37,7 +41,8 @@ that moment, and save the places to Google Maps, a GPS app or a printable trip s
   and how sure it is. It also marks intros, recaps and montages. The owner checks the list (untick, move, change
   the parts the map skips), then TrailCast draws the route through the ticked places. Places only mentioned
   ("one day we'll ride to Leh") start unticked, and places that would send the route far off its way are flagged.
-  The same video is never analysed (or paid for) twice, and daily and monthly limits stop runaway bills.
+  The same video is never analysed (or paid for) twice, and daily and monthly limits stop runaway bills. Places
+  where the rider spent the night come ticked as overnight stops, so they count towards the riding days.
 - **Take it with you:** an "Open in Google Maps" link for every key point, GPX and KML downloads (KML imports into
   Google My Maps), and a printable trip sheet you can save as a PDF.
 - **Day and night:** the site follows the device's light or dark setting. The switch is hidden in the scenery:
@@ -130,6 +135,7 @@ real video, of course).
 | `npm test` | Runs the server and client tests |
 | `npm run build` | Builds the website for production into `client/dist/` |
 | `npm run try-ai -w server -- <youtube-link or video file>` | Asks Gemini about one video and prints the places and the cost |
+| `npm run backfill-route-extras -w server` | Once, after updating: works out heights, services and stats for trails saved before the route tools |
 
 ## How the code is organised
 
@@ -139,8 +145,8 @@ client/                  React website (Vite, Tailwind CSS, Leaflet)
     pages/               One file per page: Home, NewTrail, Trail (watch + edit), Print (trip sheet),
                          Signup, Login, Welcome (questions after signing up), Account, Feedback
     components/          Pieces used by the pages: the map (with the gliding, draggable marker), the
-                         elevation chart, key point list, add-point form, route panel, AI route panel
-                         (start, progress, review), RequireAuth (makes a page logged-in only)
+                         elevation chart, trip stats chips, key point list, add-point form, route panel,
+                         AI route panel (start, progress, review), RequireAuth (makes a page logged-in only)
       art/               The hand-drawn SVG illustrations (hero landscape, summit, campsite, logo) and icons
     hooks/               useYouTubePlayer: puts a YouTube player on the page and reports its time,
                          with a clock the map reads 60 times a second, and seeks (also while scrubbing);
@@ -151,6 +157,7 @@ client/                  React website (Vite, Tailwind CSS, Leaflet)
                            along the route, and which video moment a point on the route belongs to
       exports.js           GPX/KML files and Google Maps / YouTube links
       elevation.js         axes for the elevation chart, the passes on the way, naming a spot after a key point
+      stats.js             the words on the trip stats chips, and how each number was worked out
       time.js              12:30 <-> 750 seconds
       theme.js             day/night mode: follows the device until the visitor clicks the sun or moon
     api.js               All calls to the server
@@ -166,7 +173,8 @@ server/                  Express API + MongoDB (Mongoose)
                          on the map, working out the cost
     routeExtras/         The route tools: the background job (route-enrich) that works out heights, services
                          along the route and trip stats once per version of a route; profile.js turns heights
-                         into the elevation chart's profile, highest point and climb
+                         into the elevation chart's profile, highest point and climb; stats.js works out the
+                         trip stats (distance, riding days, highest point, climb)
     jobs/worker.js       Runs background jobs one at a time (AI analyses and route-enrich); a job continues
                          where it stopped after a restart, and a paid Gemini answer is never asked for twice
     prompts/             What Gemini is asked (versioned, so a changed prompt doesn't reuse old answers)
@@ -175,6 +183,7 @@ server/                  Express API + MongoDB (Mongoose)
     utils/               YouTube link parsing, distances on the map, times like 1:02:05, small helpers
     config.js            The AI settings from server/.env
   scripts/try-ai-route.js  Try Gemini on one video from the command line
+  scripts/backfill-route-extras.js  Queue the route tools' work for trails saved before them
   test/                  API tests against a real (in-memory) MongoDB, with fake Gemini, maps and routing
 samples/                 A sample GPX file to try
 ```
@@ -194,11 +203,11 @@ samples/                 A sample GPX file to try
 | GET | `/api/trails` | Anyone | List trails (without their routes) |
 | GET | `/api/trails/:id` | Anyone | One trail with its route, key points, `routeVersion` and `elevationProfile` |
 | POST | `/api/trails` | Logged in | Create a trail from `youtubeUrl`, `title` and optional route (`track`, `trackTimes`, and `trackElevations`: one height or null per point) |
-| PATCH | `/api/trails/:id` | Owner | Change a trail (title, sync, support link...) |
+| PATCH | `/api/trails/:id` | Owner | Change a trail (title, sync, support link, `daysOverride`: riding days, or null to work them out...) |
 | DELETE | `/api/trails/:id` | Owner | Delete a trail |
 | POST | `/api/trails/:id/route` | Owner | Draw the route between the key points (`style`: `roads`, `paths` or `straight`) |
 | POST | `/api/trails/:id/points` | Owner | Add a key point |
-| PATCH | `/api/trails/:id/points/:pointId` | Owner | Change a key point |
+| PATCH | `/api/trails/:id/points/:pointId` | Owner | Change a key point (also `stopKind`: `break` or `overnight`) |
 | DELETE | `/api/trails/:id/points/:pointId` | Owner | Delete a key point |
 | POST | `/api/trails/:id/ai-route` | Owner | Start an AI analysis (`durationSec`, optional `highDetail`, `fresh`). Reuses an earlier analysis of the same video unless `fresh` |
 | GET | `/api/trails/:id/ai-route` | Owner | The trail's latest AI analysis, or `null` |

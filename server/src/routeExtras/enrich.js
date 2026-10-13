@@ -9,6 +9,7 @@ import { Trail } from '../models/Trail.js';
 import { heightsAvailable, lineHeights, MAX_ELEVATION_POINTS } from '../services/elevation.js';
 import { cumulativeDistances, locationAtDistance } from '../utils/geo.js';
 import { buildProfile } from './profile.js';
+import { computeStats } from './stats.js';
 
 // The outside services, replaceable in tests.
 export const defaultEnrichServices = { heightsAvailable, lineHeights };
@@ -82,7 +83,9 @@ export async function runEnrichJob(job, services = defaultEnrichServices) {
       await job.save();
     }
     if (job.stage === 'stats') {
-      await currentTrail(job);
+      // Now with the heights (and services) the earlier stages found.
+      const trail = await currentTrail(job);
+      await saveForVersion(job, { stats: computeStats(trail) });
     }
     job.state = 'done';
     job.lockedUntil = new Date(0);

@@ -178,6 +178,10 @@ describe('heights for the elevation chart', () => {
     assert.equal(after.elevationProfile.source, 'dem');
     assert.equal(after.elevationProfile.routeVersion, after.routeVersion);
     assert.equal(after.elevationProfile.summary.highestM, 3000);
+    // The stats stage then adds the highest point and climb to the trip stats.
+    assert.equal(after.stats.highestM, 3000);
+    assert.equal(after.stats.highestName, 'Top');
+    assert.ok(Math.abs(after.stats.ascentM - 1000) <= 10);
   });
 
   test('the job leaves a route that already has heights alone, and copes without a key', async () => {

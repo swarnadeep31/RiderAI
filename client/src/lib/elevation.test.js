@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { formatKm, formatMetres, heightAxis, keyPointsAlong, kmTicks, nameNear, niceStep, notablePeaks } from './elevation.js';
-import { cumulativeDistances } from './track.js';
+import { formatKm, formatMetres, heightAxis, kmTicks, nameNear, niceStep, notablePeaks } from './elevation.js';
 
 test('niceStep picks round steps', () => {
   expect(niceStep(3300, 3)).toBe(2000);
@@ -32,27 +31,16 @@ test('formatting', () => {
 });
 
 describe('naming a spot after the nearest key point', () => {
-  // A straight route along the equator, 0.1 degrees = 11.1 km.
-  const track = [
-    [0, 0],
-    [0, 0.1],
-    [0, 0.2],
-  ];
-  const route = { track, cum: cumulativeDistances(track) };
-  const along = keyPointsAlong(route, [
+  // Along the equator, 0.1 degrees is 11.1 km.
+  const points = [
     { name: 'Far end', lat: 0.001, lng: 0.2 },
     { name: 'Start', lat: 0, lng: 0 },
-  ]);
-
-  test('key points are placed along the route in order', () => {
-    expect(along.map((p) => p.name)).toEqual(['Start', 'Far end']);
-    expect(along[1].alongM).toBeCloseTo(22239, 0);
-  });
+  ];
 
   test('within 10 km, or nothing', () => {
-    expect(nameNear(along, 3000)).toBe('Start');
-    expect(nameNear(along, 20000)).toBe('Far end');
-    expect(nameNear(along, 11000)).toBeNull();
+    expect(nameNear(points, [0, 0.03])).toBe('Start');
+    expect(nameNear(points, [0, 0.18])).toBe('Far end');
+    expect(nameNear(points, [0, 0.1])).toBeNull();
   });
 });
 

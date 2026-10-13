@@ -83,6 +83,15 @@ function CandidateRow({ place, onChange, onSeek }) {
             {EVIDENCE[place.evidence]}
             {place.quote && <span className="italic"> · “{place.quote}”</span>}
           </p>
+          <label className="mt-0.5 flex w-fit items-center gap-1.5 text-xs text-stone-700">
+            <input
+              type="checkbox"
+              checked={place.stopKind === 'overnight'}
+              onChange={(e) => onChange({ stopKind: e.target.checked ? 'overnight' : null })}
+            />
+            <Icon name="moon" className="h-3.5 w-3.5 text-sky-600" />
+            Stayed the night here
+          </label>
           {place.flags
             ?.filter((flag) => FLAGS[flag])
             .map((flag) => (

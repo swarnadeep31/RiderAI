@@ -7,7 +7,9 @@ import { GoogleGenAI, MediaResolution } from '@google/genai';
 import { aiConfig } from '../config.js';
 import { formatClock } from '../utils/time.js';
 
-export const PROMPT_VERSION = 'videoPlaces.v1';
+// A new version means analyses made with an older prompt aren't reused.
+// v2 adds stay_kind (a break, or a night's stay).
+export const PROMPT_VERSION = 'videoPlaces.v2';
 const PROMPT = readFileSync(new URL(`../prompts/${PROMPT_VERSION}.md`, import.meta.url), 'utf8');
 
 // The answer Gemini must give (JSON Schema). The server checks it again before use.
@@ -23,6 +25,7 @@ export const PLACES_SCHEMA = {
         properties: {
           time: { type: 'string', description: 'H:MM:SS or MM:SS' },
           stay_until: { type: 'string', description: 'H:MM:SS or MM:SS' },
+          stay_kind: { type: 'string', enum: ['break', 'overnight'] },
           name: { type: 'string' },
           region: { type: 'string' },
           alt_names: { type: 'array', items: { type: 'string' } },

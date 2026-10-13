@@ -8,8 +8,8 @@ import { httpError } from '../utils/httpError.js';
 import { parseYouTubeId } from '../utils/youtube.js';
 
 // Only these fields can be set from a request; anything else in the body is ignored.
-const TRAIL_FIELDS = ['title', 'description', 'activity', 'supportUrl', 'track', 'trackTimes', 'recordedAt', 'videoStartsAt'];
-const POINT_FIELDS = ['name', 'note', 'time', 'lat', 'lng'];
+const TRAIL_FIELDS = ['title', 'description', 'activity', 'supportUrl', 'track', 'trackTimes', 'recordedAt', 'videoStartsAt', 'daysOverride'];
+const POINT_FIELDS = ['name', 'note', 'time', 'lat', 'lng', 'stopKind'];
 // Show who added a trail, but nothing else about them.
 const OWNER_FIELDS = 'username';
 

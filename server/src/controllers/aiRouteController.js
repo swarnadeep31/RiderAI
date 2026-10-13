@@ -97,11 +97,12 @@ export async function latestAiRoute(req, res) {
 
 function acceptedPlace(place) {
   if (typeof place !== 'object' || place === null) throw httpError(400, 'Each place must be an object.');
-  const { name, time, stayUntil, lat, lng, note, confidence, evidence, quote } = place;
+  const { name, time, stayUntil, stopKind, lat, lng, note, confidence, evidence, quote } = place;
   return {
     name,
     time,
     stayUntil: stayUntil ?? undefined,
+    stopKind: stopKind ?? undefined,
     lat,
     lng,
     note: note ?? '',

@@ -1,5 +1,5 @@
 // Plain functions for the elevation chart and the trip sheet.
-import { projectOnTrack } from './track.js';
+import { distanceMeters } from './track.js';
 
 // A round step for an axis that covers `range`: 50, 100, 200, 500, 1000...
 export function niceStep(range, maxTicks = 4) {
@@ -40,21 +40,13 @@ export const formatKm = (m) => {
   return km < 10 ? String(Math.round(km * 10) / 10) : String(Math.round(km));
 };
 
-// Where each key point is along the route: [{ name, alongM }], in order.
-export function keyPointsAlong(route, points) {
-  if (route.track.length < 2) return [];
-  return points
-    .map((p) => ({ name: p.name, alongM: projectOnTrack(route.track, route.cum, [p.lat, p.lng]).alongM }))
-    .sort((a, b) => a.alongM - b.alongM);
-}
-
-// The name of the key point nearest a spot on the route, if one is within
-// `withinM` along the route ("Taglang La"), otherwise null.
-export function nameNear(pointsAlong, alongM, withinM = 10000) {
+// The name of the key point nearest a location, if one is within `withinM`
+// ("Taglang La"), otherwise null. The same rule as the server's trip stats.
+export function nameNear(points, location, withinM = 10000) {
   let best = null;
-  for (const p of pointsAlong) {
-    const gap = Math.abs(p.alongM - alongM);
-    if (gap <= withinM && (!best || gap < best.gap)) best = { name: p.name, gap };
+  for (const p of points) {
+    const distance = distanceMeters(location, [p.lat, p.lng]);
+    if (distance <= withinM && (!best || distance < best.distance)) best = { name: p.name, distance };
   }
   return best?.name ?? null;
 }

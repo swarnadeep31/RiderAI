@@ -6,6 +6,7 @@ import { parseClock } from '../utils/time.js';
 const PRESENCES = ['here', 'mentioned'];
 const EVIDENCE = ['sign', 'milestone', 'speech', 'landmark'];
 const HIDDEN_REASONS = ['intro', 'recap', 'montage', 'flashback', 'off_route'];
+const STAY_KINDS = ['break', 'overnight'];
 const SAME_PLACE_WINDOW = 120; // seconds: the same name this close in two clips is one place
 export const MAX_CANDIDATES = 150;
 
@@ -43,6 +44,8 @@ export function cleanClip(answer, clip, duration) {
     places.push({
       time,
       stayUntil: stayUntil !== null && stayUntil > time ? stayUntil : null,
+      // A night's stay counts towards the trip's riding days.
+      stopKind: STAY_KINDS.includes(p?.stay_kind) ? p.stay_kind : null,
       name,
       region: text(p?.region, 100),
       altNames: (Array.isArray(p?.alt_names) ? p.alt_names : []).map((n) => text(n, 100)).filter(Boolean).slice(0, 5),
@@ -98,6 +101,9 @@ export function mergeClips(cleanedClips, { minConfidence }) {
     if (last && sameName(last.name, place.name) && last.presence === 'here' && place.presence === 'here') {
       last.stayUntil = Math.max(last.stayUntil ?? last.time, place.stayUntil ?? place.time);
       last.confidence = Math.max(last.confidence, place.confidence);
+      // A night's stay wins over a break.
+      if (place.stopKind === 'overnight') last.stopKind = 'overnight';
+      else last.stopKind ??= place.stopKind;
       continue;
     }
     collapsed.push({ ...place });

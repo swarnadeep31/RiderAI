@@ -41,6 +41,7 @@ export const api = {
   updateTrail: (id, changes) => request(`/trails/${id}`, { method: 'PATCH', body: changes }),
   deleteTrail: (id) => request(`/trails/${id}`, { method: 'DELETE' }),
   addPoint: (id, point) => request(`/trails/${id}/points`, { method: 'POST', body: point }),
+  updatePoint: (id, pointId, changes) => request(`/trails/${id}/points/${pointId}`, { method: 'PATCH', body: changes }),
   deletePoint: (id, pointId) => request(`/trails/${id}/points/${pointId}`, { method: 'DELETE' }),
   // style: 'roads', 'paths' or 'straight'
   drawRoute: (id, style) => request(`/trails/${id}/route`, { method: 'POST', body: { style } }),

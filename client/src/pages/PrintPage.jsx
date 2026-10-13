@@ -3,18 +3,19 @@ import { Link, useParams } from 'react-router';
 import { api } from '../api.js';
 import ErrorMessage from '../components/ErrorMessage.jsx';
 import { ACTIVITIES } from '../lib/activities.js';
-import { formatKm, formatMetres, keyPointsAlong, nameNear, notablePeaks } from '../lib/elevation.js';
+import { formatKm, formatMetres, nameNear, notablePeaks } from '../lib/elevation.js';
+import { climbText, daysText, distanceText, highestText } from '../lib/stats.js';
 import { googleMapsUrl, youtubeUrlAt } from '../lib/exports.js';
 import { formatTime } from '../lib/time.js';
-import { cumulativeDistances } from '../lib/track.js';
+import { cumulativeDistances, locationAtDistance } from '../lib/track.js';
 
 // The passes and summits on the way, highest first, named after the nearest key point.
 function Passes({ trail }) {
   const passes = useMemo(() => {
     const profile = trail.elevationProfile;
     if (!profile || profile.routeVersion !== trail.routeVersion) return [];
-    const along = keyPointsAlong({ track: trail.track, cum: cumulativeDistances(trail.track) }, trail.points);
-    return notablePeaks(profile).map((peak) => ({ ...peak, name: nameNear(along, peak.alongM) }));
+    const cum = cumulativeDistances(trail.track);
+    return notablePeaks(profile).map((peak) => ({ ...peak, name: nameNear(trail.points, locationAtDistance(trail.track, cum, peak.alongM)) }));
   }, [trail]);
   if (passes.length === 0) return null;
   const approximate = trail.routeSource === 'keypoints';
@@ -69,6 +70,12 @@ export default function PrintPage() {
   if (error) return <ErrorMessage>{error}</ErrorMessage>;
   if (!trail) return <p className="p-8 text-stone-500">Loading...</p>;
 
+  // "475 km · 2 days · Highest 5,328 m · Taglang La · 5,840 m climb"
+  const statsLine = [distanceText, daysText, highestText, climbText]
+    .map((text) => text(trail.stats))
+    .filter(Boolean)
+    .join(' · ');
+
   return (
     <main className="mx-auto max-w-3xl bg-white p-8 text-stone-900">
       <div className="no-print mb-8 flex flex-wrap items-center gap-3 rounded-lg bg-stone-100 p-3 text-sm">
@@ -92,6 +99,7 @@ export default function PrintPage() {
           youtu.be/{trail.youtubeId}
         </a>
       </p>
+      {statsLine && <p className="mt-3 font-semibold">{statsLine}</p>}
       {trail.description && <p className="mt-4 whitespace-pre-line">{trail.description}</p>}
 
       {trail.points.length > 0 ? (

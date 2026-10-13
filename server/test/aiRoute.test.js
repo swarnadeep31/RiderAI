@@ -25,7 +25,7 @@ afterEach(() => delete process.env.GEMINI_API_KEY);
 const geminiAnswer = {
   places: [
     { time: '1:30', name: 'Howrah', region: 'West Bengal', presence: 'here', evidence: 'sign', quote: 'Howrah station', confidence: 0.9 },
-    { time: '9:00', stay_until: '11:00', name: 'Durgapur', presence: 'here', evidence: 'speech', quote: 'chai break in Durgapur', confidence: 0.85 },
+    { time: '9:00', stay_until: '11:00', stay_kind: 'overnight', name: 'Durgapur', presence: 'here', evidence: 'speech', quote: 'night in Durgapur', confidence: 0.85 },
     { time: '12:00', name: 'Leh', presence: 'mentioned', evidence: 'speech', quote: 'one day we will reach Leh', confidence: 0.8 },
     { time: '16:00', name: 'Asansol', presence: 'here', evidence: 'milestone', confidence: 0.7 },
   ],
@@ -95,6 +95,9 @@ describe('AI route jobs', () => {
       ['Asansol', 'ai', 960, null],
     ]);
     assert.equal(trail.points[0].quote, 'Howrah station');
+    // A night's stay found by the AI counts towards the riding days.
+    assert.equal(trail.points[1].stopKind, 'overnight');
+    assert.equal(trail.stats.days, 2);
     assert.equal(trail.routeSource, 'keypoints');
     assert.equal(trail.ai.model, 'gemini-3.5-flash-lite');
     assert.deepEqual(trail.hiddenRanges, [{ start: 0, end: 90, reason: 'intro' }]);

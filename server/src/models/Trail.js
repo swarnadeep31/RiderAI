@@ -1,10 +1,13 @@
 import mongoose from 'mongoose';
+import { computeStats } from '../routeExtras/stats.js';
 
 export const ACTIVITIES = ['ride', 'hike', 'climb', 'cycle', 'other'];
 // How a route drawn between key points travels: along roads, along footpaths, or in straight lines.
 export const ROUTE_STYLES = ['roads', 'paths', 'straight'];
 export const MAX_TRACK_POINTS = 20000;
 export const MAX_KEY_POINTS = 200;
+// A key point where the rider took a break, or stayed the night (which counts towards riding days).
+export const STOP_KINDS = ['break', 'overnight'];
 
 const isLatitude = (n) => Number.isFinite(n) && n >= -90 && n <= 90;
 const isLongitude = (n) => Number.isFinite(n) && n >= -180 && n <= 180;
@@ -36,6 +39,7 @@ const keyPointSchema = new mongoose.Schema({
       message: 'A stop must end after it starts.',
     },
   },
+  stopKind: { type: String, enum: { values: STOP_KINDS, message: 'A stop is a break or an overnight stay.' } },
   // Added by a person, or suggested by the AI and accepted in review.
   origin: { type: String, enum: ['manual', 'ai'], default: 'manual' },
   // For AI places: how sure the AI was, and what it relied on.
@@ -81,6 +85,30 @@ const elevationProfileSchema = new mongoose.Schema(
   { _id: false },
 );
 
+// The trip stats under the title (see routeExtras/stats.js). Fields that
+// can't be known are left out. routeVersion: the route they were worked out for.
+const statsSchema = new mongoose.Schema(
+  {
+    routeVersion: Number,
+    distanceM: Number,
+    days: Number,
+    // owner: set by the creator; gps: rests in the recording; stops: key points marked as overnight.
+    daysSource: { type: String, enum: ['owner', 'gps', 'stops'] },
+    // Where the nights were, for the elevation chart.
+    nights: { type: [{ alongM: Number, name: String, _id: false }], default: [] },
+    highestM: Number,
+    highestAlongM: Number,
+    highestName: String,
+    ascentM: Number,
+    descentM: Number,
+    longestFuelGap: { fromM: Number, toM: Number, lengthM: Number, afterName: String, beforeName: String },
+    // A route drawn between key points: distances are estimates.
+    approximate: Boolean,
+    updatedAt: Date,
+  },
+  { _id: false },
+);
+
 const trailSchema = new mongoose.Schema(
   {
     // The user who added the trail. Only they can change it.
@@ -121,6 +149,15 @@ const trailSchema = new mongoose.Schema(
     // it was made for; a different version means it's out of date.
     routeVersion: { type: Number, default: 0 },
     elevationProfile: { type: elevationProfileSchema, default: undefined },
+    stats: { type: statsSchema, default: undefined },
+    // The number of riding days, if the creator says so (wins over the worked-out one).
+    daysOverride: {
+      type: Number,
+      min: [1, 'A trip lasts at least 1 day.'],
+      max: [365, 'A trip can last at most 365 days.'],
+      // null: worked out again from the route.
+      validate: { validator: (days) => days === null || Number.isInteger(days), message: 'Riding days must be a whole number.' },
+    },
     routeStyle: { type: String, enum: ROUTE_STYLES, default: 'roads' },
     hiddenRanges: { type: [hiddenRangeSchema], default: [] },
     // Set when an AI analysis was accepted, to trace and evaluate it.
@@ -147,6 +184,11 @@ trailSchema.path('trackTimes').validate({
     return times.every((t, i) => Number.isFinite(t) && (i === 0 || t >= times[i - 1]));
   },
   message: 'Route times must match the route points one for one and never go backwards.',
+});
+
+// The stats follow whatever was saved: the route, the key points, the owner's days.
+trailSchema.pre('save', function updateStats() {
+  this.stats = computeStats(this);
 });
 
 export const Trail = mongoose.model('Trail', trailSchema);

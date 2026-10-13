@@ -13,10 +13,65 @@ import KeyPointList from '../components/KeyPointList.jsx';
 import RoutePanel from '../components/RoutePanel.jsx';
 import SaveOptions from '../components/SaveOptions.jsx';
 import TrailMap from '../components/TrailMap.jsx';
+import TripStats from '../components/TripStats.jsx';
 import { useYouTubePlayer } from '../hooks/useYouTubePlayer.js';
-import { keyPointsAlong, nameNear } from '../lib/elevation.js';
-import { cumulativeDistances, hiddenRangeAt, isGpxRoute, nearestIndex, positionAt } from '../lib/track.js';
+import {
+  cumulativeDistances,
+  hiddenRangeAt,
+  isGpxRoute,
+  locationAtDistance,
+  nearestIndex,
+  positionAt,
+  videoTimeAtDistance,
+} from '../lib/track.js';
 import { formatTime } from '../lib/time.js';
+
+// The owner can say how many days the trip took, when the worked-out number is wrong.
+function DaysSetting({ trail, onSaved }) {
+  const [text, setText] = useState(trail.daysOverride ? String(trail.daysOverride) : '');
+  const [error, setError] = useState(null);
+  const worked = trail.stats?.daysSource && trail.stats.daysSource !== 'owner' ? trail.stats.days : null;
+
+  async function save(event) {
+    event.preventDefault();
+    const days = text.trim() === '' ? null : Number(text);
+    try {
+      setError(null);
+      onSaved(await api.updateTrail(trail._id, { daysOverride: days }));
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  return (
+    <form onSubmit={save} className="space-y-2 text-sm">
+      <h3 className="font-semibold">Riding days</h3>
+      <p className="text-stone-600">
+        {trail.daysOverride
+          ? `You set ${trail.daysOverride}. Empty the box and save to work it out again.`
+          : worked
+            ? `Worked out from the ${trail.stats.daysSource === 'gps' ? 'GPS recording' : 'overnight stops'}: ${worked}. Change it if that's wrong.`
+            : 'Mark the places you stayed the night (the moon on a key point), or type the number of days.'}
+      </p>
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          min="1"
+          max="365"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={worked ? String(worked) : 'Days'}
+          aria-label="Riding days"
+          className="field w-24"
+        />
+        <button type="submit" className="btn-secondary px-3 py-1.5">
+          Save
+        </button>
+      </div>
+      {error && <ErrorMessage>{error}</ErrorMessage>}
+    </form>
+  );
+}
 
 function describeSync(videoStartsAt) {
   if (videoStartsAt === 0) return 'The video and the GPS recording start at the same moment.';
@@ -69,7 +124,6 @@ export default function TrailPage() {
       },
     [trail?.track, trail?.trackTimes, trail?.videoStartsAt, trail?.hiddenRanges],
   );
-  const pointsAlong = useMemo(() => (route ? keyPointsAlong(route, trail.points) : []), [route, trail?.points]);
 
   if (loadError) {
     return (
@@ -104,6 +158,11 @@ export default function TrailPage() {
   const canSync = recorded && trail.trackTimes.length > 0;
   // Heights for the chart, if they belong to the route as it is now.
   const profile = trail.elevationProfile?.routeVersion === trail.routeVersion ? trail.elevationProfile : null;
+  const stats = trail.stats;
+  const overnights = (stats?.nights ?? []).map((night, i) => ({ alongM: night.alongM, label: `Night ${i + 1}${night.name ? ` · ${night.name}` : ''}` }));
+  const statsRow = (className) => (
+    <TripStats stats={stats} onHighest={Number.isFinite(stats?.highestAlongM) ? () => goAlong(stats.highestAlongM) : null} className={className} />
+  );
 
   // After any change, the server sends the updated trail, plus a message if
   // redrawing the route didn't go as asked (e.g. no road-following key).
@@ -115,6 +174,22 @@ export default function TrailPage() {
   function selectPoint(point) {
     video.seekTo(point.time);
     setFocus({ location: [point.lat, point.lng] });
+  }
+
+  // A spot along the route (the highest point, a fuel stop): show it on the
+  // map, and watch the moment the rider was there.
+  function goAlong(alongM) {
+    setFocus({ location: locationAtDistance(route.track, route.cum, alongM) });
+    const moment = videoTimeAtDistance(route, alongM, { duration: video.getDuration() });
+    if (moment) video.seekTo(moment.time);
+  }
+
+  async function toggleNight(point) {
+    try {
+      applyUpdate(await api.updatePoint(trail._id, point._id, { stopKind: point.stopKind === 'overnight' ? null : 'overnight' }));
+    } catch (err) {
+      setNotice(err.message);
+    }
   }
 
   // Clicking or dragging along the route. While dragging (not final), show the
@@ -198,6 +273,8 @@ export default function TrailPage() {
               <ErrorMessage>{video.error}</ErrorMessage>
             </div>
           )}
+          {/* Phones: the trip stats come straight after the video, before the map. */}
+          {statsRow('mt-4 lg:hidden')}
         </div>
 
         {/* The map, with the elevation chart under it in the same sticky column. */}
@@ -234,7 +311,8 @@ export default function TrailPage() {
               route={route}
               clock={video.clock}
               approximate={drawnRoute}
-              highestName={nameNear(pointsAlong, profile.summary?.highestAlongM)}
+              highestName={stats?.highestName}
+              overnights={overnights}
               getDuration={video.getDuration}
               onSeek={mapMode ? null : seekFromRoute}
               onHover={setGhost}
@@ -265,6 +343,7 @@ export default function TrailPage() {
                     Recorded GPS route
                   </p>
                 )}
+                {statsRow('mt-4 hidden lg:flex')}
                 {drawnRoute && (
                   <p className={`badge mt-3 ${aiRoute ? 'bg-violet-100 text-violet-800' : 'bg-amber-100 text-amber-900'}`}>
                     <Icon name={aiRoute ? 'sparkles' : 'route'} className="h-3.5 w-3.5 shrink-0" />
@@ -390,6 +469,8 @@ export default function TrailPage() {
                 />
               )}
 
+              {trail.track.length > 1 && <DaysSetting key={trail.daysOverride ?? 'auto'} trail={trail} onSaved={applyUpdate} />}
+
               <button type="button" onClick={deleteTrail} className="text-sm text-red-700 hover:underline">
                 Delete this trail
               </button>
@@ -406,6 +487,7 @@ export default function TrailPage() {
               editing={editing}
               onSelect={selectPoint}
               onDelete={deletePoint}
+              onToggleNight={toggleNight}
             />
           </section>
 
