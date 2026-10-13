@@ -136,13 +136,41 @@ console.log(
 );
 console.log('Asking Gemini... (a 30-minute video usually takes a minute or two)\n');
 
+// What to do about an error that didn't go away.
+function explainFailure(err) {
+  if (err.status === 503 || err.status === 500) {
+    return [
+      "Google's servers are overloaded right now. Your key, your code and your limits are fine.",
+      'Try again in a few minutes, or try another model, e.g. --model gemini-2.5-flash-lite (see --list-models).',
+    ];
+  }
+  if (err.status === 429) {
+    return [
+      'A rate limit was hit. Per-minute limits reset after a minute; daily ones at midnight Pacific time (12:30 PM in India).',
+      'A long video can pass the tokens-per-minute limit on its own: send fewer frames (--fps 0.5) or part of it (--end 30:00).',
+    ];
+  }
+  return [];
+}
+
 const startedAt = Date.now();
+const waits = config.retryDelays.slice(0, 2); // seconds to wait before trying again when Gemini is busy
 let result;
 try {
-  result = await extractPlaces({ youtubeId, file: upload, clipStart, clipEnd, model, highDetail: values.high, fps, noAudio });
-} catch (err) {
-  console.error(`Gemini failed: ${err.message}`);
-  process.exitCode = 1;
+  for (let attempt = 0; !result; attempt++) {
+    try {
+      result = await extractPlaces({ youtubeId, file: upload, clipStart, clipEnd, model, highDetail: values.high, fps, noAudio });
+    } catch (err) {
+      if (!err.retryable || attempt >= waits.length) {
+        console.error(`Gemini failed: ${err.message}`);
+        for (const line of explainFailure(err)) console.error(`  ${line}`);
+        process.exitCode = 1;
+        break;
+      }
+      console.log(`Gemini is busy${err.status ? ` (${err.status})` : ''}. Trying again in ${waits[attempt]} s...`);
+      await new Promise((done) => setTimeout(done, waits[attempt] * 1000));
+    }
+  }
 } finally {
   // Don't leave the video with Gemini or in the temp folder.
   if (upload) await deleteUploadedVideo(upload.name);
