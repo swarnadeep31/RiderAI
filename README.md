@@ -152,8 +152,10 @@ server/                  Express API + MongoDB (Mongoose)
                          FFmpeg (shrinking a video file and removing its sound)
     aiRoute/             The AI route builder: the job's stages, cleaning Gemini's answers, finding the places
                          on the map, working out the cost
-    jobs/worker.js       Runs AI jobs in the background, one at a time; a job continues where it stopped after
-                         a restart, and a paid Gemini answer is never asked for twice
+    routeExtras/         The route tools' background job (route-enrich): heights, services along the route and
+                         trip stats, worked out once per version of a route
+    jobs/worker.js       Runs background jobs one at a time (AI analyses and route-enrich); a job continues
+                         where it stopped after a restart, and a paid Gemini answer is never asked for twice
     prompts/             What Gemini is asked (versioned, so a changed prompt doesn't reuse old answers)
     routes/              Which URL goes to which controller
     middleware/          auth.js: login sessions; errorHandler.js: clear JSON error messages

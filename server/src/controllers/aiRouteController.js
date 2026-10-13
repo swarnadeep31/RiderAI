@@ -3,7 +3,7 @@ import { aiConfig } from '../config.js';
 import { Job } from '../models/Job.js';
 import { PROMPT_VERSION } from '../services/gemini.js';
 import { httpError } from '../utils/httpError.js';
-import { drawRouteFromPoints, findOwnTrail, sendTrail } from './trailsController.js';
+import { drawRouteFromPoints, findOwnTrail, saveTrail, sendTrail } from './trailsController.js';
 
 // What the browser sees of a job (not the raw Gemini answers).
 export function jobView(job) {
@@ -45,12 +45,12 @@ export async function startAiRoute(req, res) {
   if (durationSec > config.maxVideoMinutes * 60) {
     throw httpError(400, `Videos longer than ${config.maxVideoMinutes / 60} hours aren't supported yet.`);
   }
-  if (await Job.exists({ trail: trail._id, state: { $in: ['queued', 'running'] } })) {
+  if (await Job.exists({ type: 'ai-route', trail: trail._id, state: { $in: ['queued', 'running'] } })) {
     throw httpError(409, 'An analysis is already running for this trail.');
   }
 
   const highDetail = typeof req.body?.highDetail === 'boolean' ? req.body.highDetail : config.highDetail;
-  const settings = { youtubeId: trail.youtubeId, model: config.model, promptVersion: PROMPT_VERSION, highDetail };
+  const settings = { type: 'ai-route', youtubeId: trail.youtubeId, model: config.model, promptVersion: PROMPT_VERSION, highDetail };
 
   // Someone already analysed this video with the same settings: reuse it, free.
   if (!req.body?.fresh) {
@@ -72,7 +72,7 @@ export async function startAiRoute(req, res) {
   }
 
   // Limits that stop a runaway bill.
-  const today = await Job.countDocuments({ user: req.user._id, createdAt: { $gte: startOfTodayUtc() }, reusedFrom: null });
+  const today = await Job.countDocuments({ type: 'ai-route', user: req.user._id, createdAt: { $gte: startOfTodayUtc() }, reusedFrom: null });
   if (today >= config.jobsPerUserPerDay) {
     throw httpError(429, `You can run ${config.jobsPerUserPerDay} AI analyses a day. Please try again tomorrow.`);
   }
@@ -91,7 +91,7 @@ export async function startAiRoute(req, res) {
 // The latest analysis of this trail, so the page can pick up where it was.
 export async function latestAiRoute(req, res) {
   const trail = await findOwnTrail(req);
-  const job = await Job.findOne({ trail: trail._id }).sort({ createdAt: -1 });
+  const job = await Job.findOne({ type: 'ai-route', trail: trail._id }).sort({ createdAt: -1 });
   res.json(job ? jobView(job) : null);
 }
 
@@ -115,8 +115,9 @@ function acceptedPlace(place) {
 // The owner reviewed the AI's places: they become key points, and the route is drawn.
 export async function acceptAiRoute(req, res) {
   const trail = await findOwnTrail(req);
+  const version = trail.routeVersion;
   if (hasRecordedRoute(trail)) throw httpError(409, "This trail already has the rider's GPS route.");
-  const job = await Job.findOne({ _id: req.body?.jobId, trail: trail._id, user: req.user._id }).catch(() => null);
+  const job = await Job.findOne({ _id: req.body?.jobId, type: 'ai-route', trail: trail._id, user: req.user._id }).catch(() => null);
   if (!job) throw httpError(404, 'Analysis not found.');
   if (!['needs_review', 'accepted'].includes(job.state)) throw httpError(409, "This analysis isn't ready to accept.");
 
@@ -132,7 +133,7 @@ export async function acceptAiRoute(req, res) {
 
   const routeNotice = await drawRouteFromPoints(trail);
   trail.ai = { job: job._id, model: job.model, promptVersion: job.promptVersion, analyzedAt: new Date() };
-  await trail.save();
+  await saveTrail(trail, version);
   job.state = 'accepted';
   await job.save();
   await sendTrail(res, trail, { routeNotice });

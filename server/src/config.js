@@ -27,3 +27,18 @@ export function aiConfig() {
 }
 
 export const aiRouteAvailable = () => Boolean(aiConfig().apiKey);
+
+// Settings for the route tools: heights, services along the route and trip stats.
+export function routeConfig() {
+  return {
+    // Overpass finds fuel stations, mechanics, clinics and ATMs in OpenStreetMap.
+    overpassUrl: process.env.OVERPASS_URL || 'https://overpass-api.de/api/interpreter',
+    // "off" hides services along the route entirely.
+    services: process.env.ROUTE_SERVICES !== 'off',
+    chunkKm: number('SERVICES_CHUNK_KM', 200),
+    fuelGapWarnKm: number('FUEL_GAP_WARN_KM', 150),
+    // Wait this long after a route changes before working on it, so a burst of
+    // edits (adding key points one by one) is only worked on once.
+    enrichDelaySec: number('ROUTE_ENRICH_DELAY_SEC', 30),
+  };
+}

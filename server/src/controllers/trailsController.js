@@ -1,4 +1,6 @@
+import { Job } from '../models/Job.js';
 import { MAX_TRACK_POINTS, ROUTE_STYLES, Trail } from '../models/Trail.js';
+import { queueRouteEnrich } from '../routeExtras/enrich.js';
 import { routeSegments } from '../services/routing.js';
 import { timedTrack } from '../utils/geo.js';
 import { httpError } from '../utils/httpError.js';
@@ -41,6 +43,18 @@ export async function sendTrail(res, trail, { status = 200, routeNotice = null }
   res.status(status).json({ ...trail.toJSON(), routeNotice });
 }
 
+// A route with a new shape gets a new version, so what was worked out for the
+// old shape (heights, services along the route, stats) is redone.
+function bumpVersionIfReshaped(trail, previousTrack) {
+  if (JSON.stringify(trail.track) !== previousTrack) trail.routeVersion += 1;
+}
+
+// Saves the trail, and if its route has a new shape, queues the work for it.
+export async function saveTrail(trail, previousVersion) {
+  await trail.save();
+  if (trail.routeVersion !== previousVersion) await queueRouteEnrich(trail);
+}
+
 function sortPoints(trail) {
   trail.points.sort((a, b) => a.time - b.time);
   trail.markModified('points');
@@ -51,13 +65,16 @@ function sortPoints(trail) {
 export async function drawRouteFromPoints(trail) {
   const points = [...trail.points].sort((a, b) => a.time - b.time);
   if (points.length < 2) {
+    if (trail.track.length > 0) trail.routeVersion += 1;
     trail.set({ track: [], trackTimes: [] });
     return null;
   }
+  const previousTrack = JSON.stringify(trail.track);
   const { segments, notice } = await routeSegments(points, trail.routeStyle);
   const { track, trackTimes } = timedTrack(points, segments, MAX_TRACK_POINTS);
   // The times are video times already, so the video and route need no lining up.
   trail.set({ track, trackTimes, routeSource: 'keypoints', videoStartsAt: 0, recordedAt: undefined });
+  bumpVersionIfReshaped(trail, previousTrack);
   return notice;
 }
 
@@ -77,12 +94,14 @@ export async function listTrails(req, res) {
 
 export async function createTrail(req, res) {
   const fields = pick(req.body, TRAIL_FIELDS);
-  const trail = await Trail.create({
+  const trail = new Trail({
     ...fields,
     youtubeId: youtubeIdFrom(req.body),
     owner: req.user._id,
     routeSource: fields.track?.length ? 'gpx' : undefined,
+    routeVersion: fields.track?.length ? 1 : 0,
   });
+  await saveTrail(trail, 0);
   await sendTrail(res, trail, { status: 201 });
 }
 
@@ -92,17 +111,22 @@ export async function getTrail(req, res) {
 
 export async function updateTrail(req, res) {
   const trail = await findOwnTrail(req);
+  const version = trail.routeVersion;
+  const previousTrack = JSON.stringify(trail.track);
   const fields = pick(req.body, TRAIL_FIELDS);
   trail.set(fields);
   if (fields.track?.length) trail.routeSource = 'gpx';
+  if (fields.track !== undefined) bumpVersionIfReshaped(trail, previousTrack);
   if (req.body?.youtubeUrl !== undefined) trail.youtubeId = youtubeIdFrom(req.body);
-  await trail.save();
+  await saveTrail(trail, version);
   await sendTrail(res, trail);
 }
 
 export async function deleteTrail(req, res) {
   const trail = await findOwnTrail(req);
   await trail.deleteOne();
+  // Work waiting for this trail's route is no longer needed.
+  await Job.updateMany({ type: 'route-enrich', trail: trail._id, state: 'queued' }, { state: 'cancelled' });
   res.status(204).end();
 }
 
@@ -112,40 +136,44 @@ export async function drawRoute(req, res) {
   const style = req.body?.style ?? trail.routeStyle;
   if (!ROUTE_STYLES.includes(style)) throw httpError(400, `The route style must be one of: ${ROUTE_STYLES.join(', ')}.`);
   if (trail.points.length < 2) throw httpError(400, 'Add at least two key points first.');
+  const version = trail.routeVersion;
   trail.routeStyle = style;
   const routeNotice = await drawRouteFromPoints(trail);
-  await trail.save();
+  await saveTrail(trail, version);
   await sendTrail(res, trail, { routeNotice });
 }
 
 export async function addPoint(req, res) {
   const trail = await findOwnTrail(req);
+  const version = trail.routeVersion;
   trail.points.push(pick(req.body, POINT_FIELDS));
   sortPoints(trail);
   await trail.validate(); // check the new point before spending time on the route
   const routeNotice = await redrawIfDrawn(trail);
-  await trail.save();
+  await saveTrail(trail, version);
   await sendTrail(res, trail, { status: 201, routeNotice });
 }
 
 export async function updatePoint(req, res) {
   const trail = await findOwnTrail(req);
+  const version = trail.routeVersion;
   const point = trail.points.id(req.params.pointId);
   if (!point) throw httpError(404, 'Key point not found.');
   point.set(pick(req.body, POINT_FIELDS));
   sortPoints(trail);
   await trail.validate();
   const routeNotice = await redrawIfDrawn(trail);
-  await trail.save();
+  await saveTrail(trail, version);
   await sendTrail(res, trail, { routeNotice });
 }
 
 export async function deletePoint(req, res) {
   const trail = await findOwnTrail(req);
+  const version = trail.routeVersion;
   const point = trail.points.id(req.params.pointId);
   if (!point) throw httpError(404, 'Key point not found.');
   point.deleteOne();
   const routeNotice = await redrawIfDrawn(trail);
-  await trail.save();
+  await saveTrail(trail, version);
   await sendTrail(res, trail, { routeNotice });
 }

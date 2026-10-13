@@ -100,6 +100,10 @@ const trailSchema = new mongoose.Schema(
     // Where the route came from: a GPX recording, or drawn between the key points
     // (then trackTimes are estimated video times, and the route is approximate).
     routeSource: { type: String, enum: ['gpx', 'keypoints'] },
+    // Goes up by one whenever the shape of the route changes. Whatever was
+    // worked out for a route (heights, services, stats) records the version
+    // it was made for; a different version means it's out of date.
+    routeVersion: { type: Number, default: 0 },
     routeStyle: { type: String, enum: ROUTE_STYLES, default: 'roads' },
     hiddenRanges: { type: [hiddenRangeSchema], default: [] },
     // Set when an AI analysis was accepted, to trace and evaluate it.

@@ -5,6 +5,10 @@ import mongoose from 'mongoose';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 
+// Tests never call real outside services. Anything that forgets to use a fake
+// finds nothing listening here, instead of the real Overpass server.
+process.env.OVERPASS_URL ??= 'http://127.0.0.1:9/api/interpreter';
+
 export const app = createApp();
 
 // Each test file gets its own throwaway MongoDB, emptied before every test.

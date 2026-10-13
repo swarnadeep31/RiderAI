@@ -1,5 +1,19 @@
 import { describe, expect, test } from 'vitest';
-import { boundsOf, hiddenRangeAt, indexAtOrBefore, isGpxRoute, nearestIndex, positionAt, travelledAt } from './track.js';
+import cases from '../../../server/test/fixtures/route-geometry.json';
+import {
+  boundsOf,
+  cumulativeDistances,
+  distanceAtTime,
+  hiddenRangeAt,
+  indexAtOrBefore,
+  isGpxRoute,
+  locationAtDistance,
+  nearestIndex,
+  positionAt,
+  projectOnTrack,
+  timeAtDistance,
+  travelledAt,
+} from './track.js';
 
 const track = [
   [10, 20],
@@ -80,4 +94,40 @@ test('travelledAt: the covered part of the route, ending at the rider', () => {
     [10.5, 21],
   ]);
   expect(travelledAt(track, times, 0, 500)).toEqual(track);
+});
+
+// The same cases are checked against server/src/utils/geo.js, so both give the same answers.
+describe('route geometry (shared cases)', () => {
+  const near = (actual, expected, tolerance) => expect(Math.abs(actual - expected)).toBeLessThanOrEqual(tolerance);
+  const nearPoint = (actual, expected) => {
+    near(actual[0], expected[0], 1e-6); // about 0.1 m
+    near(actual[1], expected[1], 1e-6);
+  };
+
+  test.each(cases.cumulativeDistances)('cumulativeDistances: $track', (c) => {
+    const cum = cumulativeDistances(cases.tracks[c.track]);
+    expect(cum).toHaveLength(c.expected.length);
+    cum.forEach((d, i) => near(d, c.expected[i], 0.05));
+  });
+
+  test.each(cases.projectOnTrack)('projectOnTrack: $name', (c) => {
+    const track = cases.tracks[c.track];
+    const p = projectOnTrack(track, cumulativeDistances(track), c.location, c.window);
+    near(p.alongM, c.expected.alongM, 0.05);
+    if (c.expected.offM !== undefined) near(p.offM, c.expected.offM, 0.05);
+    nearPoint(p.point, c.expected.point);
+  });
+
+  test.each(cases.locationAtDistance)('locationAtDistance: $alongM m', (c) => {
+    const track = cases.tracks[c.track];
+    nearPoint(locationAtDistance(track, cumulativeDistances(track), c.alongM), c.expected);
+  });
+
+  test.each(cases.timeAtDistance)('timeAtDistance: $name', (c) => {
+    near(timeAtDistance(cumulativeDistances(cases.tracks[c.track]), cases.times[c.track], c.alongM), c.expected, 0.01);
+  });
+
+  test.each(cases.distanceAtTime)('distanceAtTime: $name', (c) => {
+    near(distanceAtTime(cumulativeDistances(cases.tracks[c.track]), cases.times[c.track], c.t), c.expected, 0.05);
+  });
 });
