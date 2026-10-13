@@ -45,6 +45,7 @@ export default function NewTrailPage() {
         ...form,
         track: route?.track ?? [],
         trackTimes: route?.trackTimes ?? [],
+        trackElevations: route?.trackElevations ?? undefined,
         recordedAt: route?.recordedAt ?? undefined,
       });
       navigate(`/trails/${trail._id}?edit=1`);

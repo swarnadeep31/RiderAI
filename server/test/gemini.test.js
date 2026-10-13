@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
-import { after, before, beforeEach, test } from 'node:test';
-import { summarizeUsage } from '../src/aiRoute/cost.js';
-import { writeFile, rm } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { after, before, beforeEach, test } from 'node:test';
+import { summarizeUsage } from '../src/aiRoute/cost.js';
+import { defaultServices } from '../src/aiRoute/pipeline.js';
 import { buildPrompt, deleteUploadedVideo, extractPlaces, GeminiError, uploadVideo } from '../src/services/gemini.js';
+import { hasFfmpeg } from '../src/services/videoFile.js';
 import { startFakeService } from './helpers.js';
 
 let gemini;
@@ -70,6 +73,7 @@ test('the prompt only mentions sound when the video has none', () => {
   const normal = buildPrompt({ wholeVideo: true });
   assert.doesNotMatch(normal, /\{\{|NO SOUND/);
   assert.match(buildPrompt({ wholeVideo: true, noAudio: true }), /landmarks\. This copy of the video has NO SOUND: use only what you see/);
+  assert.match(buildPrompt({ wholeVideo: true, soundOnly: true }), /landmarks\. You only have the SOUND of this video, no picture: use what is said/);
 });
 
 test('a video file is uploaded, processed, sent by its Gemini link, and can be deleted', async () => {
@@ -106,6 +110,34 @@ test('a video file is uploaded, processed, sent by its Gemini link, and can be d
     assert.ok(gemini.requests.some((r) => r.method === 'DELETE' && r.url.startsWith('/v1beta/files/ride123')));
   } finally {
     await rm(path, { force: true });
+  }
+});
+
+test('an uploaded ride, sound only: FFmpeg takes out the sound, Gemini gets it as audio, and it is deleted after', { skip: !(await hasFfmpeg()) && 'FFmpeg is not installed' }, async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'trailcast-sound-'));
+  const ride = join(dir, 'ride.mp4');
+  execFileSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=320x240:rate=10:duration=4', '-f', 'lavfi', '-i', 'sine=duration=4', '-shortest', '-c:v', 'libx264', '-c:a', 'aac', ride]);
+  const file = { name: 'files/sound1', uri: `${gemini.url}/v1beta/files/sound1`, mimeType: 'audio/mp4' };
+  reply = (req) => {
+    if (req.url === '/upload/v1beta/files') return [200, {}, { 'x-goog-upload-url': `${gemini.url}/upload-session/2` }];
+    if (req.url.startsWith('/upload-session/2')) return [200, { file: { ...file, state: 'ACTIVE' } }, { 'x-goog-upload-status': 'final' }];
+    if (req.method === 'DELETE') return [200, {}];
+    return ok();
+  };
+  try {
+    const job = { mediaMode: 'sound', uploadPath: ride, durationSec: 4, model: 'gemini-3.5-flash-lite', highDetail: false };
+    const result = await defaultServices.extractFromUpload({ job, clip: { start: 0, end: 4 } });
+    assert.ok(Array.isArray(result.data.places));
+
+    const sent = gemini.requests.find((r) => r.url.startsWith('/upload-session/2'));
+    assert.ok(sent.body.bytes > 1000 && sent.body.bytes < (await stat(ride)).size, `sent ${sent.body.bytes} bytes: just the sound`);
+    const ask = gemini.requests.find((r) => r.url.includes(':generateContent'));
+    const [soundPart, textPart] = ask.body.contents[0].parts;
+    assert.deepEqual(soundPart, { fileData: { fileUri: file.uri, mimeType: 'audio/mp4' } });
+    assert.match(textPart.text, /only have the SOUND/);
+    assert.ok(gemini.requests.some((r) => r.method === 'DELETE' && r.url.startsWith('/v1beta/files/sound1')), 'deleted from Gemini');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 });
 

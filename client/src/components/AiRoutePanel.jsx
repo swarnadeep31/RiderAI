@@ -15,6 +15,76 @@ const STAGES = {
   review: 'Almost done',
 };
 
+function stageText(job) {
+  if (job.source === 'upload' && job.stage === 'check') return 'Getting your file ready';
+  if (job.mediaMode === 'sound' && job.stage === 'extract') return 'Listening to the video';
+  return STAGES[job.stage];
+}
+
+// What the AI gets from a video file uploaded from the owner's computer.
+const MEDIA_MODES = [
+  { value: 'full', label: 'Picture and sound', hint: 'The most to go on: sign boards, milestones and what you say.' },
+  { value: 'sound', label: 'Sound only', hint: 'Just what is said: about a third of the tokens, so cheaper. Best for vlogs where you name the places.' },
+  { value: 'picture', label: 'Picture only', hint: 'Sign boards, milestones and on-screen text, without the sound.' },
+];
+
+// Instead of the YouTube link: the same video as a file from the owner's
+// computer. TrailCast can then choose what Gemini gets (only the sound, for
+// example), and it works for private and unlisted videos too.
+function UploadOption({ busy, onUpload }) {
+  const [file, setFile] = useState(null);
+  const [mode, setMode] = useState('full');
+  const [progress, setProgress] = useState(null);
+
+  async function upload() {
+    setProgress(0);
+    await onUpload(file, mode, setProgress);
+    setProgress(null);
+  }
+
+  return (
+    <details className="rounded-2xl border border-stone-200 p-3">
+      <summary className="cursor-pointer font-semibold text-violet-900">Or use the video file from your computer</summary>
+      <div className="mt-3 space-y-3">
+        <p className="text-stone-600">
+          Use the same video you put on YouTube, so the places line up with it. This also works for private and unlisted
+          videos. The file goes to Google's Gemini, and is deleted from TrailCast and Gemini when the analysis ends.
+        </p>
+        <input
+          type="file"
+          accept="video/*,.mkv,.mov,.mp4"
+          onChange={(e) => setFile(e.target.files[0] ?? null)}
+          className="block w-full text-sm file:mr-3 file:rounded-full file:border-0 file:bg-violet-100 file:px-3 file:py-1.5 file:font-semibold file:text-violet-800"
+        />
+        <fieldset className="space-y-1.5">
+          <legend className="font-medium">What should the AI use?</legend>
+          {MEDIA_MODES.map((option) => (
+            <label key={option.value} className="flex items-start gap-2">
+              <input type="radio" name="media-mode" value={option.value} checked={mode === option.value} onChange={() => setMode(option.value)} className="mt-1" />
+              <span>
+                <span className="font-semibold">{option.label}</span>
+                <span className="block text-xs text-stone-600">{option.hint}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        {progress !== null ? (
+          <div className="space-y-1" role="status">
+            <div className="h-2 overflow-hidden rounded-full bg-stone-200">
+              <div className="h-full rounded-full bg-violet-600 transition-all" style={{ width: `${Math.round(progress * 100)}%` }} />
+            </div>
+            <p className="text-xs text-stone-600">{progress < 1 ? `Uploading... ${Math.round(progress * 100)}%` : 'Checking the file...'}</p>
+          </div>
+        ) : (
+          <button type="button" onClick={upload} disabled={busy || !file} className="btn-ai">
+            Upload and build the route
+          </button>
+        )}
+      </div>
+    </details>
+  );
+}
+
 const EVIDENCE = { sign: 'Sign board', milestone: 'Milestone', speech: 'Said in the video', landmark: 'Landmark seen' };
 
 export const HIDDEN_REASONS = {
@@ -83,6 +153,15 @@ function CandidateRow({ place, onChange, onSeek }) {
             {EVIDENCE[place.evidence]}
             {place.quote && <span className="italic"> · “{place.quote}”</span>}
           </p>
+          <label className="mt-0.5 flex w-fit items-center gap-1.5 text-xs text-stone-700">
+            <input
+              type="checkbox"
+              checked={place.stopKind === 'overnight'}
+              onChange={(e) => onChange({ stopKind: e.target.checked ? 'overnight' : null })}
+            />
+            <Icon name="moon" className="h-3.5 w-3.5 text-sky-600" />
+            Stayed the night here
+          </label>
           {place.flags
             ?.filter((flag) => FLAGS[flag])
             .map((flag) => (
@@ -219,6 +298,22 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
     setBusy(false);
   }
 
+  async function uploadFile(file, mode, onProgress) {
+    const durationSec = Math.round(getDuration());
+    if (!durationSec) {
+      setError('Wait for the YouTube video to load, then try again: its length is needed to check the file is the same video.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      setJob(await api.uploadAiVideo(trail._id, file, { mode, durationSec, highDetail }, onProgress));
+    } catch (err) {
+      setError(err.message);
+    }
+    setBusy(false);
+  }
+
   async function cancel() {
     try {
       setJob(await api.cancelJob(job._id));
@@ -302,13 +397,14 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
           >
             {busy ? 'Starting...' : job?.state === 'accepted' ? 'Analyse the video again' : 'Build the route with AI'}
           </button>
+          <UploadOption busy={busy} onUpload={uploadFile} />
         </>
       )}
 
       {running && (
         <div className="card space-y-2 p-4">
           <p className="font-medium">
-            {job.state === 'queued' ? 'Waiting to start...' : `${STAGES[job.stage]}...`}
+            {job.state === 'queued' ? 'Waiting to start...' : `${stageText(job)}...`}
             {job.state === 'running' && job.progress?.total > 1 && (
               <span className="ml-1 text-stone-500">
                 ({job.progress.done} of {job.progress.total})

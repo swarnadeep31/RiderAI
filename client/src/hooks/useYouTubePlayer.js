@@ -99,14 +99,19 @@ export function useYouTubePlayer(videoId) {
     };
   }, [videoId]);
 
-  const seekTo = useCallback((seconds) => {
+  // allowSeekAhead: false while scrubbing (dragging the marker), so YouTube
+  // only shows frames it already has instead of loading at every step; true
+  // when the scrub ends. play: false to stay paused.
+  const seekTo = useCallback((seconds, { allowSeekAhead = true, play = true } = {}) => {
     const player = playerRef.current;
     if (!player?.seekTo) return;
-    player.seekTo(seconds, true);
-    player.playVideo();
+    player.seekTo(seconds, allowSeekAhead);
+    if (play) player.playVideo();
     Object.assign(clock.current, { time: seconds, at: performance.now() });
     setCurrentTime(seconds);
   }, []);
+
+  const isPlaying = useCallback(() => playerRef.current?.getPlayerState?.() === PLAYING, []);
 
   const pause = useCallback(() => {
     playerRef.current?.pauseVideo?.();
@@ -116,5 +121,5 @@ export function useYouTubePlayer(videoId) {
   // The video's length in seconds (0 until the player has loaded it).
   const getDuration = useCallback(() => playerRef.current?.getDuration?.() || 0, []);
 
-  return { containerRef, currentTime, clock: clock.current, error, seekTo, pause, getDuration };
+  return { containerRef, currentTime, clock: clock.current, error, seekTo, pause, isPlaying, getDuration };
 }

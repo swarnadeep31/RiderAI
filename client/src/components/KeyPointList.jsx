@@ -2,7 +2,7 @@ import { googleMapsUrl } from '../lib/exports.js';
 import Icon from './art/Icon.jsx';
 import { formatTime } from '../lib/time.js';
 
-export default function KeyPointList({ points, activePointId, editing, onSelect, onDelete }) {
+export default function KeyPointList({ points, activePointId, editing, onSelect, onDelete, onToggleNight }) {
   if (points.length === 0) {
     return (
       <p className="card flex items-center gap-3 p-5 text-sm text-stone-600">
@@ -40,6 +40,12 @@ export default function KeyPointList({ points, activePointId, editing, onSelect,
                   {formatTime(point.time)}
                   {point.stayUntil ? `–${formatTime(point.stayUntil)}` : ''}
                 </span>
+                {point.stopKind === 'overnight' && (
+                  <span className="badge ml-2 bg-sky-100 text-sky-800" title="Stayed the night here">
+                    <Icon name="moon" className="h-3 w-3" />
+                    Night
+                  </span>
+                )}
                 {point.origin === 'ai' && (
                   <span
                     className="ml-2 rounded bg-violet-100 px-1 text-xs font-medium text-violet-800"
@@ -60,6 +66,18 @@ export default function KeyPointList({ points, activePointId, editing, onSelect,
               <Icon name="pin" className="h-4 w-4" />
               Google Maps ↗
             </a>
+            {editing && (
+              <button
+                type="button"
+                onClick={() => onToggleNight(point)}
+                aria-pressed={point.stopKind === 'overnight'}
+                aria-label={`Stayed the night at ${point.name}`}
+                title={point.stopKind === 'overnight' ? 'Stayed the night here (click to undo)' : 'Mark: stayed the night here'}
+                className={`shrink-0 px-1 pt-1 ${point.stopKind === 'overnight' ? 'text-sky-600' : 'text-stone-400 hover:text-sky-600'}`}
+              >
+                <Icon name="moon" className="h-4 w-4" />
+              </button>
+            )}
             {editing && (
               <button
                 type="button"

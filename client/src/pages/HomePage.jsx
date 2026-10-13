@@ -7,6 +7,7 @@ import Icon from '../components/art/Icon.jsx';
 import { CampScene, HeroScene } from '../components/art/Scenery.jsx';
 import ErrorMessage from '../components/ErrorMessage.jsx';
 import { ACTIVITIES } from '../lib/activities.js';
+import { cardSummary } from '../lib/stats.js';
 
 const MADE_FOR = [
   ['ride', 'Moto vloggers'],
@@ -65,6 +66,12 @@ function TrailCard({ trail, index }) {
         </div>
         <div className="px-2 pt-3 pb-2">
           <h2 className="text-lg leading-snug font-bold text-ink group-hover:text-orange-700">{trail.title}</h2>
+          {cardSummary(trail.stats) && (
+            <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-stone-700">
+              <Icon name="route" className="h-4 w-4 shrink-0 text-pine-600 dark:text-pine-300" />
+              {cardSummary(trail.stats)}
+            </p>
+          )}
           <p className="mt-1 flex items-center gap-1.5 text-sm text-stone-500">
             <Icon name="pin" className="h-4 w-4 shrink-0 text-orange-500" />
             <span>

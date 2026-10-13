@@ -22,9 +22,23 @@ describe('parseGpx', () => {
         [32.25, 77.19],
         [32.26, 77.195],
       ],
+      // Heights where the file has them, null where it doesn't.
+      trackElevations: [2050, null, null],
       trackTimes: [0, 5, 60],
       recordedAt: '2026-03-12T06:00:00.000Z',
     });
+  });
+
+  test('keeps heights lined up with the points after thinning out', () => {
+    const points = Array.from({ length: 21 }, (_, i) => `<trkpt lat="${i}" lon="0"><ele>${1000 + i * 10}</ele></trkpt>`);
+    const result = parseGpx(gpx(`<trk><trkseg>${points.join('')}</trkseg></trk>`), { maxPoints: 11 });
+    expect(result.track.map(([lat]) => lat)).toEqual([0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20]);
+    expect(result.trackElevations).toEqual([1000, 1020, 1040, 1060, 1080, 1100, 1120, 1140, 1160, 1180, 1200]);
+  });
+
+  test('a file without heights has none', () => {
+    const result = parseGpx(gpx('<trk><trkseg><trkpt lat="1" lon="1" /><trkpt lat="2" lon="2"><ele> </ele></trkpt></trkseg></trk>'));
+    expect(result.trackElevations).toBeNull();
   });
 
   test('a route without times still gives a line, but no times', () => {

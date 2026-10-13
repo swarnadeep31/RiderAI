@@ -348,6 +348,78 @@
     stop-color 0.8s ease !important;
 }
 
+/* The elevation chart: one green line over a light wash, and a blue line at the
+   video's current moment (the same blue as the marker on the map). The greens
+   were checked for contrast and colourfulness on the light and dark cards. */
+:root {
+  --chart-line: #1a8a5a;
+  --chart-cursor: #2563eb;
+}
+:root.dark {
+  --chart-line: #26a46c;
+  --chart-cursor: #3b82f6;
+}
+.elevation-line {
+  stroke: var(--chart-line);
+}
+.elevation-wash {
+  fill: var(--chart-line);
+  fill-opacity: 0.1;
+}
+.elevation-dot {
+  fill: var(--chart-line);
+  stroke: var(--color-surface);
+}
+.elevation-cursor {
+  stroke: var(--chart-cursor);
+}
+
+/* Services along the route on the map: a coloured circle with its own symbol and a white ring. */
+.service-icon {
+  display: flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #ffffff;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
+}
+/* The longest stretch without fuel: a dashed outline in ink, under the route. */
+.fuel-gap-outline {
+  stroke: var(--color-ink);
+}
+
+/* The rider's marker on the map: a blue dot that can be dragged along the route. */
+.rider-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: #2563eb;
+  border: 3px solid #ffffff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+}
+.leaflet-marker-draggable .rider-dot {
+  cursor: grab;
+}
+.leaflet-dragging .rider-dot {
+  cursor: grabbing;
+}
+.rider-marker:focus {
+  outline: none;
+}
+/* The invisible line that makes the route clickable. The marker is the keyboard
+   control, so the browser's box around a clicked line would only be noise. */
+.scrub-line:focus {
+  outline: none;
+}
+.rider-marker:focus-visible .rider-dot {
+  box-shadow: 0 0 0 5px rgb(37 99 235 / 0.45);
+}
+
 /* The map at night: the tiles are turned dark; routes and pins keep their colours. */
 .dark .leaflet-tile-pane {
   filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9) saturate(0.5);

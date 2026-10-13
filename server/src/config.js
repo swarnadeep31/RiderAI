@@ -1,5 +1,7 @@
 // Settings for the AI route builder, read from the environment (server/.env).
 // Read on every call, so tests can change them.
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 function number(name, fallback) {
   const raw = process.env[name];
@@ -23,7 +25,25 @@ export function aiConfig() {
     // Waits (seconds) before retrying a failed Gemini call.
     retryDelays: (process.env.AI_RETRY_DELAYS || '30,120,600').split(',').map(Number),
     inrPerUsd: number('AI_INR_PER_USD', 88),
+    // Video files uploaded for the AI wait here until their analysis ends.
+    uploadDir: process.env.AI_UPLOAD_DIR || join(tmpdir(), 'trailcast-uploads'),
+    maxUploadMb: number('AI_MAX_UPLOAD_MB', 2048),
   };
 }
 
 export const aiRouteAvailable = () => Boolean(aiConfig().apiKey);
+
+// Settings for the route tools: heights, services along the route and trip stats.
+export function routeConfig() {
+  return {
+    // Overpass finds fuel stations, mechanics, clinics and ATMs in OpenStreetMap.
+    overpassUrl: process.env.OVERPASS_URL || 'https://overpass-api.de/api/interpreter',
+    // "off" hides services along the route entirely.
+    services: process.env.ROUTE_SERVICES !== 'off',
+    chunkKm: number('SERVICES_CHUNK_KM', 200),
+    fuelGapWarnKm: number('FUEL_GAP_WARN_KM', 150),
+    // Wait this long after a route changes before working on it, so a burst of
+    // edits (adding key points one by one) is only worked on once.
+    enrichDelaySec: number('ROUTE_ENRICH_DELAY_SEC', 30),
+  };
+}

@@ -5,6 +5,13 @@ import mongoose from 'mongoose';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 
+// Tests never call real outside services. Anything that forgets to use a fake
+// finds nothing listening here, instead of the real Overpass server.
+process.env.OVERPASS_URL ??= 'http://127.0.0.1:9/api/interpreter';
+// And tests don't wait between Overpass requests or before retrying.
+process.env.OVERPASS_SPACING_MS ??= '0';
+process.env.OVERPASS_RETRY_DELAY_SEC ??= '0';
+
 export const app = createApp();
 
 // Each test file gets its own throwaway MongoDB, emptied before every test.
