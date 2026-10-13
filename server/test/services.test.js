@@ -267,6 +267,12 @@ describe('the services stage of the route-enrich job', () => {
     }
   });
 
+  test('a route with no work waiting for it (saved before the route tools) is not shown as loading forever', async () => {
+    const { body: trail } = await alice.post('/api/trails').send({ title: 'Old', youtubeUrl, track: sampleTrack });
+    await Job.deleteMany({ trail: trail._id }); // as if saved before the route tools
+    assert.deepEqual((await alice.get(`/api/trails/${trail._id}/services`)).body, { status: 'unavailable', reason: 'not_ready' });
+  });
+
   test('a trail without a route, or a server with the feature off, says so', async () => {
     const { body: trail } = await alice.post('/api/trails').send({ title: 'Nothing yet', youtubeUrl });
     assert.deepEqual((await alice.get(`/api/trails/${trail._id}/services`)).body, { status: 'unavailable', reason: 'no_route' });

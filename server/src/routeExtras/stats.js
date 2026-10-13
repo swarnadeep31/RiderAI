@@ -35,6 +35,10 @@ export function restPeriods(track, trackTimes) {
     if (isRest) {
       rests.push({ index: i, endIndex: j - 1 });
       i = j;
+    } else if (j === track.length) {
+      // Still within 1 km at the end of the recording, but not for 6 hours:
+      // starting later can only be shorter (a climb on one crag, a city ride).
+      break;
     } else {
       i++;
     }

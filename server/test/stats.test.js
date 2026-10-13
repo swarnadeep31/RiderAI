@@ -36,6 +36,15 @@ describe('restPeriods', () => {
     assert.equal(restPeriods(track, trackTimes).length, 1);
   });
 
+  test('a long session that never leaves one place, but lasts under 6 hours, is quick and not a rest', () => {
+    // 20,000 points over 5 hours, all on one crag.
+    const crag = Array.from({ length: 20000 }, (_, i) => ({ location: [32 + (i % 7) * 0.0001, 77], time: i * 0.9 }));
+    const { track, trackTimes } = split(crag);
+    const started = performance.now();
+    assert.deepEqual(restPeriods(track, trackTimes), []);
+    assert.ok(performance.now() - started < 500, `took ${Math.round(performance.now() - started)} ms`);
+  });
+
   test('a long lunch under 6 hours is not', () => {
     const before = ride(32, 60, 0);
     const end = before.at(-1);

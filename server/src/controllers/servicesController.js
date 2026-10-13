@@ -20,7 +20,12 @@ export async function getServices(req, res) {
   if (trail.track.length < 2) return res.json({ status: 'unavailable', reason: 'no_route' });
 
   const found = await RouteServices.findOne({ trail: trail._id, routeVersion: trail.routeVersion });
-  if (!found) return res.json({ status: 'pending' });
+  if (!found) {
+    // Still being worked on, or not yet: a trail saved before the route tools
+    // (until the backfill runs), or work that stopped without an answer.
+    const working = await Job.exists({ type: 'route-enrich', trail: trail._id, routeVersion: trail.routeVersion, state: { $in: ['queued', 'running'] } });
+    return res.json(working ? { status: 'pending' } : { status: 'unavailable', reason: 'not_ready' });
+  }
   const { status, routeVersion, items, fuelGaps, computedAt, error, retryAt, reason } = found;
   if (status === 'ready') return res.json({ status, routeVersion, items, fuelGaps, computedAt });
   if (status === 'failed') return res.json({ status, error, retryAt: retryAt ?? null });
