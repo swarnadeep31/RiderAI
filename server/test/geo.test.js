@@ -146,3 +146,20 @@ test('simplify keeps the corners and drops points on a straight line', () => {
   assert.deepEqual(simplify(track.slice(0, 2), 100), [0, 1]);
   assert.deepEqual(simplify([], 100), []);
 });
+
+test('timedTrack carries heights through stops and thinning out', () => {
+  const points = [
+    { time: 100, stayUntil: 160, lat: 0, lng: 0 },
+    { time: 400, lat: 0, lng: 0.02 },
+  ];
+  const segments = [[[0, 0, 2000], [0, 0.01, 2050], [0, 0.02, 2100]]];
+  const { trackElevations } = timedTrack(points, segments);
+  assert.deepEqual(trackElevations, [2000, 2000, 2050, 2100]);
+
+  const long = Array.from({ length: 101 }, (_, i) => [0, i / 100, 1000 + i]);
+  const thinned = timedTrack([{ time: 0, lat: 0, lng: 0 }, { time: 100, lat: 0, lng: 1 }], [long], 11);
+  assert.deepEqual(thinned.trackElevations, [1000, 1010, 1020, 1030, 1040, 1050, 1060, 1070, 1080, 1090, 1100]);
+
+  const flat = timedTrack(points, [[[0, 0], [0, 0.02]]]);
+  assert.ok(flat.trackElevations.every((h) => h === null), 'straight lines have no heights');
+});

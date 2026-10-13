@@ -22,6 +22,11 @@ that moment, and save the places to Google Maps, a GPS app or a printable trip s
   - Click anywhere on the route to jump the video to the moment the rider was there. Drag the blue marker along the
     road to scrub through the ride: the video pauses and shows the frame under the marker, then carries on from
     there. With the marker focused, the arrow keys move 10 seconds (60 with Shift).
+  - An elevation chart under the map shows how high the route goes, with a blue line at the video's current moment
+    and the highest point labelled. Hover or touch it to see the distance, height and moment (the spot shows on the
+    map too); click to watch from there. Heights come from the GPX file, from OpenRouteService for routes drawn
+    along roads and footpaths, or from OpenRouteService's elevation service for everything else. The trip sheet
+    lists the passes and summits on the way.
 - **Creator tools:** add key points (pause the video, search for the place by name or click the map), line up the
   map with the video in two clicks, delete points or the whole trail.
 - **No GPS file? No problem:** add a key point each time the video reaches a new place, and TrailCast joins them into
@@ -48,7 +53,8 @@ that moment, and save the places to Google Maps, a GPS app or a printable trip s
 | Video storage, streaming, live streams | YouTube (official embedded player) | Free |
 | Map | OpenStreetMap + Leaflet | Free |
 | Place search | OpenStreetMap Nominatim | Free (one search per second) |
-| Routes along roads and paths | OpenRouteService free plan | Free (2,000 routes a day; each route is worked out once, when saved) |
+| Routes along roads and paths | OpenRouteService free plan | Free (2,000 routes a day; each route is worked out once, when saved). Heights come with the route at no extra cost |
+| Heights for other routes | OpenRouteService elevation service (same key) | Free (one request per route version, only for routes without heights) |
 | AI route builder (optional) | Google Gemini API | Free tier: up to 8 hours of YouTube video a day. Paid: about $0.06 (≈ ₹5) per 30 minutes of video, about 3× that with "read sign boards closely" |
 | Database | MongoDB Atlas free tier | Free |
 | Hosting | Free tiers (Render, Railway, Vercel...) | Free |
@@ -132,18 +138,19 @@ client/                  React website (Vite, Tailwind CSS, Leaflet)
   src/
     pages/               One file per page: Home, NewTrail, Trail (watch + edit), Print (trip sheet),
                          Signup, Login, Welcome (questions after signing up), Account, Feedback
-    components/          Pieces used by the pages: the map (with the gliding marker), key point list,
-                         add-point form, route panel, AI route panel (start, progress, review),
-                         RequireAuth (makes a page logged-in only)
+    components/          Pieces used by the pages: the map (with the gliding, draggable marker), the
+                         elevation chart, key point list, add-point form, route panel, AI route panel
+                         (start, progress, review), RequireAuth (makes a page logged-in only)
       art/               The hand-drawn SVG illustrations (hero landscape, summit, campsite, logo) and icons
     hooks/               useYouTubePlayer: puts a YouTube player on the page and reports its time,
                          with a clock the map reads 60 times a second, and seeks (also while scrubbing);
                          useReducedMotion
     lib/                 Plain functions, each with a .test.js next to it:
-      gpx.js               read GPX files in the browser
+      gpx.js               read GPX files in the browser (route, times and heights)
       track.js             where the rider is at a given video time, the part already covered, distances
                            along the route, and which video moment a point on the route belongs to
       exports.js           GPX/KML files and Google Maps / YouTube links
+      elevation.js         axes for the elevation chart, the passes on the way, naming a spot after a key point
       time.js              12:30 <-> 750 seconds
       theme.js             day/night mode: follows the device until the visitor clicks the sun or moon
     api.js               All calls to the server
@@ -152,13 +159,14 @@ server/                  Express API + MongoDB (Mongoose)
   src/
     models/              What trails, users, feedback and AI jobs look like in the database, with validation rules
     controllers/         What each API request does
-    services/            Outside services: routes along roads (OpenRouteService), place search (Nominatim),
+    services/            Outside services: routes along roads and heights (OpenRouteService), place search (Nominatim),
                          Gemini (including uploading a video file), YouTube's video check (oEmbed),
                          FFmpeg (shrinking a video file and removing its sound)
     aiRoute/             The AI route builder: the job's stages, cleaning Gemini's answers, finding the places
                          on the map, working out the cost
-    routeExtras/         The route tools' background job (route-enrich): heights, services along the route and
-                         trip stats, worked out once per version of a route
+    routeExtras/         The route tools: the background job (route-enrich) that works out heights, services
+                         along the route and trip stats once per version of a route; profile.js turns heights
+                         into the elevation chart's profile, highest point and climb
     jobs/worker.js       Runs background jobs one at a time (AI analyses and route-enrich); a job continues
                          where it stopped after a restart, and a paid Gemini answer is never asked for twice
     prompts/             What Gemini is asked (versioned, so a changed prompt doesn't reuse old answers)
@@ -184,8 +192,8 @@ samples/                 A sample GPX file to try
 | GET | `/api/places?q=...` | Logged in | Find places by name |
 | GET | `/api/config` | Anyone | What the server can do (`roadRouting`, `aiRoute`) |
 | GET | `/api/trails` | Anyone | List trails (without their routes) |
-| GET | `/api/trails/:id` | Anyone | One trail with its route and key points |
-| POST | `/api/trails` | Logged in | Create a trail from `youtubeUrl`, `title` and optional route |
+| GET | `/api/trails/:id` | Anyone | One trail with its route, key points, `routeVersion` and `elevationProfile` |
+| POST | `/api/trails` | Logged in | Create a trail from `youtubeUrl`, `title` and optional route (`track`, `trackTimes`, and `trackElevations`: one height or null per point) |
 | PATCH | `/api/trails/:id` | Owner | Change a trail (title, sync, support link...) |
 | DELETE | `/api/trails/:id` | Owner | Delete a trail |
 | POST | `/api/trails/:id/route` | Owner | Draw the route between the key points (`style`: `roads`, `paths` or `straight`) |

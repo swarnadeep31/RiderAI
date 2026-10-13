@@ -65,6 +65,22 @@ const hiddenRangeSchema = new mongoose.Schema(
   { _id: false },
 );
 
+// Heights along the route for the elevation chart: d[i] metres from the start
+// (every 10 m), e[i] the height there in metres. At most 1,000 samples.
+// summary: worked out from all the heights, not just these samples.
+export const PROFILE_SOURCES = ['gpx', 'ors', 'dem'];
+const elevationProfileSchema = new mongoose.Schema(
+  {
+    d: [Number],
+    e: [Number],
+    // gpx: the recording itself; ors: OpenRouteService with a drawn route; dem: OpenRouteService's elevation service.
+    source: { type: String, enum: PROFILE_SOURCES },
+    routeVersion: Number,
+    summary: { highestM: Number, highestAlongM: Number, ascentM: Number, descentM: Number },
+  },
+  { _id: false },
+);
+
 const trailSchema = new mongoose.Schema(
   {
     // The user who added the trail. Only they can change it.
@@ -104,6 +120,7 @@ const trailSchema = new mongoose.Schema(
     // worked out for a route (heights, services, stats) records the version
     // it was made for; a different version means it's out of date.
     routeVersion: { type: Number, default: 0 },
+    elevationProfile: { type: elevationProfileSchema, default: undefined },
     routeStyle: { type: String, enum: ROUTE_STYLES, default: 'roads' },
     hiddenRanges: { type: [hiddenRangeSchema], default: [] },
     // Set when an AI analysis was accepted, to trace and evaluate it.

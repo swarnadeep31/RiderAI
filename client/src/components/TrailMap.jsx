@@ -307,6 +307,7 @@ export default function TrailMap({
   isPlaying,
   pause,
   getDuration,
+  ghost,
 }) {
   const playable = trackTimes?.length > 0 && trackTimes.length === track.length;
   // Everything the route maths needs, worked out once per route.
@@ -354,6 +355,10 @@ export default function TrailMap({
           <CircleMarker center={pendingLocation} radius={9} pathOptions={{ color: ORANGE, weight: 3, dashArray: '4 4', fillOpacity: 0.2 }} />
         )}
         <AiPreview places={preview} />
+        {/* The spot under the pointer on the elevation chart. */}
+        {ghost && (
+          <CircleMarker center={ghost} radius={8} interactive={false} pathOptions={{ color: '#2563eb', weight: 3, fill: false, dashArray: '3 3' }} />
+        )}
         {playable && clock && <RiderLayer route={route} clock={clock} follow={follow} approximate={approximate} scrub={scrub} />}
         <FitToTrail trailId={trailId} locations={locations} />
         <FitToPreview places={preview} />

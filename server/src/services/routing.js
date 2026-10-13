@@ -1,18 +1,20 @@
 // Draws the route between key points: along real roads or footpaths using
-// OpenRouteService (free, needs ORS_API_KEY), or as straight lines.
+// OpenRouteService (free, needs ORS_API_KEY), or as straight lines. Routes
+// along roads and footpaths come with heights: [lat, lng, height].
 
 const PROFILES = { roads: 'driving-car', paths: 'foot-hiking' };
 const STYLE_NAMES = { roads: 'roads', paths: 'footpaths' };
 // Places per request. Longer routes are fetched in pieces.
 const MAX_WAYPOINTS = 25;
 
-const orsUrl = () => process.env.ORS_BASE_URL || 'https://api.openrouteservice.org';
+export const orsUrl = () => process.env.ORS_BASE_URL || 'https://api.openrouteservice.org';
 export const roadRoutingAvailable = () => Boolean(process.env.ORS_API_KEY);
 
 const straightSegments = (points) => points.slice(1).map((p, i) => [[points[i].lat, points[i].lng], [p.lat, p.lng]]);
 
-// Returns { segments, notice }: one list of [lat, lng] from each key point to
-// the next, and a message for the user if the route had to fall back to straight lines.
+// Returns { segments, notice }: one list of [lat, lng] (or [lat, lng, height])
+// from each key point to the next, and a message for the user if the route
+// had to fall back to straight lines.
 export async function routeSegments(points, style) {
   if (style === 'straight') return { segments: straightSegments(points), notice: null };
   if (!roadRoutingAvailable()) {
@@ -44,6 +46,7 @@ async function fetchSegments(points, profile) {
       body: JSON.stringify({
         coordinates: points.map((p) => [p.lng, p.lat]), // OpenRouteService wants longitude first
         radiuses: points.map(() => -1), // snap each place to the nearest road, however far
+        elevation: true, // heights for the elevation chart, at no extra cost
       }),
       signal: AbortSignal.timeout(20000),
     });
@@ -61,12 +64,15 @@ async function fetchSegments(points, profile) {
     throw new Error('OpenRouteService sent an unexpected answer');
   }
 
-  const line = coordinates.map(([lng, lat]) => [lat, lng]);
-  // Start and end each piece exactly at the key points, so the line touches the pins.
+  // [lng, lat] or [lng, lat, height] -> [lat, lng] or [lat, lng, height]
+  const line = coordinates.map(([lng, lat, height]) => (Number.isFinite(height) ? [lat, lng, height] : [lat, lng]));
+  // Start and end each piece exactly at the key points, so the line touches
+  // the pins. A key point takes the height of the road where it was snapped.
+  const at = (point, linePoint) => (linePoint?.length > 2 ? [point.lat, point.lng, linePoint[2]] : [point.lat, point.lng]);
   return points.slice(1).map((p, i) => [
-    [points[i].lat, points[i].lng],
+    at(points[i], line[wayPoints[i]]),
     ...line.slice(wayPoints[i], wayPoints[i + 1] + 1),
-    [p.lat, p.lng],
+    at(p, line[wayPoints[i + 1]]),
   ]);
 }
 

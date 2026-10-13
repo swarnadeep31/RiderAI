@@ -348,6 +348,32 @@
     stop-color 0.8s ease !important;
 }
 
+/* The elevation chart: one green line over a light wash, and a blue line at the
+   video's current moment (the same blue as the marker on the map). The greens
+   were checked for contrast and colourfulness on the light and dark cards. */
+:root {
+  --chart-line: #1a8a5a;
+  --chart-cursor: #2563eb;
+}
+:root.dark {
+  --chart-line: #26a46c;
+  --chart-cursor: #3b82f6;
+}
+.elevation-line {
+  stroke: var(--chart-line);
+}
+.elevation-wash {
+  fill: var(--chart-line);
+  fill-opacity: 0.1;
+}
+.elevation-dot {
+  fill: var(--chart-line);
+  stroke: var(--color-surface);
+}
+.elevation-cursor {
+  stroke: var(--chart-cursor);
+}
+
 /* The rider's marker on the map: a blue dot that can be dragged along the route. */
 .rider-dot {
   width: 22px;

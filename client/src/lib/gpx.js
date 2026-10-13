@@ -27,8 +27,10 @@ export function parseGpx(text, { maxPoints = MAX_TRACK_POINTS } = {}) {
     const lat = Number(node.getAttribute('lat'));
     const lng = Number(node.getAttribute('lon'));
     if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) continue;
-    const time = [...node.children].find((child) => child.localName === 'time')?.textContent;
-    points.push({ lat, lng, time: time ? Date.parse(time) : NaN });
+    const child = (name) => [...node.children].find((c) => c.localName === name)?.textContent;
+    const time = child('time');
+    const ele = child('ele');
+    points.push({ lat, lng, time: time ? Date.parse(time) : NaN, ele: ele === undefined || ele.trim() === '' ? NaN : Number(ele) });
   }
   if (points.length < 2) throw new Error('No route found in this file. It needs at least two GPS points.');
 
@@ -37,9 +39,13 @@ export function parseGpx(text, { maxPoints = MAX_TRACK_POINTS } = {}) {
   const hasTimes = kept.every((p, i) => Number.isFinite(p.time) && (i === 0 || p.time >= kept[i - 1].time));
   const start = kept[0].time;
 
+  // Heights for the elevation chart, one per point (null where the file has none).
+  const hasHeights = kept.some((p) => Number.isFinite(p.ele));
+
   return {
     name: doc.querySelector('trk > name, metadata > name')?.textContent.trim() ?? '',
     track: kept.map((p) => [round(p.lat, 6), round(p.lng, 6)]),
+    trackElevations: hasHeights ? kept.map((p) => (Number.isFinite(p.ele) ? round(p.ele, 1) : null)) : null,
     trackTimes: hasTimes ? kept.map((p) => round((p.time - start) / 1000, 1)) : [],
     recordedAt: hasTimes ? new Date(start).toISOString() : null,
   };

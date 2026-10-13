@@ -1,10 +1,50 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { api } from '../api.js';
 import ErrorMessage from '../components/ErrorMessage.jsx';
 import { ACTIVITIES } from '../lib/activities.js';
+import { formatKm, formatMetres, keyPointsAlong, nameNear, notablePeaks } from '../lib/elevation.js';
 import { googleMapsUrl, youtubeUrlAt } from '../lib/exports.js';
 import { formatTime } from '../lib/time.js';
+import { cumulativeDistances } from '../lib/track.js';
+
+// The passes and summits on the way, highest first, named after the nearest key point.
+function Passes({ trail }) {
+  const passes = useMemo(() => {
+    const profile = trail.elevationProfile;
+    if (!profile || profile.routeVersion !== trail.routeVersion) return [];
+    const along = keyPointsAlong({ track: trail.track, cum: cumulativeDistances(trail.track) }, trail.points);
+    return notablePeaks(profile).map((peak) => ({ ...peak, name: nameNear(along, peak.alongM) }));
+  }, [trail]);
+  if (passes.length === 0) return null;
+  const approximate = trail.routeSource === 'keypoints';
+  return (
+    <section className="mt-8 break-inside-avoid">
+      <h2 className="text-lg font-bold">High points on the way</h2>
+      <table className="mt-2 w-full border-collapse text-left text-sm">
+        <thead>
+          <tr className="border-b-2 border-stone-800">
+            <th className="py-2 pr-3">Place</th>
+            <th className="py-2 pr-3 text-right">Height</th>
+            <th className="py-2 text-right">Distance from the start</th>
+          </tr>
+        </thead>
+        <tbody>
+          {passes.map((pass) => (
+            <tr key={pass.alongM} className="border-b border-stone-200">
+              <td className="py-2 pr-3 font-semibold">{pass.name ?? `At km ${formatKm(pass.alongM)}`}</td>
+              <td className="py-2 pr-3 text-right tabular-nums">{formatMetres(pass.heightM)} m</td>
+              <td className="py-2 text-right tabular-nums">
+                {approximate ? '≈ ' : ''}
+                {formatKm(pass.alongM)} km
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
 
 // A plain page made for printing. The browser's print window can save it as a PDF.
 export default function PrintPage() {
@@ -91,6 +131,8 @@ export default function PrintPage() {
       ) : (
         <p className="mt-8 text-stone-500">No key points marked yet.</p>
       )}
+
+      <Passes trail={trail} />
 
       <p className="mt-10 text-xs text-stone-400">Made with TrailCast. Map data © OpenStreetMap contributors.</p>
     </main>

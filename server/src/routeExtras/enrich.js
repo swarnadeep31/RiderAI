@@ -6,9 +6,12 @@
 import { routeConfig } from '../config.js';
 import { Job } from '../models/Job.js';
 import { Trail } from '../models/Trail.js';
+import { heightsAvailable, lineHeights, MAX_ELEVATION_POINTS } from '../services/elevation.js';
+import { cumulativeDistances, locationAtDistance } from '../utils/geo.js';
+import { buildProfile } from './profile.js';
 
 // The outside services, replaceable in tests.
-export const defaultEnrichServices = {};
+export const defaultEnrichServices = { heightsAvailable, lineHeights };
 
 // The route changed (or the trail was deleted) while the job ran: its work is out of date.
 class RouteChanged extends Error {}
@@ -36,10 +39,41 @@ export async function queueRouteEnrich(trail) {
   );
 }
 
+// Saves something worked out for a route, unless the route changed meanwhile.
+async function saveForVersion(job, changes) {
+  const { matchedCount } = await Trail.updateOne({ _id: job.trail, routeVersion: job.routeVersion }, { $set: changes });
+  if (matchedCount === 0) throw new RouteChanged();
+}
+
+// Heights for routes that came without them: straight lines, GPX files without
+// heights (or with too many missing), or when road routing failed. The route
+// is sent as up to 2,000 evenly spaced points. Heights are a nice extra: if
+// they can't be had, the elevation chart is simply not shown.
+async function addHeights(job, services) {
+  const trail = await currentTrail(job);
+  if (trail.elevationProfile?.routeVersion === trail.routeVersion) return;
+  if (!services.heightsAvailable()) return;
+  const cum = cumulativeDistances(trail.track);
+  const total = cum.at(-1);
+  if (!(total > 0)) return;
+  const count = Math.max(2, Math.min(MAX_ELEVATION_POINTS, trail.track.length));
+  const alongM = Array.from({ length: count }, (_, i) => (total * i) / (count - 1));
+  let heights;
+  try {
+    heights = await services.lineHeights(alongM.map((d) => locationAtDistance(trail.track, cum, d)));
+  } catch (err) {
+    console.warn(`No heights for trail ${trail._id}: ${err.message}`);
+    return;
+  }
+  const profile = buildProfile({ alongM, heights, source: 'dem' });
+  if (profile) await saveForVersion(job, { elevationProfile: { ...profile, routeVersion: job.routeVersion } });
+}
+
 export async function runEnrichJob(job, services = defaultEnrichServices) {
   try {
     await currentTrail(job);
     if (job.stage === 'elevation') {
+      await addHeights(job, services);
       job.stage = 'services';
       await job.save();
     }

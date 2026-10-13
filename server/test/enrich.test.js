@@ -121,3 +121,81 @@ describe('route versions and the route-enrich job', () => {
     }
   });
 });
+
+describe('heights for the elevation chart', () => {
+  // A 20 km climb from 2,000 m to 3,000 m, recorded every 100 m.
+  const climbTrack = Array.from({ length: 201 }, (_, i) => [32.2 + i * 0.0009, 77.19]);
+  const climbHeights = climbTrack.map((_, i) => 2000 + i * 5);
+
+  test('a GPX route with heights gets its profile when saved', async () => {
+    const res = await alice.post('/api/trails').send({ title: 'Climb', youtubeUrl, track: climbTrack, trackElevations: climbHeights });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    const profile = res.body.elevationProfile;
+    assert.equal(profile.source, 'gpx');
+    assert.equal(profile.routeVersion, 1);
+    assert.equal(profile.d.length, 201);
+    // GPS heights are smoothed, which shaves a few metres off a peak at the very end.
+    assert.ok(Math.abs(profile.summary.highestM - 3000) <= 5, `highest ${profile.summary.highestM}`);
+    // The dead band leaves out the last climb under 10 m, and smoothing softens the ends.
+    assert.ok(Math.abs(profile.summary.ascentM - 1000) <= 25, `climb ${profile.summary.ascentM}`);
+    // The list of trails leaves the profile out, like the route.
+    const list = await alice.get('/api/trails');
+    assert.equal(list.body[0].elevationProfile, undefined);
+  });
+
+  test('heights must match the route point for point', async () => {
+    const res = await alice.post('/api/trails').send({ title: 'Climb', youtubeUrl, track: climbTrack, trackElevations: [1, 2, 3] });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /one number \(or null\) per route point/);
+  });
+
+  test('a GPX route with too many heights missing gets none, until the job finds some', async () => {
+    const patchy = climbHeights.map((h, i) => (i % 3 === 0 ? h : null));
+    const res = await alice.post('/api/trails').send({ title: 'Climb', youtubeUrl, track: climbTrack, trackElevations: patchy });
+    assert.equal(res.body.elevationProfile, undefined);
+  });
+
+  test("a straight-line route gets heights from OpenRouteService's elevation service in the job", async () => {
+    const { body: trail } = await alice.post('/api/trails').send({ title: 'Ride', youtubeUrl });
+    await alice.post(`/api/trails/${trail._id}/points`).send({ time: 0, name: 'Foot', lat: 32.2, lng: 77.19 });
+    await alice.post(`/api/trails/${trail._id}/points`).send({ time: 600, name: 'Top', lat: 32.38, lng: 77.19 });
+    const drawn = await alice.post(`/api/trails/${trail._id}/route`).send({ style: 'straight' });
+    assert.equal(drawn.body.elevationProfile, undefined);
+
+    const asked = [];
+    await processNextJob({
+      heightsAvailable: () => true,
+      lineHeights: async (locations) => {
+        asked.push(locations);
+        // Up 1,000 m from the foot to the top.
+        return locations.map(([lat]) => 2000 + ((lat - 32.2) / 0.18) * 1000);
+      },
+    });
+    assert.equal(asked.length, 1);
+    assert.equal(asked[0].length, 2, 'evenly spaced points, at most one per route point');
+
+    const { body: after } = await alice.get(`/api/trails/${trail._id}`);
+    assert.equal(after.elevationProfile.source, 'dem');
+    assert.equal(after.elevationProfile.routeVersion, after.routeVersion);
+    assert.equal(after.elevationProfile.summary.highestM, 3000);
+  });
+
+  test('the job leaves a route that already has heights alone, and copes without a key', async () => {
+    await alice.post('/api/trails').send({ title: 'Climb', youtubeUrl, track: climbTrack, trackElevations: climbHeights });
+    let asked = 0;
+    await processNextJob({ heightsAvailable: () => true, lineHeights: async () => (asked++, []) });
+    assert.equal(asked, 0);
+
+    const { body: plain } = await alice.post('/api/trails').send({ title: 'No heights', youtubeUrl, track });
+    await processNextJob({ heightsAvailable: () => false, lineHeights: async () => (asked++, []) });
+    assert.equal(asked, 0);
+    assert.equal((await alice.get(`/api/trails/${plain._id}`)).body.elevationProfile, undefined);
+  });
+
+  test('if the elevation service fails, the job carries on without heights', async () => {
+    const { body: plain } = await alice.post('/api/trails').send({ title: 'No heights', youtubeUrl, track });
+    await processNextJob({ heightsAvailable: () => true, lineHeights: async () => { throw new Error('quota used up'); } });
+    const [job] = await enrichJobs(plain._id);
+    assert.equal(job.state, 'done');
+  });
+});

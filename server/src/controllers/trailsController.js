@@ -1,6 +1,7 @@
 import { Job } from '../models/Job.js';
 import { MAX_TRACK_POINTS, ROUTE_STYLES, Trail } from '../models/Trail.js';
 import { queueRouteEnrich } from '../routeExtras/enrich.js';
+import { profileForTrack } from '../routeExtras/profile.js';
 import { routeSegments } from '../services/routing.js';
 import { timedTrack } from '../utils/geo.js';
 import { httpError } from '../utils/httpError.js';
@@ -16,6 +17,24 @@ function pick(body, fields) {
   const out = {};
   for (const field of fields) if (body?.[field] !== undefined) out[field] = body[field];
   return out;
+}
+
+// Heights sent with a GPX route: one per route point, a number or null.
+function elevationsFrom(body, track) {
+  const heights = body?.trackElevations;
+  if (heights === undefined || heights === null) return null;
+  const valid =
+    Array.isArray(heights) && heights.length === track.length && heights.every((h) => h === null || (typeof h === 'number' && Number.isFinite(h)));
+  if (!valid) throw httpError(400, 'The route heights must be one number (or null) per route point.');
+  return heights;
+}
+
+// Builds the elevation chart's profile from heights that belong to the
+// route's points. Without usable heights the trail gets none for now, and the
+// route-enrich job asks OpenRouteService's elevation service instead.
+function setProfile(trail, heights, source) {
+  const profile = heights ? profileForTrack(trail.track, heights, source) : null;
+  trail.elevationProfile = profile ? { ...profile, routeVersion: trail.routeVersion } : undefined;
 }
 
 function youtubeIdFrom(body) {
@@ -66,15 +85,18 @@ export async function drawRouteFromPoints(trail) {
   const points = [...trail.points].sort((a, b) => a.time - b.time);
   if (points.length < 2) {
     if (trail.track.length > 0) trail.routeVersion += 1;
-    trail.set({ track: [], trackTimes: [] });
+    trail.set({ track: [], trackTimes: [], elevationProfile: undefined });
     return null;
   }
   const previousTrack = JSON.stringify(trail.track);
   const { segments, notice } = await routeSegments(points, trail.routeStyle);
-  const { track, trackTimes } = timedTrack(points, segments, MAX_TRACK_POINTS);
+  const { track, trackTimes, trackElevations } = timedTrack(points, segments, MAX_TRACK_POINTS);
   // The times are video times already, so the video and route need no lining up.
   trail.set({ track, trackTimes, routeSource: 'keypoints', videoStartsAt: 0, recordedAt: undefined });
+  const version = trail.routeVersion;
   bumpVersionIfReshaped(trail, previousTrack);
+  // Roads and footpaths come with heights from OpenRouteService; straight lines don't.
+  if (trail.routeVersion !== version) setProfile(trail, trackElevations.some((h) => h !== null) ? trackElevations : null, 'ors');
   return notice;
 }
 
@@ -86,7 +108,7 @@ export async function listTrails(req, res) {
   const trails = await Trail.find()
     .sort({ createdAt: -1, _id: -1 })
     .limit(100)
-    .select('-track -trackTimes')
+    .select('-track -trackTimes -elevationProfile')
     .populate('owner', OWNER_FIELDS)
     .lean();
   res.json(trails);
@@ -101,6 +123,7 @@ export async function createTrail(req, res) {
     routeSource: fields.track?.length ? 'gpx' : undefined,
     routeVersion: fields.track?.length ? 1 : 0,
   });
+  if (fields.track?.length) setProfile(trail, elevationsFrom(req.body, fields.track), 'gpx');
   await saveTrail(trail, 0);
   await sendTrail(res, trail, { status: 201 });
 }
@@ -116,7 +139,11 @@ export async function updateTrail(req, res) {
   const fields = pick(req.body, TRAIL_FIELDS);
   trail.set(fields);
   if (fields.track?.length) trail.routeSource = 'gpx';
-  if (fields.track !== undefined) bumpVersionIfReshaped(trail, previousTrack);
+  if (fields.track !== undefined) {
+    bumpVersionIfReshaped(trail, previousTrack);
+    const heights = elevationsFrom(req.body, fields.track);
+    if (trail.routeVersion !== version || heights) setProfile(trail, heights, 'gpx');
+  }
   if (req.body?.youtubeUrl !== undefined) trail.youtubeId = youtubeIdFrom(req.body);
   await saveTrail(trail, version);
   await sendTrail(res, trail);

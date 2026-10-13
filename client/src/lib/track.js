@@ -200,10 +200,18 @@ export function distanceAtTime(cum, trackTimes, t) {
 // clamped to the video's start, or a second before its end: a video that
 // reaches its very end stops, and playing it again starts it from the top).
 export function videoTimeAtLocation(route, location, { window, duration = 0 } = {}) {
-  const { track, cum, trackTimes, videoStartsAt = 0, hiddenRanges = [] } = route;
+  const { track, cum, trackTimes } = route;
   if (!trackTimes?.length || trackTimes.length !== track.length) return null;
   const projection = projectOnTrack(track, cum, location, window);
-  let time = timeAtDistance(cum, trackTimes, projection.alongM) - videoStartsAt;
+  return { ...projection, ...videoTimeAtDistance(route, projection.alongM, { duration }) };
+}
+
+// The same for a distance along the route (the elevation chart, the services
+// list): { time, hidden, outside }, or null when the route has no times.
+export function videoTimeAtDistance(route, alongM, { duration = 0 } = {}) {
+  const { track, cum, trackTimes, videoStartsAt = 0, hiddenRanges = [] } = route;
+  if (!trackTimes?.length || trackTimes.length !== track.length) return null;
+  let time = timeAtDistance(cum, trackTimes, alongM) - videoStartsAt;
   const hidden = hiddenRangeAt(hiddenRanges, time);
   if (hidden) time = hidden.end;
   let outside = null;
@@ -214,5 +222,5 @@ export function videoTimeAtLocation(route, location, { window, duration = 0 } = 
     if (time > duration) outside = 'after';
     time = Math.max(0, duration - 1);
   }
-  return { ...projection, time, hidden, outside };
+  return { time, hidden, outside };
 }

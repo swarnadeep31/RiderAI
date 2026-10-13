@@ -155,13 +155,17 @@ export function simplify(track, toleranceM) {
 // estimates when (in video seconds) each track point is passed: between two
 // key points, time moves on in step with the distance travelled. A key point
 // with stayUntil is a stop: the marker waits there, then rides on.
-// segments[i] runs from points[i] to points[i + 1], as [[lat, lng], ...].
+// segments[i] runs from points[i] to points[i + 1], as [[lat, lng], ...] or
+// [[lat, lng, height], ...]. Returns trackElevations too: one height (or
+// null) per track point.
 export function timedTrack(points, segments, maxPoints = Infinity) {
   let track = [];
   let trackTimes = [];
+  let trackElevations = [];
   const push = (location, time) => {
     track.push([round(location[0], 6), round(location[1], 6)]);
     trackTimes.push(round(time, 1));
+    trackElevations.push(Number.isFinite(location[2]) ? round(location[2], 1) : null);
   };
   // Leave a stop when it ends, but never later than reaching the next place.
   const departure = (point, next) => Math.min(Math.max(point.stayUntil ?? point.time, point.time), next ? next.time : Infinity);
@@ -188,7 +192,7 @@ export function timedTrack(points, segments, maxPoints = Infinity) {
 
   // A stop at the very last place keeps the marker there until it ends.
   const last = points.at(-1);
-  if (segments.length > 0 && last.stayUntil > last.time) push(track.at(-1), last.stayUntil);
+  if (segments.length > 0 && last.stayUntil > last.time) push([...track.at(-1), trackElevations.at(-1)], last.stayUntil);
 
   // Very long routes: keep evenly spaced points, always including the start and end.
   if (track.length > maxPoints) {
@@ -196,6 +200,7 @@ export function timedTrack(points, segments, maxPoints = Infinity) {
     const keep = Array.from({ length: maxPoints }, (_, i) => Math.round(i * step));
     track = keep.map((i) => track[i]);
     trackTimes = keep.map((i) => trackTimes[i]);
+    trackElevations = keep.map((i) => trackElevations[i]);
   }
-  return { track, trackTimes };
+  return { track, trackTimes, trackElevations };
 }

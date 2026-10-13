@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { api } from '../api.js';
 import { useAuth } from '../auth.jsx';
 import ActivityBadge from '../components/ActivityBadge.jsx';
 import AddPointForm from '../components/AddPointForm.jsx';
 import AiRoutePanel, { HIDDEN_REASONS } from '../components/AiRoutePanel.jsx';
+import ElevationChart from '../components/ElevationChart.jsx';
 import Icon from '../components/art/Icon.jsx';
 import { CampScene } from '../components/art/Scenery.jsx';
 import ErrorMessage from '../components/ErrorMessage.jsx';
@@ -13,7 +14,8 @@ import RoutePanel from '../components/RoutePanel.jsx';
 import SaveOptions from '../components/SaveOptions.jsx';
 import TrailMap from '../components/TrailMap.jsx';
 import { useYouTubePlayer } from '../hooks/useYouTubePlayer.js';
-import { hiddenRangeAt, isGpxRoute, nearestIndex, positionAt } from '../lib/track.js';
+import { keyPointsAlong, nameNear } from '../lib/elevation.js';
+import { cumulativeDistances, hiddenRangeAt, isGpxRoute, nearestIndex, positionAt } from '../lib/track.js';
 import { formatTime } from '../lib/time.js';
 
 function describeSync(videoStartsAt) {
@@ -39,6 +41,8 @@ export default function TrailPage() {
   const [focus, setFocus] = useState(null);
   // The AI's places on the map while the owner reviews them.
   const [preview, setPreview] = useState([]);
+  // The spot under the pointer on the elevation chart, shown on the map too.
+  const [ghost, setGhost] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,6 +56,20 @@ export default function TrailPage() {
   }, [id]);
 
   const video = useYouTubePlayer(trail?.youtubeId);
+
+  // Everything the route maths needs, worked out once per route.
+  const route = useMemo(
+    () =>
+      trail && {
+        track: trail.track,
+        trackTimes: trail.trackTimes,
+        videoStartsAt: trail.videoStartsAt,
+        hiddenRanges: trail.hiddenRanges ?? [],
+        cum: cumulativeDistances(trail.track),
+      },
+    [trail?.track, trail?.trackTimes, trail?.videoStartsAt, trail?.hiddenRanges],
+  );
+  const pointsAlong = useMemo(() => (route ? keyPointsAlong(route, trail.points) : []), [route, trail?.points]);
 
   if (loadError) {
     return (
@@ -84,6 +102,8 @@ export default function TrailPage() {
   const hidden = drawnRoute ? hiddenRangeAt(trail.hiddenRanges, video.currentTime) : null;
   // Recorded routes may need lining up with the video; drawn routes use video times already.
   const canSync = recorded && trail.trackTimes.length > 0;
+  // Heights for the chart, if they belong to the route as it is now.
+  const profile = trail.elevationProfile?.routeVersion === trail.routeVersion ? trail.elevationProfile : null;
 
   // After any change, the server sends the updated trail, plus a message if
   // redrawing the route didn't go as asked (e.g. no road-following key).
@@ -180,30 +200,46 @@ export default function TrailPage() {
           )}
         </div>
 
-        <div className="isolate h-[55vh] overflow-hidden rounded-3xl shadow-xl ring-4 shadow-pine-900/20 ring-surface lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-[calc(100vh-7rem)] lg:self-start">
-          <TrailMap
-            trailId={trail._id}
-            track={trail.track}
-            trackTimes={trail.trackTimes}
-            videoStartsAt={trail.videoStartsAt}
-            hiddenRanges={trail.hiddenRanges}
-            clock={video.clock}
-            approximate={drawnRoute}
-            points={trail.points}
-            activePointId={activePoint?._id}
-            pendingLocation={pendingLocation}
-            preview={preview}
-            hiddenNote={hidden && `${HIDDEN_REASONS[hidden.reason]}: the map picks up again at ${formatTime(hidden.end)}`}
-            focus={focus}
-            follow={follow}
-            onFollowChange={setFollow}
-            onPointClick={selectPoint}
-            onMapClick={mapMode ? handleMapClick : null}
-            onSeek={seekFromRoute}
-            isPlaying={video.isPlaying}
-            pause={video.pause}
-            getDuration={video.getDuration}
-          />
+        {/* The map, with the elevation chart under it in the same sticky column. */}
+        <div className="flex flex-col gap-3 lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-[calc(100vh-7rem)] lg:self-start">
+          <div className="isolate h-[55vh] overflow-hidden rounded-3xl shadow-xl ring-4 shadow-pine-900/20 ring-surface lg:h-auto lg:min-h-0 lg:flex-1">
+            <TrailMap
+              trailId={trail._id}
+              track={trail.track}
+              trackTimes={trail.trackTimes}
+              videoStartsAt={trail.videoStartsAt}
+              hiddenRanges={trail.hiddenRanges}
+              clock={video.clock}
+              approximate={drawnRoute}
+              points={trail.points}
+              activePointId={activePoint?._id}
+              pendingLocation={pendingLocation}
+              preview={preview}
+              hiddenNote={hidden && `${HIDDEN_REASONS[hidden.reason]}: the map picks up again at ${formatTime(hidden.end)}`}
+              focus={focus}
+              follow={follow}
+              onFollowChange={setFollow}
+              onPointClick={selectPoint}
+              onMapClick={mapMode ? handleMapClick : null}
+              onSeek={seekFromRoute}
+              isPlaying={video.isPlaying}
+              pause={video.pause}
+              getDuration={video.getDuration}
+              ghost={ghost}
+            />
+          </div>
+          {profile && (
+            <ElevationChart
+              profile={profile}
+              route={route}
+              clock={video.clock}
+              approximate={drawnRoute}
+              highestName={nameNear(pointsAlong, profile.summary?.highestAlongM)}
+              getDuration={video.getDuration}
+              onSeek={mapMode ? null : seekFromRoute}
+              onHover={setGhost}
+            />
+          )}
         </div>
 
         <div className="space-y-6 lg:col-start-1 lg:row-start-2">
