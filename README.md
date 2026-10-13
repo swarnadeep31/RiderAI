@@ -19,6 +19,9 @@ that moment, and save the places to Google Maps, a GPS app or a printable trip s
   - A blue marker glides along the route with the video (when the route has times). It waits at stops, and
     disappears during intros, recaps and montages, with a note saying when the map picks up again.
   - Numbered pins mark the key points. Clicking a pin or a list item jumps the video there.
+  - Click anywhere on the route to jump the video to the moment the rider was there. Drag the blue marker along the
+    road to scrub through the ride: the video pauses and shows the frame under the marker, then carries on from
+    there. With the marker focused, the arrow keys move 10 seconds (60 with Shift).
 - **Creator tools:** add key points (pause the video, search for the place by name or click the map), line up the
   map with the video in two clicks, delete points or the whole trail.
 - **No GPS file? No problem:** add a key point each time the video reaches a new place, and TrailCast joins them into
@@ -134,10 +137,12 @@ client/                  React website (Vite, Tailwind CSS, Leaflet)
                          RequireAuth (makes a page logged-in only)
       art/               The hand-drawn SVG illustrations (hero landscape, summit, campsite, logo) and icons
     hooks/               useYouTubePlayer: puts a YouTube player on the page and reports its time,
-                         with a clock the map reads 60 times a second; useReducedMotion
+                         with a clock the map reads 60 times a second, and seeks (also while scrubbing);
+                         useReducedMotion
     lib/                 Plain functions, each with a .test.js next to it:
       gpx.js               read GPX files in the browser
-      track.js             where the rider is at a given video time, and the part already covered
+      track.js             where the rider is at a given video time, the part already covered, distances
+                           along the route, and which video moment a point on the route belongs to
       exports.js           GPX/KML files and Google Maps / YouTube links
       time.js              12:30 <-> 750 seconds
       theme.js             day/night mode: follows the device until the visitor clicks the sun or moon

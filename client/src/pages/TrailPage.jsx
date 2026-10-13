@@ -97,6 +97,13 @@ export default function TrailPage() {
     setFocus({ location: [point.lat, point.lng] });
   }
 
+  // Clicking or dragging along the route. While dragging (not final), show the
+  // frame there without loading ahead or playing; when it ends, carry on.
+  function seekFromRoute(seconds, { final, play = true }) {
+    if (final) video.seekTo(seconds, { play });
+    else video.seekTo(seconds, { allowSeekAhead: false, play: false });
+  }
+
   function startAddingPoint() {
     video.pause();
     setPendingLocation(position);
@@ -192,6 +199,10 @@ export default function TrailPage() {
             onFollowChange={setFollow}
             onPointClick={selectPoint}
             onMapClick={mapMode ? handleMapClick : null}
+            onSeek={seekFromRoute}
+            isPlaying={video.isPlaying}
+            pause={video.pause}
+            getDuration={video.getDuration}
           />
         </div>
 

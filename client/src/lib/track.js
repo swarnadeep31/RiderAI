@@ -189,3 +189,30 @@ export function distanceAtTime(cum, trackTimes, t) {
   const f = span > 0 ? (t - trackTimes[i]) / span : 0;
   return cum[i] + (cum[i + 1] - cum[i]) * f;
 }
+
+// The video moment when the rider was at (or nearest to) `location` on the
+// route: what clicking the route or dragging the marker seeks to.
+// route: { track, cum, trackTimes, videoStartsAt, hiddenRanges }.
+// Returns null when the route has no times. Otherwise the projection (see
+// projectOnTrack) plus `time` (video seconds), `hidden` (the skipped part it
+// landed in, if any: the time is moved to its end) and `outside`: 'before'
+// or 'after' when the GPS was recording outside the video (the time is
+// clamped to the video's start, or a second before its end: a video that
+// reaches its very end stops, and playing it again starts it from the top).
+export function videoTimeAtLocation(route, location, { window, duration = 0 } = {}) {
+  const { track, cum, trackTimes, videoStartsAt = 0, hiddenRanges = [] } = route;
+  if (!trackTimes?.length || trackTimes.length !== track.length) return null;
+  const projection = projectOnTrack(track, cum, location, window);
+  let time = timeAtDistance(cum, trackTimes, projection.alongM) - videoStartsAt;
+  const hidden = hiddenRangeAt(hiddenRanges, time);
+  if (hidden) time = hidden.end;
+  let outside = null;
+  if (time < 0) {
+    time = 0;
+    outside = 'before';
+  } else if (duration > 0 && time > duration - 1) {
+    if (time > duration) outside = 'after';
+    time = Math.max(0, duration - 1);
+  }
+  return { ...projection, time, hidden, outside };
+}

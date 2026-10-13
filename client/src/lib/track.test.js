@@ -13,6 +13,7 @@ import {
   projectOnTrack,
   timeAtDistance,
   travelledAt,
+  videoTimeAtLocation,
 } from './track.js';
 
 const track = [
@@ -129,5 +130,61 @@ describe('route geometry (shared cases)', () => {
 
   test.each(cases.distanceAtTime)('distanceAtTime: $name', (c) => {
     near(distanceAtTime(cumulativeDistances(cases.tracks[c.track]), cases.times[c.track], c.t), c.expected, 0.05);
+  });
+});
+
+describe('videoTimeAtLocation', () => {
+  // 0.01 degrees of longitude along the equator is 1111.949 m.
+  const route = {
+    track: [
+      [0, 0],
+      [0, 0.01],
+      [0, 0.01], // a stop: arrives at 100, leaves at 160
+      [0, 0.02],
+    ],
+    trackTimes: [0, 100, 160, 400],
+    videoStartsAt: 0,
+    hiddenRanges: [],
+  };
+  route.cum = cumulativeDistances(route.track);
+
+  test('a point on the route becomes the moment the rider passed it', () => {
+    const hit = videoTimeAtLocation(route, [0.0005, 0.005]);
+    expect(hit.time).toBeCloseTo(50, 1);
+    expect(hit.point[1]).toBeCloseTo(0.005, 9);
+    expect(hit.outside).toBeNull();
+  });
+
+  test('landing on a stop jumps to the arrival, not the departure', () => {
+    expect(videoTimeAtLocation(route, [0, 0.01]).time).toBeCloseTo(100, 1);
+  });
+
+  test('allows for the video starting partway through the recording', () => {
+    expect(videoTimeAtLocation({ ...route, videoStartsAt: 30 }, [0, 0.005]).time).toBeCloseTo(20, 1);
+  });
+
+  test('GPS recorded before or after the video is clamped to the video, and says so', () => {
+    const before = videoTimeAtLocation({ ...route, videoStartsAt: 80 }, [0, 0.005]);
+    expect(before).toMatchObject({ time: 0, outside: 'before' });
+    // A second before the end: a video that reaches its very end would start again from the top.
+    const after = videoTimeAtLocation(route, [0, 0.019], { duration: 300 });
+    expect(after).toMatchObject({ time: 299, outside: 'after' });
+  });
+
+  test('a moment inside a skipped part (intro, montage) moves to its end', () => {
+    const hit = videoTimeAtLocation({ ...route, hiddenRanges: [{ start: 40, end: 70, reason: 'montage' }] }, [0, 0.005]);
+    expect(hit.time).toBe(70);
+    expect(hit.hidden.reason).toBe('montage');
+  });
+
+  test('a window keeps the search on the road under the pointer', () => {
+    const outAndBack = { ...route, track: [[0, 0], [0, 0.01], [0, 0]], trackTimes: [0, 100, 200] };
+    outAndBack.cum = cumulativeDistances(outAndBack.track);
+    expect(videoTimeAtLocation(outAndBack, [0, 0.004]).time).toBeCloseTo(40, 1);
+    expect(videoTimeAtLocation(outAndBack, [0, 0.004], { window: { from: 1, to: 1 } }).time).toBeCloseTo(160, 1);
+  });
+
+  test('is null for a route without times', () => {
+    expect(videoTimeAtLocation({ ...route, trackTimes: [] }, [0, 0.005])).toBeNull();
   });
 });
