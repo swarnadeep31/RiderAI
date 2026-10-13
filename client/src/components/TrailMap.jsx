@@ -1,6 +1,7 @@
 import L from 'leaflet';
 import { useEffect, useMemo, useRef } from 'react';
 import { CircleMarker, MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
+import { SERVICE_KINDS, serviceName } from '../lib/services.js';
 import { formatTime } from '../lib/time.js';
 import { boundsOf, cumulativeDistances, indexAtOrBefore, positionAt, travelledAt, videoTimeAtLocation } from '../lib/track.js';
 
@@ -15,6 +16,63 @@ const DRAG_WINDOW = 300;
 const FULL_SEARCH_M = 200;
 // Show the video frame under the marker at most this often while dragging.
 const PREVIEW_MS = 250;
+
+// Fuel always shows; mechanics, medical help and ATMs only from this zoom, so towns don't drown in ATMs.
+const SERVICES_MIN_ZOOM = 11;
+
+const serviceIcons = Object.fromEntries(
+  Object.entries(SERVICE_KINDS).map(([kind, { symbol, colour, ink }]) => [
+    kind,
+    L.divIcon({
+      className: '',
+      iconSize: [22, 22],
+      iconAnchor: [11, 11],
+      html: `<div class="service-icon" style="background:${colour};color:${ink}">${symbol}</div>`,
+    }),
+  ]),
+);
+
+const escapeHtml = (text) => String(text).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+// Fuel stations, mechanics, medical help and ATMs near the route, with the
+// longest stretch without fuel outlined. Drawn straight onto the map (there
+// can be hundreds), only the kinds switched on in the services panel.
+function ServicesLayer({ items, visibleKinds, gapLine }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map.getPane('fuelGap')) map.createPane('fuelGap').style.zIndex = '390'; // just under the route
+    const outline = gapLine?.length > 1 ? L.polyline(gapLine, { pane: 'fuelGap', className: 'fuel-gap-outline', weight: 12, opacity: 0.5, dashArray: '2 10', lineCap: 'round', interactive: false }) : null;
+    outline?.addTo(map);
+    return () => outline?.remove();
+  }, [map, gapLine]);
+
+  useEffect(() => {
+    const always = L.layerGroup();
+    const closeUp = L.layerGroup();
+    for (const item of items) {
+      if (!visibleKinds.has(item.kind)) continue;
+      const lines = [`<strong>${escapeHtml(serviceName(item))}</strong>`];
+      if (item.brand && item.name) lines.push(escapeHtml(item.brand));
+      if (item.hours) lines.push(`Open: ${escapeHtml(item.hours)}`);
+      const marker = L.marker([item.lat, item.lng], { icon: serviceIcons[item.kind], keyboard: false, title: serviceName(item) }).bindTooltip(lines.join('<br>'), {
+        direction: 'top',
+        offset: [0, -10],
+      });
+      (item.kind === 'fuel' ? always : closeUp).addLayer(marker);
+    }
+    always.addTo(map);
+    const showCloseUp = () => (map.getZoom() >= SERVICES_MIN_ZOOM ? closeUp.addTo(map) : closeUp.remove());
+    showCloseUp();
+    map.on('zoomend', showCloseUp);
+    return () => {
+      map.off('zoomend', showCloseUp);
+      always.remove();
+      closeUp.remove();
+    };
+  }, [map, items, visibleKinds]);
+  return null;
+}
 
 const riderIcon = L.divIcon({ className: 'rider-marker', iconSize: [22, 22], iconAnchor: [11, 11], html: '<div class="rider-dot"></div>' });
 
@@ -308,6 +366,9 @@ export default function TrailMap({
   pause,
   getDuration,
   ghost,
+  services = [],
+  serviceKinds,
+  fuelGapLine,
 }) {
   const playable = trackTimes?.length > 0 && trackTimes.length === track.length;
   // Everything the route maths needs, worked out once per route.
@@ -354,6 +415,8 @@ export default function TrailMap({
         {pendingLocation && (
           <CircleMarker center={pendingLocation} radius={9} pathOptions={{ color: ORANGE, weight: 3, dashArray: '4 4', fillOpacity: 0.2 }} />
         )}
+        {/* While the AI's places are reviewed, the service icons step aside (ATM violet is close to the AI's). */}
+        {preview.length === 0 && (services.length > 0 || fuelGapLine) && <ServicesLayer items={services} visibleKinds={serviceKinds} gapLine={fuelGapLine} />}
         <AiPreview places={preview} />
         {/* The spot under the pointer on the elevation chart. */}
         {ghost && (

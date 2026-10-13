@@ -1,15 +1,25 @@
+import { useState } from 'react';
 import { Link } from 'react-router';
 import { downloadFile, fileNameFor, toGpx, toKml } from '../lib/exports.js';
 import Icon from './art/Icon.jsx';
 
-export default function SaveOptions({ trail }) {
+export default function SaveOptions({ trail, services = [] }) {
+  const [withServices, setWithServices] = useState(false);
   return (
     <div className="space-y-3">
+      {services.length > 0 && (
+        <label className="flex items-center gap-2 text-sm font-medium text-stone-700">
+          <input type="checkbox" checked={withServices} onChange={(e) => setWithServices(e.target.checked)} />
+          Include fuel stops and services in the GPX file
+        </label>
+      )}
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
           className="btn-secondary"
-          onClick={() => downloadFile(fileNameFor(trail.title, 'gpx'), toGpx(trail), 'application/gpx+xml')}
+          onClick={() =>
+            downloadFile(fileNameFor(trail.title, 'gpx'), toGpx(trail, { services: withServices ? services : [] }), 'application/gpx+xml')
+          }
         >
           <Icon name="download" className="h-4 w-4 text-pine-600" />
           Download GPX

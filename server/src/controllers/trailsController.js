@@ -1,4 +1,5 @@
 import { Job } from '../models/Job.js';
+import { RouteServices } from '../models/RouteServices.js';
 import { MAX_TRACK_POINTS, ROUTE_STYLES, Trail } from '../models/Trail.js';
 import { queueRouteEnrich } from '../routeExtras/enrich.js';
 import { profileForTrack } from '../routeExtras/profile.js';
@@ -152,8 +153,9 @@ export async function updateTrail(req, res) {
 export async function deleteTrail(req, res) {
   const trail = await findOwnTrail(req);
   await trail.deleteOne();
-  // Work waiting for this trail's route is no longer needed.
+  // Work waiting for this trail's route, and what it found, are no longer needed.
   await Job.updateMany({ type: 'route-enrich', trail: trail._id, state: 'queued' }, { state: 'cancelled' });
+  await RouteServices.deleteMany({ trail: trail._id });
   res.status(204).end();
 }
 

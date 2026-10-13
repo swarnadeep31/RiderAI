@@ -12,9 +12,12 @@ import ErrorMessage from '../components/ErrorMessage.jsx';
 import KeyPointList from '../components/KeyPointList.jsx';
 import RoutePanel from '../components/RoutePanel.jsx';
 import SaveOptions from '../components/SaveOptions.jsx';
+import ServicesPanel, { ServiceBadge } from '../components/ServicesPanel.jsx';
 import TrailMap from '../components/TrailMap.jsx';
 import TripStats from '../components/TripStats.jsx';
+import { useRouteServices } from '../hooks/useRouteServices.js';
 import { useYouTubePlayer } from '../hooks/useYouTubePlayer.js';
+import { FUEL_CAVEAT, KIND_ORDER, fuelGapChip, fuelGapSentence } from '../lib/services.js';
 import {
   cumulativeDistances,
   hiddenRangeAt,
@@ -73,6 +76,25 @@ function DaysSetting({ trail, onSaved }) {
   );
 }
 
+// Which kinds of services (fuel, mechanics...) the viewer has switched on,
+// remembered in this browser.
+const KINDS_KEY = 'trailcast.serviceKinds';
+function loadKinds() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(KINDS_KEY));
+    if (Array.isArray(saved)) return new Set(saved.filter((kind) => KIND_ORDER.includes(kind)));
+  } catch {
+    // No storage (private window): everything is on.
+  }
+  return new Set(KIND_ORDER);
+}
+
+// The part of the route between two distances, for outlining it on the map.
+function routeBetween(route, fromM, toM) {
+  const inside = route.track.filter((_, i) => route.cum[i] > fromM && route.cum[i] < toM);
+  return [locationAtDistance(route.track, route.cum, fromM), ...inside, locationAtDistance(route.track, route.cum, toM)];
+}
+
 function describeSync(videoStartsAt) {
   if (videoStartsAt === 0) return 'The video and the GPS recording start at the same moment.';
   return videoStartsAt > 0
@@ -98,6 +120,12 @@ export default function TrailPage() {
   const [preview, setPreview] = useState([]);
   // The spot under the pointer on the elevation chart, shown on the map too.
   const [ghost, setGhost] = useState(null);
+  const [serviceKinds, setServiceKinds] = useState(loadKinds);
+  const [fuelGapWarnKm, setFuelGapWarnKm] = useState(150);
+
+  useEffect(() => {
+    api.getConfig().then((config) => config.fuelGapWarnKm && setFuelGapWarnKm(config.fuelGapWarnKm), () => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -124,6 +152,28 @@ export default function TrailPage() {
       },
     [trail?.track, trail?.trackTimes, trail?.videoStartsAt, trail?.hiddenRanges],
   );
+  // Fuel stops and the like along the route, found by the server once per route version.
+  const services = useRouteServices(trail?._id, trail?.routeVersion, trail?.track.length > 1);
+  const ready = services?.status === 'ready' ? services : null;
+  const longestGap = ready?.fuelGaps[0];
+  const fuelGapLine = useMemo(
+    () => (route && longestGap && serviceKinds.has('fuel') ? routeBetween(route, longestGap.fromM, longestGap.toM) : null),
+    [route, longestGap, serviceKinds],
+  );
+
+  function toggleKind(kind) {
+    setServiceKinds((kinds) => {
+      const next = new Set(kinds);
+      if (next.has(kind)) next.delete(kind);
+      else next.add(kind);
+      try {
+        localStorage.setItem(KINDS_KEY, JSON.stringify([...next]));
+      } catch {
+        // Not remembered, but still switched.
+      }
+      return next;
+    });
+  }
 
   if (loadError) {
     return (
@@ -160,8 +210,28 @@ export default function TrailPage() {
   const profile = trail.elevationProfile?.routeVersion === trail.routeVersion ? trail.elevationProfile : null;
   const stats = trail.stats;
   const overnights = (stats?.nights ?? []).map((night, i) => ({ alongM: night.alongM, label: `Night ${i + 1}${night.name ? ` · ${night.name}` : ''}` }));
+  // The longest stretch without fuel joins the stats once the services are in. Clicking it shows it on the map.
+  const fuelChip = longestGap && (
+    <li>
+      <button
+        type="button"
+        onClick={() => goAlong(longestGap.fromM)}
+        title={`${fuelGapSentence(longestGap, drawnRoute)} ${FUEL_CAVEAT}`}
+        className="inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1 text-sm font-semibold text-stone-800 shadow-sm ring-1 ring-stone-900/10 transition hover:-translate-y-0.5 hover:ring-orange-300"
+      >
+        <ServiceBadge kind="fuel" className="h-4 w-4 text-[9px] ring-0" />
+        {longestGap.lengthM >= fuelGapWarnKm * 1000 && <span aria-hidden="true">⚠</span>}
+        {fuelGapChip(longestGap, drawnRoute)}
+      </button>
+    </li>
+  );
   const statsRow = (className) => (
-    <TripStats stats={stats} onHighest={Number.isFinite(stats?.highestAlongM) ? () => goAlong(stats.highestAlongM) : null} className={className} />
+    <TripStats
+      stats={stats}
+      onHighest={Number.isFinite(stats?.highestAlongM) ? () => goAlong(stats.highestAlongM) : null}
+      extra={fuelChip}
+      className={className}
+    />
   );
 
   // After any change, the server sends the updated trail, plus a message if
@@ -303,6 +373,9 @@ export default function TrailPage() {
               pause={video.pause}
               getDuration={video.getDuration}
               ghost={ghost}
+              services={ready?.items}
+              serviceKinds={serviceKinds}
+              fuelGapLine={fuelGapLine}
             />
           </div>
           {profile && (
@@ -491,12 +564,24 @@ export default function TrailPage() {
             />
           </section>
 
+          <ServicesPanel
+            services={services}
+            lengthM={route.cum.at(-1) ?? 0}
+            approximate={drawnRoute}
+            warnKm={fuelGapWarnKm}
+            visibleKinds={serviceKinds}
+            onToggleKind={toggleKind}
+            momentAt={(alongM) => videoTimeAtDistance(route, alongM, { duration: video.getDuration() })}
+            onSeek={(seconds) => video.seekTo(seconds)}
+            onFocus={(location) => setFocus({ location })}
+          />
+
           {(trail.points.length > 0 || trail.track.length > 0) && (
             <section className="card space-y-3 bg-linear-to-br from-surface to-sky-50 p-5">
               <h2 className="flex items-center gap-2 text-2xl font-extrabold text-ink">
                 <Icon name="map" className="h-6 w-6 text-sky-600" /> Take this trail with you
               </h2>
-              <SaveOptions trail={trail} />
+              <SaveOptions trail={trail} services={ready?.items ?? []} />
             </section>
           )}
         </div>

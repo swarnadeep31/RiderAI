@@ -11,6 +11,7 @@ import {
   updatePoint,
   updateTrail,
 } from '../controllers/trailsController.js';
+import { enrichNow, getServices } from '../controllers/servicesController.js';
 import { requireUser } from '../middleware/auth.js';
 import { checkObjectId } from '../middleware/validId.js';
 
@@ -22,12 +23,15 @@ trailsRouter.param('pointId', checkObjectId);
 // Anyone can watch...
 trailsRouter.get('/', listTrails);
 trailsRouter.get('/:id', getTrail);
+trailsRouter.get('/:id/services', getServices);
 
 // ...but adding and changing trails needs an account.
 trailsRouter.post('/', requireUser, createTrail);
 trailsRouter.patch('/:id', requireUser, updateTrail);
 trailsRouter.delete('/:id', requireUser, deleteTrail);
 trailsRouter.post('/:id/route', requireUser, drawRoute);
+// Work out the heights, services and stats again (owner only, a few times a day).
+trailsRouter.post('/:id/enrich', requireUser, enrichNow);
 
 // Building the route with AI (owner only): start, check the latest, accept the reviewed places.
 trailsRouter.get('/:id/ai-route', requireUser, latestAiRoute);

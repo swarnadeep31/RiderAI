@@ -4,10 +4,60 @@ import { api } from '../api.js';
 import ErrorMessage from '../components/ErrorMessage.jsx';
 import { ACTIVITIES } from '../lib/activities.js';
 import { formatKm, formatMetres, nameNear, notablePeaks } from '../lib/elevation.js';
+import { FUEL_CAVEAT, fuelGapSentence, kmAlong, kmLength, longGaps, offRoute, serviceName } from '../lib/services.js';
 import { climbText, daysText, distanceText, highestText } from '../lib/stats.js';
 import { googleMapsUrl, youtubeUrlAt } from '../lib/exports.js';
 import { formatTime } from '../lib/time.js';
 import { cumulativeDistances, locationAtDistance } from '../lib/track.js';
+
+// The fuel stations along the route, with the stretches without one.
+function FuelTable({ trail, services, warnKm }) {
+  if (services?.status !== 'ready') return null;
+  const approximate = trail.routeSource === 'keypoints';
+  const stations = services.items.filter((item) => item.kind === 'fuel');
+  const warnings = longGaps(services.fuelGaps, warnKm);
+  return (
+    <section className="mt-8 break-inside-avoid">
+      <h2 className="text-lg font-bold">Fuel along the route</h2>
+      <p className="mt-1 font-semibold">{fuelGapSentence(services.fuelGaps[0], approximate)}</p>
+      {warnings.map((gap) => (
+        <p key={gap.fromM} className="font-semibold">
+          ⚠ {kmLength(gap.lengthM, approximate)} with no mapped fuel station, from {kmAlong(gap.fromM, approximate)} to {kmAlong(gap.toM, approximate)}.
+        </p>
+      ))}
+      {stations.length > 0 && (
+        <table className="mt-2 w-full border-collapse text-left text-sm">
+          <thead>
+            <tr className="border-b-2 border-stone-800">
+              <th className="py-2 pr-3">Distance</th>
+              <th className="py-2 pr-3">Fuel station</th>
+              <th className="py-2">Location</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stations.map((station) => (
+              <tr key={station.osm} className="break-inside-avoid border-b border-stone-200 align-top">
+                <td className="py-2 pr-3 font-mono">{kmAlong(station.alongM, approximate)}</td>
+                <td className="py-2 pr-3">
+                  <div className="font-semibold">{serviceName(station)}</div>
+                  <div className="text-stone-600">{[station.brand && station.name ? station.brand : null, station.place, offRoute(station), station.hours && `Open: ${station.hours}`].filter(Boolean).join(' · ')}</div>
+                </td>
+                <td className="py-2 font-mono text-xs">
+                  {station.lat.toFixed(5)}, {station.lng.toFixed(5)}
+                  <br />
+                  <a href={googleMapsUrl(station.lat, station.lng)} className="font-sans text-orange-700 underline">
+                    Open in Google Maps
+                  </a>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <p className="mt-2 text-xs text-stone-600">{FUEL_CAVEAT}</p>
+    </section>
+  );
+}
 
 // The passes and summits on the way, highest first, named after the nearest key point.
 function Passes({ trail }) {
@@ -52,9 +102,13 @@ export default function PrintPage() {
   const { id } = useParams();
   const [trail, setTrail] = useState(null);
   const [error, setError] = useState(null);
+  const [services, setServices] = useState(null);
+  const [warnKm, setWarnKm] = useState(150);
 
   useEffect(() => {
     api.getTrail(id).then(setTrail, (err) => setError(err.message));
+    api.getServices(id).then(setServices, () => {});
+    api.getConfig().then((config) => config.fuelGapWarnKm && setWarnKm(config.fuelGapWarnKm), () => {});
   }, [id]);
 
   // The trip sheet is for paper, so it stays light even at night.
@@ -141,6 +195,7 @@ export default function PrintPage() {
       )}
 
       <Passes trail={trail} />
+      <FuelTable trail={trail} services={services} warnKm={warnKm} />
 
       <p className="mt-10 text-xs text-stone-400">Made with TrailCast. Map data © OpenStreetMap contributors.</p>
     </main>

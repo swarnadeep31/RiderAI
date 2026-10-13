@@ -1,0 +1,443 @@
+{
+ "version": 0.6,
+ "generator": "Overpass API (recorded for tests)",
+ "elements": [
+  {
+   "type": "node",
+   "id": 795826239,
+   "lat": 32.2583689,
+   "lon": 77.1880018,
+   "tags": {
+    "amenity": "fuel",
+    "brand": "Indian Oil",
+    "brand:wikidata": "Q1289348",
+    "brand:wikipedia": "en:Indian Oil Corporation",
+    "compressed_air": "yes",
+    "name": "Indian oil"
+   }
+  },
+  {
+   "type": "node",
+   "id": 856402274,
+   "lat": 32.2395569,
+   "lon": 77.1882886,
+   "tags": {
+    "amenity": "fuel"
+   }
+  },
+  {
+   "type": "node",
+   "id": 884337205,
+   "lat": 32.2437879,
+   "lon": 77.189446,
+   "tags": {
+    "amenity": "atm",
+    "brand": "State Bank of India",
+    "brand:en": "State Bank of India",
+    "brand:wikidata": "Q1340361",
+    "currency:INR": "yes",
+    "drive_through": "no",
+    "indoor": "yes",
+    "note": "Contributors are requested to not edit the \"brand\", \"brand:en\", \"brand:wikidata\", \"operator\", \"operator:en\" and \"operator:wikidata\" tags. (2025/03/03)",
+    "opening_hours": "24/7",
+    "operator": "State Bank of India",
+    "operator:en": "State Bank of India",
+    "operator:wikidata": "Q1340361",
+    "short_name": "SBI"
+   }
+  },
+  {
+   "type": "node",
+   "id": 884337216,
+   "lat": 32.2441741,
+   "lon": 77.1894318,
+   "tags": {
+    "amenity": "atm",
+    "check_date": "2023-08-01",
+    "operator": "Bank of Baroda"
+   }
+  },
+  {
+   "type": "node",
+   "id": 2380691341,
+   "lat": 32.2450271,
+   "lon": 77.187861,
+   "tags": {
+    "addr:district": "Kullu",
+    "addr:full": "Near Telephone Exchange, Manali",
+    "addr:postcode": "175131",
+    "addr:state": "Himachal Pradesh",
+    "amenity": "clinic",
+    "healthcare": "clinic",
+    "name": "Rawat Clinic",
+    "source": "OpenGovernmentData"
+   }
+  },
+  {
+   "type": "node",
+   "id": 2380691376,
+   "lat": 32.245374,
+   "lon": 77.1898329,
+   "tags": {
+    "amenity": "atm",
+    "check_date": "2023-08-01"
+   }
+  },
+  {
+   "type": "node",
+   "id": 2380691377,
+   "lat": 32.2456038,
+   "lon": 77.1867368,
+   "tags": {
+    "amenity": "clinic",
+    "healthcare": "clinic"
+   }
+  },
+  {
+   "type": "node",
+   "id": 2380691388,
+   "lat": 32.2462507,
+   "lon": 77.1892445,
+   "tags": {
+    "amenity": "atm",
+    "check_date": "2025-06-18"
+   }
+  },
+  {
+   "type": "node",
+   "id": 3041244957,
+   "lat": 32.2449885,
+   "lon": 77.1886231,
+   "tags": {
+    "amenity": "hospital",
+    "healthcare": "hospital",
+    "name": "Mission Hospital"
+   }
+  },
+  {
+   "type": "node",
+   "id": 3042955724,
+   "lat": 32.2387613,
+   "lon": 77.1877726,
+   "tags": {
+    "addr:block": "Naggar",
+    "addr:district": "Kullu",
+    "addr:full": "VO MANALI DISTT KULLU",
+    "addr:postcode": "175131",
+    "addr:state": "Himachal Pradesh",
+    "amenity": "hospital",
+    "contact:phone": "1902253385",
+    "description": "Civil Hospital",
+    "healthcare": "hospital",
+    "name": "Civil Hospital, Manali",
+    "source": "OpenGovernmentData"
+   }
+  },
+  {
+   "type": "node",
+   "id": 3042985801,
+   "lat": 32.2453333,
+   "lon": 77.1893096,
+   "tags": {
+    "amenity": "hospital",
+    "healthcare": "hospital",
+    "name": "Dr Behl's Hospital"
+   }
+  },
+  {
+   "type": "node",
+   "id": 4135407790,
+   "lat": 32.2713663,
+   "lon": 77.1810577,
+   "tags": {
+    "amenity": "fuel",
+    "brand": "Hindustan Petroleum",
+    "brand:wikidata": "Q1619375",
+    "fuel:diesel": "yes",
+    "fuel:octane_95": "yes",
+    "name": "HP",
+    "official_name": "Hindustan Petroleum",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "payment:google_pay": "yes",
+    "self_service": "no"
+   }
+  },
+  {
+   "type": "node",
+   "id": 4135408490,
+   "lat": 32.2483509,
+   "lon": 77.190927,
+   "tags": {
+    "shop": "car_repair"
+   }
+  },
+  {
+   "type": "node",
+   "id": 4346703891,
+   "lat": 32.2463188,
+   "lon": 77.189253,
+   "tags": {
+    "addr:street": "Circuit House Road",
+    "amenity": "bank",
+    "atm": "yes",
+    "brand": "HDFC",
+    "brand:wikidata": "Q631047",
+    "brand:wikipedia": "en:HDFC Bank",
+    "check_date": "2025-06-18",
+    "name": "HDFC Bank",
+    "short_name": "HDFC",
+    "website": "https://www.hdfcbank.com"
+   }
+  },
+  {
+   "type": "node",
+   "id": 4346717289,
+   "lat": 32.2464495,
+   "lon": 77.1892836,
+   "tags": {
+    "addr:street": "Circuit House Road",
+    "amenity": "bank",
+    "atm": "yes",
+    "brand:wikidata": "Q2743499",
+    "check_date": "2025-06-18",
+    "name": "Punjab National Bank",
+    "name:en": "Punjab National Bank",
+    "short_name": "PNB",
+    "website": "https://www.pnbindia.in",
+    "wikidata": "Q2743499",
+    "wikipedia": "en:Punjab National Bank"
+   }
+  },
+  {
+   "type": "node",
+   "id": 4346717389,
+   "lat": 32.2464012,
+   "lon": 77.1891948,
+   "tags": {
+    "addr:street": "Circuit House Road",
+    "amenity": "bank",
+    "atm": "yes",
+    "brand": "ICICI",
+    "brand:wikidata": "Q1653258",
+    "check_date": "2025-06-18",
+    "name": "ICICI Bank",
+    "name:en": "ICICI Bank",
+    "short_name": "ICICI",
+    "website": "https://www.icicibank.com",
+    "wikidata": "Q1653258",
+    "wikipedia": "en:ICICI Bank"
+   }
+  },
+  {
+   "type": "node",
+   "id": 4346717489,
+   "lat": 32.2463532,
+   "lon": 77.1892184,
+   "tags": {
+    "addr:street": "Circuit House Road",
+    "amenity": "bank",
+    "atm": "yes",
+    "brand": "Canara Bank",
+    "brand:pa": "ਕੇਨਰਾ ਬੈਂਕ",
+    "brand:ur": "کینرا بینک",
+    "brand:wikidata": "Q2003777",
+    "brand:wikipedia": "en:Canara Bank",
+    "brand:wikipedia:pa": "ਕੇਨਰਾ ਬੈਂਕ",
+    "name": "Canara Bank",
+    "name:pa": "ਕੇਨਰਾ ਬੈਂਕ",
+    "name:ur": "کینرا بینک",
+    "website": "https://www.canarabank.com/"
+   }
+  },
+  {
+   "type": "node",
+   "id": 4346723389,
+   "lat": 32.24559,
+   "lon": 77.1895936,
+   "tags": {
+    "amenity": "bank",
+    "atm": "yes",
+    "brand:wikidata": "Q2005310",
+    "brand:wikipedia": "en:UCO Bank",
+    "name": "UCO Bank",
+    "name:en": "UCO Bank",
+    "old_name": "United Commercial Bank",
+    "website": "https://www.ucobank.com"
+   }
+  },
+  {
+   "type": "node",
+   "id": 4346739991,
+   "lat": 32.241254,
+   "lon": 77.1886737,
+   "tags": {
+    "addr:street": "Kulu Highway",
+    "amenity": "bank",
+    "atm": "yes",
+    "brand:wikidata": "Q1340361",
+    "brand:wikipedia": "en:State Bank of India",
+    "name": "State Bank of India",
+    "short_name": "SBI"
+   }
+  },
+  {
+   "type": "node",
+   "id": 4346743589,
+   "lat": 32.2415771,
+   "lon": 77.1887529,
+   "tags": {
+    "amenity": "atm",
+    "operator": "Bank of India"
+   }
+  },
+  {
+   "type": "node",
+   "id": 4346752192,
+   "lat": 32.2440654,
+   "lon": 77.1897104,
+   "tags": {
+    "amenity": "atm",
+    "brand": "ICICI Bank",
+    "brand:en": "ICICI Bank",
+    "brand:wikidata": "Q1653258",
+    "currency:INR": "yes",
+    "drive_through": "no",
+    "indoor": "yes",
+    "note": "Contributors are requested to not edit the \"brand\", \"brand:en\", \"brand:wikidata\", \"operator\", \"operator:en\" and \"operator:wikidata\" tags. (2025/03/03)",
+    "opening_hours": "24/7",
+    "operator": "ICICI Bank",
+    "operator:en": "ICICI Bank",
+    "operator:wikidata": "Q1653258",
+    "short_name": "ICICI"
+   }
+  },
+  {
+   "type": "node",
+   "id": 4346771190,
+   "lat": 32.2452675,
+   "lon": 77.1897761,
+   "tags": {
+    "amenity": "atm",
+    "brand": "State Bank of India",
+    "brand:en": "State Bank of India",
+    "brand:wikidata": "Q1340361",
+    "cash_in": "no",
+    "check_date": "2023-08-01",
+    "currency:INR": "yes",
+    "drive_through": "no",
+    "indoor": "yes",
+    "note": "Contributors are requested to not edit the \"brand\", \"brand:en\", \"brand:wikidata\", \"operator\", \"operator:en\" and \"operator:wikidata\" tags. (2025/03/03)",
+    "opening_hours": "24/7",
+    "operator": "State Bank of India",
+    "operator:en": "State Bank of India",
+    "operator:wikidata": "Q1340361",
+    "short_name": "SBI"
+   }
+  },
+  {
+   "type": "node",
+   "id": 4346905390,
+   "lat": 32.2490192,
+   "lon": 77.1861474,
+   "tags": {
+    "amenity": "atm",
+    "operator": "Bank of Baroda"
+   }
+  },
+  {
+   "type": "node",
+   "id": 4347360590,
+   "lat": 32.2493659,
+   "lon": 77.185693,
+   "tags": {
+    "addr:street": "Circuit House Road",
+    "name": "Hari Bike Repair & Hire",
+    "shop": "car_repair",
+    "wheelchair": "yes"
+   }
+  },
+  {
+   "type": "node",
+   "id": 4347492292,
+   "lat": 32.2455402,
+   "lon": 77.1893502,
+   "tags": {
+    "amenity": "bank",
+    "atm": "yes",
+    "brand:wikidata": "Q367008",
+    "brand:wikipedia": "en:Oriental Bank of Commerce",
+    "name": "Oriental Bank of Commerce",
+    "name:en": "Oriental Bank of Commerce",
+    "short_name": "OBC",
+    "website": "https://www.obcindia.co.in"
+   }
+  },
+  {
+   "type": "node",
+   "id": 7007287760,
+   "lat": 32.2458867,
+   "lon": 77.1859744,
+   "tags": {
+    "addr:district": "Kullu",
+    "addr:full": "Manali",
+    "addr:postcode": "175131",
+    "addr:state": "Himachal Pradesh",
+    "amenity": "hospital",
+    "healthcare": "hospital",
+    "name": "Civil Hospital, Manali",
+    "source": "OpenGovernmentData"
+   }
+  },
+  {
+   "type": "node",
+   "id": 7642218118,
+   "lat": 32.2418408,
+   "lon": 77.1877903,
+   "tags": {
+    "addr:district": "Kullu",
+    "addr:full": "Gompa Road, Manali",
+    "addr:postcode": "175131",
+    "addr:state": "Himachal Pradesh",
+    "amenity": "hospital",
+    "healthcare": "hospital",
+    "name": "Manu Diagnostic Centre and Hospital",
+    "source": "Local Knowledge",
+    "wheelchair": "yes"
+   }
+  },
+  {
+   "type": "node",
+   "id": 9971656617,
+   "lat": 32.2414006,
+   "lon": 77.1871161,
+   "tags": {
+    "amenity": "clinic",
+    "healthcare": "clinic",
+    "name": "Men-Tsee-Khang Manali",
+    "name:en": "Men-Tsee-Khang",
+    "opening_hours": "Mo-Sa 10:00-17:00",
+    "wheelchair": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 900573232,
+   "center": {
+    "lat": 32.2450022,
+    "lon": 77.1885293
+   },
+   "tags": {
+    "addr:district": "Kullu",
+    "addr:full": "Manali",
+    "addr:postcode": "175131",
+    "addr:state": "Himachal Pradesh",
+    "amenity": "hospital",
+    "healthcare": "hospital",
+    "name": "Lady Willingdon Hospital",
+    "source": "OpenGovernmentData"
+   }
+  }
+ ]
+}

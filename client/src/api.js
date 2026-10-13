@@ -45,6 +45,10 @@ export const api = {
   deletePoint: (id, pointId) => request(`/trails/${id}/points/${pointId}`, { method: 'DELETE' }),
   // style: 'roads', 'paths' or 'straight'
   drawRoute: (id, style) => request(`/trails/${id}/route`, { method: 'POST', body: { style } }),
+  // Fuel stops, mechanics, medical help and ATMs along the route
+  getServices: (id) => request(`/trails/${id}/services`),
+  // Work out the heights, services and stats again (owner only)
+  enrich: (id) => request(`/trails/${id}/enrich`, { method: 'POST' }),
 
   // Building the route with AI
   startAiRoute: (id, options) => request(`/trails/${id}/ai-route`, { method: 'POST', body: options }),

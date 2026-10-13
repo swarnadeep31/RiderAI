@@ -1,4 +1,5 @@
 // Ways for viewers to take a trail with them: links and downloadable files.
+import { FUEL_CAVEAT, SERVICE_KINDS } from './services.js';
 
 export const googleMapsUrl = (lat, lng) => `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
 export const youtubeUrlAt = (youtubeId, seconds) => `https://youtu.be/${youtubeId}?t=${Math.floor(seconds)}`;
@@ -7,7 +8,8 @@ const XML_ESCAPES = { '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"'
 const escapeXml = (text) => String(text).replace(/[<>&'"]/g, (c) => XML_ESCAPES[c]);
 
 // GPX works with GPS apps and devices: Garmin, OsmAnd, Gaia GPS, Komoot...
-export function toGpx(trail) {
+// services: places along the route (fuel stops...) to add as waypoints, with a <type>.
+export function toGpx(trail, { services = [] } = {}) {
   const start = trail.recordedAt && trail.trackTimes?.length ? Date.parse(trail.recordedAt) : null;
   const lines = [
     '<?xml version="1.0" encoding="UTF-8"?>',
@@ -19,6 +21,18 @@ export function toGpx(trail) {
     if (p.note) lines.push(`    <desc>${escapeXml(p.note)}</desc>`);
     lines.push(`    <link href="${escapeXml(youtubeUrlAt(trail.youtubeId, p.time))}"><text>Watch this moment</text></link>`);
     lines.push('  </wpt>');
+  }
+  for (const s of services) {
+    const type = SERVICE_KINDS[s.kind].label;
+    const name = s.name ?? s.brand ?? type;
+    const details = [s.brand && s.name ? s.brand : null, s.hours ? `Open: ${s.hours}` : null, FUEL_CAVEAT].filter(Boolean).join(' · ');
+    lines.push(
+      `  <wpt lat="${s.lat}" lon="${s.lng}">`,
+      `    <name>${escapeXml(name)}</name>`,
+      `    <desc>${escapeXml(details)}</desc>`,
+      `    <type>${type}</type>`,
+      '  </wpt>',
+    );
   }
   if (trail.track.length > 0) {
     lines.push('  <trk>', `    <name>${escapeXml(trail.title)}</name>`, '    <trkseg>');

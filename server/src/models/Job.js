@@ -39,8 +39,9 @@ const jobSchema = new mongoose.Schema(
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     youtubeId: { type: String, required: isAiRoute },
     durationSec: { type: Number, required: isAiRoute },
-    // route-enrich: the version of the route this job works on.
+    // route-enrich: the version of the route this job works on, and whether the owner asked for it.
     routeVersion: Number,
+    manual: Boolean,
     model: String,
     promptVersion: String,
     highDetail: { type: Boolean, default: false },
