@@ -13,6 +13,12 @@ export function aiConfig() {
   return {
     apiKey: process.env.GEMINI_API_KEY || '',
     model: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
+    // Models to switch to, in order, when the main one has reached its limit or
+    // is too busy (each model has its own free-tier limits). Comma-separated.
+    fallbackModels: (process.env.GEMINI_FALLBACK_MODELS || '')
+      .split(',')
+      .map((name) => name.trim())
+      .filter(Boolean),
     // "minimal" keeps thinking (charged as output) cheap. Empty: let the model decide.
     thinkingLevel: process.env.GEMINI_THINKING_LEVEL ?? 'MINIMAL',
     // High detail reads boards and milestones better, but costs about 3-4x as much.
@@ -20,7 +26,7 @@ export function aiConfig() {
     clipMinutes: number('AI_CLIP_MINUTES', 60),
     maxVideoMinutes: number('AI_MAX_VIDEO_MINUTES', 180),
     minConfidence: number('AI_MIN_CONFIDENCE', 0.5),
-    jobsPerUserPerDay: number('AI_JOBS_PER_USER_PER_DAY', 3),
+    jobsPerUserPerDay: number('AI_JOBS_PER_USER_PER_DAY', 6),
     monthlyBudgetUsd: number('AI_MONTHLY_BUDGET_USD', 5),
     // Waits (seconds) before retrying a failed Gemini call.
     retryDelays: (process.env.AI_RETRY_DELAYS || '30,120,600').split(',').map(Number),

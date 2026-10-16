@@ -3,10 +3,18 @@ import { execFileSync } from 'node:child_process';
 import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { after, before, beforeEach, test } from 'node:test';
+import { after, before, beforeEach, describe, test } from 'node:test';
 import { summarizeUsage } from '../src/aiRoute/cost.js';
 import { defaultServices } from '../src/aiRoute/pipeline.js';
-import { buildPrompt, deleteUploadedVideo, extractPlaces, GeminiError, uploadVideo } from '../src/services/gemini.js';
+import {
+  buildPrompt,
+  deleteUploadedVideo,
+  extractPlaces,
+  extractPlacesWithFallback,
+  forgetRestingModels,
+  GeminiError,
+  uploadVideo,
+} from '../src/services/gemini.js';
 import { hasFfmpeg } from '../src/services/videoFile.js';
 import { startFakeService } from './helpers.js';
 
@@ -153,6 +161,80 @@ test('explains errors, and says which are worth retrying', async () => {
     { candidates: [{ content: { role: 'model', parts: [{ text: 'Sorry, I cannot help.' }] } }], usageMetadata: {} },
   ];
   await assert.rejects(extractPlaces({ youtubeId: 'aBcD3fGh1_-' }), /not with the JSON/);
+});
+
+describe('switching to a backup model', () => {
+  // Gemini's answer when a free-tier limit is reached: which limit, and when to try again.
+  const limitReached = (quotaId, retryDelay = '20s') => [
+    429,
+    {
+      error: {
+        code: 429,
+        message: 'You exceeded your current quota.',
+        status: 'RESOURCE_EXHAUSTED',
+        details: [
+          { '@type': 'type.googleapis.com/google.rpc.QuotaFailure', violations: [{ quotaId }] },
+          { '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay },
+        ],
+      },
+    },
+  ];
+  const busy = [503, { error: { code: 503, message: 'This model is currently experiencing high demand.', status: 'UNAVAILABLE' } }];
+  const asked = () => gemini.requests.filter((r) => r.url.includes(':generateContent')).map((r) => r.url.match(/models\/([^:]+):/)[1]);
+
+  beforeEach(() => {
+    forgetRestingModels();
+    process.env.GEMINI_FALLBACK_MODELS = 'gemini-backup-1, gemini-backup-2';
+  });
+  after(() => delete process.env.GEMINI_FALLBACK_MODELS);
+
+  test('a model at its limit is rested, and the next one answers at once', async () => {
+    reply = (req) => (req.url.includes('gemini-main') ? limitReached('GenerateContentInputTokensPerModelPerMinute-FreeTier') : ok());
+    const result = await extractPlacesWithFallback({ youtubeId: 'aBcD3fGh1_-', model: 'gemini-main' });
+    assert.equal(result.model, 'gemini-backup-1');
+    assert.deepEqual(asked(), ['gemini-main', 'gemini-backup-1']);
+
+    // While it rests (Gemini said 20 seconds), the main model isn't asked again.
+    gemini.requests.length = 0;
+    await extractPlacesWithFallback({ youtubeId: 'aBcD3fGh1_-', model: 'gemini-main' });
+    assert.deepEqual(asked(), ['gemini-backup-1']);
+  });
+
+  test('too busy (503) and gone (404) also switch; the rest of the list is tried in order', async () => {
+    reply = (req) => {
+      if (req.url.includes('gemini-main')) return busy;
+      if (req.url.includes('gemini-backup-1')) return [404, { error: { code: 404, message: 'This model models/gemini-backup-1 is no longer available to new users.', status: 'NOT_FOUND' } }];
+      return ok();
+    };
+    const result = await extractPlacesWithFallback({ youtubeId: 'aBcD3fGh1_-', model: 'gemini-main' });
+    assert.equal(result.model, 'gemini-backup-2');
+    assert.deepEqual(asked(), ['gemini-main', 'gemini-backup-1', 'gemini-backup-2']);
+  });
+
+  test("problems that aren't about the model don't switch", async () => {
+    reply = [400, { error: { code: 400, message: 'Video is not public', status: 'INVALID_ARGUMENT' } }];
+    await assert.rejects(extractPlacesWithFallback({ youtubeId: 'aBcD3fGh1_-', model: 'gemini-main' }), /public/);
+    assert.deepEqual(asked(), ['gemini-main']);
+  });
+
+  test('when every model is resting, it says so and can be retried later', async () => {
+    reply = limitReached('GenerateRequestsPerDayPerProjectPerModel-FreeTier');
+    await assert.rejects(extractPlacesWithFallback({ youtubeId: 'aBcD3fGh1_-', model: 'gemini-main' }), (err) => err.retryable && err.status === 429);
+    assert.equal(asked().length, 3);
+    gemini.requests.length = 0;
+    await assert.rejects(
+      extractPlacesWithFallback({ youtubeId: 'aBcD3fGh1_-', model: 'gemini-main' }),
+      (err) => err.retryable && /Every AI model has reached its limit or is busy until about/.test(err.message),
+    );
+    assert.equal(asked().length, 0, 'a daily limit rests the models for an hour');
+  });
+
+  test('without backups, only the main model is asked', async () => {
+    delete process.env.GEMINI_FALLBACK_MODELS;
+    reply = busy;
+    await assert.rejects(extractPlacesWithFallback({ youtubeId: 'aBcD3fGh1_-', model: 'gemini-main' }), (err) => err.retryable);
+    assert.deepEqual(asked(), ['gemini-main']);
+  });
 });
 
 test('works out the cost, counting thinking as output', () => {

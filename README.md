@@ -48,7 +48,8 @@ that moment, and save the places to Google Maps, a GPS app or a printable trip s
   and how sure it is. It also marks intros, recaps and montages. The owner checks the list (untick, move, change
   the parts the map skips), then TrailCast draws the route through the ticked places. Places only mentioned
   ("one day we'll ride to Leh") start unticked, and places that would send the route far off its way are flagged.
-  The same video is never analysed (or paid for) twice, and daily and monthly limits stop runaway bills. Places
+  The same video is never analysed (or paid for) twice, and daily and monthly limits stop runaway bills (6 analyses
+  per user a day). When a Gemini model reaches its limit or is too busy, a backup model takes over automatically. Places
   where the rider spent the night come ticked as overnight stops, so they count towards the riding days.
 - **AI route builder from a video file:** instead of the YouTube link, the owner can upload the same video from their
   computer. TrailCast then chooses what Gemini gets: picture and sound, the picture only, or **only the sound** (what's
@@ -118,8 +119,11 @@ server, switching it off, the 150 km fuel warning). After updating an existing s
 `npm run backfill-route-extras -w server` once so trails saved before get them too.
 
 **AI route builder (optional):** get a Gemini API key at https://aistudio.google.com ("Get API key") and set
-`GEMINI_API_KEY` in `server/.env`. `.env.example` lists the other settings: the model, the daily limit per user
-(3) and the monthly budget ($5). Before using it in the app, try it on a few real vlogs from the command line. It
+`GEMINI_API_KEY` in `server/.env`. `.env.example` lists the other settings: the model, backup models, the daily limit
+per user (6) and the monthly budget ($5). Each Gemini model has its own free-tier limits (requests and tokens per
+minute and per day). When the model reaches one, or is too busy, TrailCast switches at once to the next model in
+`GEMINI_FALLBACK_MODELS`, and goes back to it once it has rested (as long as Gemini says, or an hour for a daily
+limit). The review says when a backup model answered. Before using it in the app, try it on a few real vlogs from the command line. It
 prints the places found, the parts to skip, the tokens used and the cost in dollars and rupees, and saves Gemini's
 full answer in `server/ai-results/`:
 

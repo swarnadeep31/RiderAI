@@ -72,6 +72,8 @@ describe('AI route jobs', () => {
     assert.equal(job.body.state, 'needs_review');
     assert.equal(job.body.videoTitle, 'Kolkata to Dhanbad ride');
     assert.ok(Math.abs(job.body.costUsd - 0.0615) < 1e-9);
+    // Which model answered (a backup, when the main one had reached its limit).
+    assert.deepEqual(job.body.modelsUsed, ['gemini-3.5-flash-lite']);
     const { candidates, hiddenRanges } = job.body.result;
     assert.deepEqual(candidates.map((c) => [c.name, c.time, c.checked]), [
       ['Howrah', 90, true],

@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { aiConfig } from '../config.js';
 import { Job } from '../models/Job.js';
-import { deleteUploadedVideo, extractPlaces, uploadVideo } from '../services/gemini.js';
+import { deleteUploadedVideo, extractPlacesWithFallback, uploadVideo } from '../services/gemini.js';
 import { extractSound, prepareVideo } from '../services/videoFile.js';
 import { checkVideo } from '../services/youtubeInfo.js';
 import { addUsage, summarizeUsage } from './cost.js';
@@ -36,7 +36,7 @@ async function extractFromUpload({ job, clip }) {
       throw err;
     }
     uploaded = await uploadVideo(path, { mimeType: soundOnly ? 'audio/mp4' : 'video/mp4' });
-    return await extractPlaces({ file: uploaded, model: job.model, highDetail: job.highDetail, noAudio, soundOnly });
+    return await extractPlacesWithFallback({ file: uploaded, model: job.model, highDetail: job.highDetail, noAudio, soundOnly });
   } finally {
     if (uploaded) await deleteUploadedVideo(uploaded.name);
     await rm(dir, { recursive: true, force: true });
@@ -44,7 +44,8 @@ async function extractFromUpload({ job, clip }) {
 }
 
 // The outside services, replaceable in tests.
-export const defaultServices = { extract: extractPlaces, extractFromUpload, checkVideo, geocode: geocodeCandidates };
+// extract switches to a backup model when the job's model has reached its limit (see GEMINI_FALLBACK_MODELS).
+export const defaultServices = { extract: extractPlacesWithFallback, extractFromUpload, checkVideo, geocode: geocodeCandidates };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -121,7 +122,8 @@ async function runStages(job, services) {
       if (clip.status === 'done') continue;
       await stopIfCancelled(job);
       const result = await extractWithRetries(job, clip, services);
-      const usage = summarizeUsage(result.model ?? job.model, result.usage);
+      // Priced (and remembered) by the model that actually answered, which may be a backup.
+      const usage = { ...summarizeUsage(result.model ?? job.model, result.usage), model: result.model ?? job.model };
       Object.assign(clip, { status: 'done', raw: result.raw, answer: result.data, usage });
       job.usage = addUsage(job.usage, usage);
       job.progress = { done: job.clips.filter((c) => c.status === 'done').length, total: job.clips.length };
