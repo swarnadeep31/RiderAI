@@ -117,6 +117,13 @@ const trailSchema = new mongoose.Schema(
     description: { type: String, trim: true, maxlength: 5000, default: '' },
     activity: { type: String, enum: ACTIVITIES, default: 'ride' },
     youtubeId: { type: String, required: true, match: /^[A-Za-z0-9_-]{11}$/ },
+    // Who made the video, as shown on the page: the name the trail's owner
+    // gives, or else the YouTube channel's. The owner's own username isn't shown.
+    creatorName: { type: String, trim: true, maxlength: 100, default: '' },
+    channel: {
+      name: { type: String, trim: true, maxlength: 100 },
+      url: { type: String, validate: { validator: isWebLink, message: "The channel's link must start with http:// or https://." } },
+    },
     supportUrl: {
       type: String,
       trim: true,

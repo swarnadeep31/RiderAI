@@ -399,15 +399,20 @@ export default function TrailPage() {
               <div className="min-w-0">
                 <ActivityBadge activity={trail.activity} />
                 <h1 className="mt-2 text-3xl leading-tight font-extrabold text-ink sm:text-4xl">{trail.title}</h1>
-                {trail.owner && (
+                {/* The video's creator: the name given for the trail, or else the YouTube channel. */}
+                {(trail.creatorName || trail.channel?.name) && (
                   <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-stone-600">
-                    <span
-                      aria-hidden="true"
-                      className="flex h-7 w-7 items-center justify-center rounded-full bg-pine-700 font-display text-xs text-white uppercase"
-                    >
-                      {trail.owner.username[0]}
+                    <Icon name="video" className="h-5 w-5 text-red-600" />
+                    <span>
+                      Video by{' '}
+                      {trail.channel?.url ? (
+                        <a href={trail.channel.url} target="_blank" rel="noopener noreferrer" className="text-ink hover:underline">
+                          {trail.creatorName || trail.channel.name}
+                        </a>
+                      ) : (
+                        <span className="text-ink">{trail.creatorName || trail.channel?.name}</span>
+                      )}
                     </span>
-                    <span>by @{trail.owner.username}</span>
                   </p>
                 )}
                 {recorded && (

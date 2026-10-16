@@ -76,7 +76,7 @@ function TrailCard({ trail, index }) {
             <Icon name="pin" className="h-4 w-4 shrink-0 text-orange-500" />
             <span>
               {ACTIVITIES[trail.activity]} · {trail.points.length} key {trail.points.length === 1 ? 'point' : 'points'}
-              {trail.owner && ` · by @${trail.owner.username}`}
+              {(trail.creatorName || trail.channel?.name) && ` · by ${trail.creatorName || trail.channel.name}`}
             </span>
           </p>
         </div>

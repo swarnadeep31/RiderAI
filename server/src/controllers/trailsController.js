@@ -4,15 +4,17 @@ import { MAX_TRACK_POINTS, ROUTE_STYLES, Trail } from '../models/Trail.js';
 import { queueRouteEnrich } from '../routeExtras/enrich.js';
 import { profileForTrack } from '../routeExtras/profile.js';
 import { routeSegments } from '../services/routing.js';
+import { fetchChannel } from '../services/youtubeInfo.js';
 import { timedTrack } from '../utils/geo.js';
 import { httpError } from '../utils/httpError.js';
 import { parseYouTubeId } from '../utils/youtube.js';
 
 // Only these fields can be set from a request; anything else in the body is ignored.
-const TRAIL_FIELDS = ['title', 'description', 'activity', 'supportUrl', 'track', 'trackTimes', 'recordedAt', 'videoStartsAt', 'daysOverride'];
+const TRAIL_FIELDS = ['title', 'description', 'activity', 'supportUrl', 'track', 'trackTimes', 'recordedAt', 'videoStartsAt', 'daysOverride', 'creatorName'];
 const POINT_FIELDS = ['name', 'note', 'time', 'lat', 'lng', 'stopKind'];
-// Show who added a trail, but nothing else about them.
-const OWNER_FIELDS = 'username';
+// Only who owns a trail (so the page knows who may edit it), not their name:
+// the page credits the video's creator instead.
+const OWNER_FIELDS = '_id';
 
 function pick(body, fields) {
   const out = {};
@@ -55,6 +57,16 @@ export async function findOwnTrail(req) {
   const trail = await findTrail(req.params.id);
   if (!trail.owner?.equals(req.user._id)) throw httpError(403, 'Only the person who added this trail can change it.');
   return trail;
+}
+
+// Finds the YouTube channel a trail's video is on, if it isn't known yet
+// (trails saved before, or when YouTube couldn't be reached), and saves it.
+async function fillChannel(trail) {
+  if (trail.channel?.name) return;
+  const channel = await fetchChannel(trail.youtubeId);
+  if (!channel) return;
+  trail.channel = channel;
+  await Trail.updateOne({ _id: trail._id }, { $set: { channel } });
 }
 
 // routeNotice: a message for the user when drawing the route didn't go as asked.
@@ -113,6 +125,8 @@ export async function listTrails(req, res) {
     .populate('owner', OWNER_FIELDS)
     .lean();
   res.json(trails);
+  // Older trails without their channel: look a few up for next time.
+  for (const trail of trails.filter((t) => !t.channel?.name).slice(0, 5)) fillChannel(trail).catch(() => {});
 }
 
 export async function createTrail(req, res) {
@@ -125,12 +139,15 @@ export async function createTrail(req, res) {
     routeVersion: fields.track?.length ? 1 : 0,
   });
   if (fields.track?.length) setProfile(trail, elevationsFrom(req.body, fields.track), 'gpx');
+  trail.channel = (await fetchChannel(trail.youtubeId)) ?? undefined;
   await saveTrail(trail, 0);
   await sendTrail(res, trail, { status: 201 });
 }
 
 export async function getTrail(req, res) {
-  await sendTrail(res, await findTrail(req.params.id));
+  const trail = await findTrail(req.params.id);
+  await fillChannel(trail);
+  await sendTrail(res, trail);
 }
 
 export async function updateTrail(req, res) {
@@ -145,7 +162,13 @@ export async function updateTrail(req, res) {
     const heights = elevationsFrom(req.body, fields.track);
     if (trail.routeVersion !== version || heights) setProfile(trail, heights, 'gpx');
   }
-  if (req.body?.youtubeUrl !== undefined) trail.youtubeId = youtubeIdFrom(req.body);
+  if (req.body?.youtubeUrl !== undefined) {
+    const youtubeId = youtubeIdFrom(req.body);
+    if (youtubeId !== trail.youtubeId) {
+      trail.youtubeId = youtubeId;
+      trail.channel = (await fetchChannel(youtubeId)) ?? undefined;
+    }
+  }
   await saveTrail(trail, version);
   await sendTrail(res, trail);
 }
