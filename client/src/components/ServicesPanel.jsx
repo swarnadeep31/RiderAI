@@ -3,6 +3,7 @@ import { googleMapsUrl } from '../lib/exports.js';
 import { FUEL_CAVEAT, KIND_ORDER, SERVICE_KINDS, fuelGapSentence, kmAlong, kmLength, longGaps, offRoute, serviceName } from '../lib/services.js';
 import { formatTime } from '../lib/time.js';
 import Icon from './art/Icon.jsx';
+import SectionHeading from './SectionHeading.jsx';
 
 // A service's round icon: its colour and its own symbol (so colour is never the only clue).
 export function ServiceBadge({ kind, className = 'h-5 w-5 text-[11px]' }) {
@@ -87,10 +88,11 @@ export default function ServicesPanel({ services, lengthM, approximate, warnKm, 
   if (!services || (services.status === 'unavailable' && services.reason !== 'straight')) return null;
 
   return (
-    <section className="card space-y-4 p-5">
-      <h2 className="flex items-center gap-2 text-2xl font-extrabold text-ink">
-        <ServiceBadge kind="fuel" className="h-6 w-6 text-xs" /> Along the route
-      </h2>
+    <section className="space-y-3">
+      <SectionHeading icon="route" iconClass="bg-pine-100 text-pine-700 dark:bg-pine-900/70 dark:text-pine-300" aside={items.length > 0 && `${items.length} nearby`}>
+        Along the route
+      </SectionHeading>
+      <div className="card space-y-4 p-5">
 
       {services.status === 'pending' && (
         <p className="flex items-center gap-2 text-sm text-stone-600">
@@ -144,6 +146,7 @@ export default function ServicesPanel({ services, lengthM, approximate, warnKm, 
       )}
 
       {services.status === 'ready' && visibleKinds.has('fuel') && <p className="text-xs text-stone-500">{FUEL_CAVEAT}</p>}
+      </div>
     </section>
   );
 }
