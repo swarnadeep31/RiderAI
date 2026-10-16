@@ -430,6 +430,8 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
               {job.reused
                 ? ' This video was analysed before, so this cost nothing.'
                 : job.costUsd > 0 && ` This analysis cost about ${usd(job.costUsd)}.`}
+              {job.modelsUsed?.some((model) => model !== job.model) &&
+                ` ${job.model} had reached its limit or was busy, so ${job.modelsUsed.filter((model) => model !== job.model).join(' and ')} answered instead.`}
             </p>
           </div>
 

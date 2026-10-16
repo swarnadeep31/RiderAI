@@ -25,6 +25,8 @@ export function jobView(job) {
     error: job.error ?? null,
     videoTitle: job.videoTitle ?? '',
     model: job.model,
+    // The models that answered: a backup when the main one had reached its limit.
+    modelsUsed: [...new Set((job.clips ?? []).map((clip) => clip.usage?.model).filter(Boolean))],
     highDetail: job.highDetail,
     source: job.source ?? 'youtube',
     mediaMode: job.mediaMode ?? 'full',
