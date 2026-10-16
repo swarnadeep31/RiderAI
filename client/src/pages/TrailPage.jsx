@@ -12,6 +12,7 @@ import ErrorMessage from '../components/ErrorMessage.jsx';
 import KeyPointList from '../components/KeyPointList.jsx';
 import RoutePanel from '../components/RoutePanel.jsx';
 import SaveOptions from '../components/SaveOptions.jsx';
+import SectionHeading from '../components/SectionHeading.jsx';
 import ServicesPanel, { ServiceBadge } from '../components/ServicesPanel.jsx';
 import TrailMap from '../components/TrailMap.jsx';
 import TripStats from '../components/TripStats.jsx';
@@ -28,6 +29,47 @@ import {
   videoTimeAtDistance,
 } from '../lib/track.js';
 import { formatTime } from '../lib/time.js';
+
+// Who the page credits for the video: a name the owner types, or else the YouTube channel's.
+function CreatorSetting({ trail, onSaved }) {
+  const [text, setText] = useState(trail.creatorName ?? '');
+  const [error, setError] = useState(null);
+
+  async function save(event) {
+    event.preventDefault();
+    try {
+      setError(null);
+      onSaved(await api.updateTrail(trail._id, { creatorName: text }));
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  return (
+    <form onSubmit={save} className="space-y-2 text-sm">
+      <h3 className="font-semibold">Video creator</h3>
+      <p className="text-stone-600">
+        {trail.channel?.name
+          ? `Leave it empty to show the YouTube channel's name (${trail.channel.name}).`
+          : 'The name shown as "Video by ...".'}
+      </p>
+      <div className="flex items-center gap-2">
+        <input
+          maxLength={100}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={trail.channel?.name ?? "The rider's or channel's name"}
+          aria-label="Video creator's name"
+          className="field w-full max-w-xs"
+        />
+        <button type="submit" className="btn-secondary px-3 py-1.5">
+          Save
+        </button>
+      </div>
+      {error && <ErrorMessage>{error}</ErrorMessage>}
+    </form>
+  );
+}
 
 // The owner can say how many days the trip took, when the worked-out number is wrong.
 function DaysSetting({ trail, onSaved }) {
@@ -209,6 +251,7 @@ export default function TrailPage() {
   // Heights for the chart, if they belong to the route as it is now.
   const profile = trail.elevationProfile?.routeVersion === trail.routeVersion ? trail.elevationProfile : null;
   const stats = trail.stats;
+  const creator = trail.creatorName || trail.channel?.name;
   const overnights = (stats?.nights ?? []).map((night, i) => ({ alongM: night.alongM, label: `Night ${i + 1}${night.name ? ` · ${night.name}` : ''}` }));
   // The longest stretch without fuel joins the stats once the services are in. Clicking it shows it on the map.
   const fuelChip = longestGap && (
@@ -393,48 +436,29 @@ export default function TrailPage() {
           )}
         </div>
 
-        <div className="space-y-6 lg:col-start-1 lg:row-start-2">
-          <section>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
+        <div className="space-y-8 lg:col-start-1 lg:row-start-2">
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
                 <ActivityBadge activity={trail.activity} />
-                <h1 className="mt-2 text-3xl leading-tight font-extrabold text-ink sm:text-4xl">{trail.title}</h1>
-                {/* The video's creator: the name given for the trail, or else the YouTube channel. */}
-                {(trail.creatorName || trail.channel?.name) && (
-                  <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-stone-600">
-                    <Icon name="video" className="h-5 w-5 text-red-600" />
-                    <span>
-                      Video by{' '}
-                      {trail.channel?.url ? (
-                        <a href={trail.channel.url} target="_blank" rel="noopener noreferrer" className="text-ink hover:underline">
-                          {trail.creatorName || trail.channel.name}
-                        </a>
-                      ) : (
-                        <span className="text-ink">{trail.creatorName || trail.channel?.name}</span>
-                      )}
-                    </span>
-                  </p>
-                )}
                 {recorded && (
-                  <p className="badge mt-3 bg-pine-100 text-pine-800 dark:bg-pine-900/70 dark:text-pine-300">
+                  <span className="badge bg-pine-100 text-pine-800 dark:bg-pine-900/70 dark:text-pine-300" title="The route was recorded with GPS">
                     <Icon name="satellite" className="h-3.5 w-3.5" />
-                    Recorded GPS route
-                  </p>
+                    GPS route
+                  </span>
                 )}
-                {statsRow('mt-4 hidden lg:flex')}
                 {drawnRoute && (
-                  <p className={`badge mt-3 ${aiRoute ? 'bg-violet-100 text-violet-800' : 'bg-amber-100 text-amber-900'}`}>
+                  <span className={`badge ${aiRoute ? 'bg-violet-100 text-violet-800' : 'bg-amber-100 text-amber-900'}`}>
                     <Icon name={aiRoute ? 'sparkles' : 'route'} className="h-3.5 w-3.5 shrink-0" />
-                    {aiRoute
-                      ? 'AI-estimated route through the places in the video. Roads may differ.'
-                      : 'Approximate route, drawn between the key points'}
-                  </p>
+                    {aiRoute ? 'AI-estimated route' : 'Approximate route'}
+                  </span>
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
                 {trail.supportUrl && (
                   <a href={trail.supportUrl} target="_blank" rel="noopener noreferrer" className="btn-primary">
-                    ♥ Support the creator
+                    <Icon name="heart" className="h-4 w-4" />
+                    Support the creator
                   </a>
                 )}
                 {isOwner && (
@@ -453,7 +477,37 @@ export default function TrailPage() {
                 )}
               </div>
             </div>
-            {trail.description && <p className="mt-4 text-lg whitespace-pre-line text-stone-700">{trail.description}</p>}
+
+            <div>
+              <h1 className="text-3xl leading-tight font-extrabold text-ink sm:text-4xl">{trail.title}</h1>
+              {/* The video's creator: the name given for the trail, or else the YouTube channel. */}
+              {creator && (
+                <p className="mt-2 flex items-center gap-2 text-sm text-stone-600">
+                  <Icon name="video" className="h-5 w-5 shrink-0 text-red-600" />
+                  <span>
+                    Video by{' '}
+                    {trail.channel?.url ? (
+                      <a href={trail.channel.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-ink hover:underline">
+                        {creator}
+                      </a>
+                    ) : (
+                      <span className="font-semibold text-ink">{creator}</span>
+                    )}
+                  </span>
+                </p>
+              )}
+            </div>
+
+            {statsRow('hidden lg:flex')}
+
+            {drawnRoute && (
+              <p className="text-sm text-stone-500">
+                {aiRoute
+                  ? 'The AI worked out this route from the places in the video, so the roads may differ.'
+                  : 'This route is drawn between the key points, so the roads may differ.'}
+              </p>
+            )}
+            {trail.description && <p className="text-lg whitespace-pre-line text-stone-700">{trail.description}</p>}
           </section>
 
           {notice && (
@@ -549,6 +603,8 @@ export default function TrailPage() {
 
               {trail.track.length > 1 && <DaysSetting key={trail.daysOverride ?? 'auto'} trail={trail} onSaved={applyUpdate} />}
 
+              <CreatorSetting key={trail.creatorName ?? ''} trail={trail} onSaved={applyUpdate} />
+
               <button type="button" onClick={deleteTrail} className="text-sm text-red-700 hover:underline">
                 Delete this trail
               </button>
@@ -556,9 +612,9 @@ export default function TrailPage() {
           )}
 
           <section className="space-y-3">
-            <h2 className="flex items-center gap-2 text-2xl font-extrabold text-ink">
-              <Icon name="pin" className="h-6 w-6 text-orange-500" /> Key points
-            </h2>
+            <SectionHeading icon="pin" iconClass="bg-orange-100 text-orange-600" aside={trail.points.length > 0 && `${trail.points.length} ${trail.points.length === 1 ? 'place' : 'places'}`}>
+              Key points
+            </SectionHeading>
             <KeyPointList
               points={trail.points}
               activePointId={activePoint?._id}
@@ -582,10 +638,10 @@ export default function TrailPage() {
           />
 
           {(trail.points.length > 0 || trail.track.length > 0) && (
-            <section className="card space-y-3 bg-linear-to-br from-surface to-sky-50 p-5">
-              <h2 className="flex items-center gap-2 text-2xl font-extrabold text-ink">
-                <Icon name="map" className="h-6 w-6 text-sky-600" /> Take this trail with you
-              </h2>
+            <section className="space-y-3">
+              <SectionHeading icon="map" iconClass="bg-sky-100 text-sky-700">
+                Take this trail with you
+              </SectionHeading>
               <SaveOptions trail={trail} services={ready?.items ?? []} />
             </section>
           )}

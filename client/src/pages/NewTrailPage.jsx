@@ -14,7 +14,7 @@ const hintClass = 'mt-1.5 block text-sm font-normal text-stone-500';
 
 export default function NewTrailPage() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ youtubeUrl: '', title: '', activity: 'ride', description: '', supportUrl: '' });
+  const [form, setForm] = useState({ youtubeUrl: '', title: '', creatorName: '', activity: 'ride', description: '', supportUrl: '' });
   const [route, setRoute] = useState(null);
   const [routeError, setRouteError] = useState(null);
   const [error, setError] = useState(null);
@@ -87,6 +87,12 @@ export default function NewTrailPage() {
           <label className={labelClass}>
             Title
             <input required maxLength={120} value={form.title} onChange={update('title')} className={inputClass} />
+          </label>
+
+          <label className={labelClass}>
+            Video creator's name <span className="font-normal text-stone-500">(optional)</span>
+            <input maxLength={100} value={form.creatorName} onChange={update('creatorName')} placeholder="The rider's or channel's name" className={inputClass} />
+            <span className={hintClass}>Shown as "Video by ...". Leave it empty to use the YouTube channel's name.</span>
           </label>
 
           <fieldset>

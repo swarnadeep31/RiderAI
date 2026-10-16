@@ -14,6 +14,9 @@ that moment, and save the places to Google Maps, a GPS app or a printable trip s
 - **Feedback:** logged-in users can send feedback from the link at the bottom of every page.
 - **Add a trail:** paste a YouTube link (normal video or live stream) and, optionally, upload the GPS route as a
   `.gpx` file from Strava, Garmin, Komoot or any tracking app.
+- **Credit where it's due:** trail pages and cards say "Video by" the video's creator: the YouTube channel's name
+  (looked up from the link), or a name the person adding the trail gives. The name of the person who added it isn't
+  shown.
 - **Watch page:** the video on one side, the map on the other, like following a cab in a taxi app.
   - The whole route is drawn faded; the part already covered is drawn bold.
   - A blue marker glides along the route with the video (when the route has times). It waits at stops, and
