@@ -8,9 +8,15 @@ that moment, and save the places to Google Maps, a GPS app or a printable trip s
 
 ## What works today
 
-- **Accounts:** sign up with email, username and password. New users answer one short welcome question (what
-  they'll use TrailCast for), plus two optional ones (how they found TrailCast, what they'd like to see). Anyone can
-  watch; you need an account to add trails, and only the person who added a trail can change it.
+- **Tour:** first-time visitors get a short animated tour of what TrailCast does (the map beside the video, scrubbing,
+  fuel stops, AI routes, downloads), ending with sign up or log in. It opens once by itself; "Take the tour" on the
+  home page opens it again. It respects the device's "reduce motion" setting.
+- **Accounts:** sign up with your name and an email address or phone number and a password, or with "Continue with
+  Google". If that email, number or Google account already has an account, the page says so and offers to log in
+  (Google just logs you in); logging in with one that has none offers to sign up. Phone numbers can be typed any way
+  ("98765 43210", "+91 98765-43210"); ten digits without a country code count as Indian. New users answer one short
+  welcome question (what they'll use TrailCast for), plus two optional ones. Anyone can watch; you need an account to
+  add trails, and only the person who added a trail can change it.
 - **Feedback:** logged-in users can send feedback from the link at the bottom of every page.
 - **Add a trail:** paste a YouTube link (normal video or live stream) and, optionally, upload the GPS route as a
   `.gpx` file from Strava, Garmin, Komoot or any tracking app.
@@ -111,6 +117,11 @@ If the in-memory database can't start on your system, use one of these instead.
 
 **Logins:** `.env.example` also explains `JWT_SECRET`, the secret that signs login sessions. While developing you can
 leave it empty; it must be set before TrailCast goes online.
+
+**Continue with Google (optional):** in the [Google Cloud console](https://console.cloud.google.com/apis/credentials),
+create an OAuth client ID of type "Web application", add `http://localhost:5173` (and your site's address once it's
+online) under "Authorised JavaScript origins", and put the client ID in `GOOGLE_CLIENT_ID` in `server/.env`. Without
+it, the Google button doesn't show and email and phone sign-up work as usual.
 
 **Routes along roads (optional):** for routes drawn between key points to follow real roads and footpaths, get a free
 key at https://openrouteservice.org and set `ORS_API_KEY` in `server/.env`. Without it they're straight lines. The same
@@ -226,8 +237,9 @@ samples/                 A sample GPX file to try
 
 | Method | URL | Who | What it does |
 | --- | --- | --- | --- |
-| POST | `/api/auth/signup` | Anyone | Create an account (`email`, `username`, `password`) and log in |
-| POST | `/api/auth/login` | Anyone | Log in with `email` and `password` |
+| POST | `/api/auth/signup` | Anyone | Create an account (`name`, `email` or `phone`, `password`) and log in. 409 with `code: 'exists'` if that email or number already has one |
+| POST | `/api/auth/login` | Anyone | Log in with `email` or `phone`, and `password`. 404 with `code: 'not_found'` if there's no such account |
+| POST | `/api/auth/google` | Anyone | Log in or sign up with Google (`credential`: the token from Google's button). Answers `{ user, existing }` |
 | POST | `/api/auth/logout` | Anyone | Log out |
 | GET | `/api/auth/me` | Anyone | The logged-in user, or `null` |
 | PUT | `/api/auth/onboarding` | Logged in | Save the welcome answers (`interests`, `referralSource`, `wishlist`) |

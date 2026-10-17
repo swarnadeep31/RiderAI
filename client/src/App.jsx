@@ -13,6 +13,7 @@ import NewTrailPage from './pages/NewTrailPage.jsx';
 import SignupPage from './pages/SignupPage.jsx';
 import WelcomePage from './pages/WelcomePage.jsx';
 import { NoticesProvider } from './notices.jsx';
+import TourPage from './pages/TourPage.jsx';
 
 // The map library is big, so the pages with a map load when first opened.
 const TrailPage = lazy(() => import('./pages/TrailPage.jsx'));
@@ -51,10 +52,10 @@ function HeaderLinks() {
           aria-hidden="true"
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-pine-700 font-display text-sm text-white uppercase"
         >
-          {user.username[0]}
+          {(user.name || user.username)[0]}
         </span>
-        {/* Phones show just the round letter; screen readers still hear the username. */}
-        <span className="sr-only sm:not-sr-only sm:truncate">@{user.username}</span>
+        {/* Phones show just the round letter; screen readers still hear the name. */}
+        <span className="sr-only sm:not-sr-only sm:truncate">{user.name || `@${user.username}`}</span>
       </Link>
     </div>
   );
@@ -190,6 +191,8 @@ export default function App() {
               />
               <Route path="*" element={<NotFound />} />
             </Route>
+            {/* The onboarding tour: full screen, without the site's header and footer. */}
+            <Route path="tour" element={<TourPage />} />
             <Route
               path="trails/:id/print"
               element={

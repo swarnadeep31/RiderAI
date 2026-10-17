@@ -1,36 +1,119 @@
+import { randomInt } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { endSession, startSession } from '../middleware/auth.js';
-import { User } from '../models/User.js';
+import { normalizePhone, User } from '../models/User.js';
+import { verifyGoogleCredential } from '../services/google.js';
 import { httpError } from '../utils/httpError.js';
 
 const MIN_PASSWORD_LENGTH = 8;
 const normalize = (text) => String(text ?? '').trim().toLowerCase();
 
+// An error the sign-up and log-in pages can act on: code 'exists' (offer to
+// log in instead) or 'not_found' (offer to sign up instead).
+function authError(status, message, code) {
+  const err = httpError(status, message);
+  err.code = code;
+  return err;
+}
+
+// The way in someone typed: { email } or { phone }, normalised.
+function identifierFrom(body) {
+  if (body?.phone) {
+    const phone = normalizePhone(String(body.phone));
+    if (!phone) throw httpError(400, 'Enter a phone number with its country code, like +91 98765 43210.');
+    return { phone };
+  }
+  if (body?.email) return { email: normalize(body.email) };
+  throw httpError(400, 'Enter your email address or phone number.');
+}
+
+const describe = (identifier) => (identifier.phone ? 'phone number' : 'email');
+
+// A username for people who don't pick one, from their name or email: "swarnadeep_roy_4821".
+async function makeUsername(seed) {
+  const base =
+    normalize(seed)
+      .replace(/@.*/, '')
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 20) || 'rider';
+  for (let i = 0; i < 20; i++) {
+    const candidate = (base.length < 3 ? `${base}_rider` : base) + (i === 0 ? '' : `_${randomInt(1000, 10000)}`);
+    if (!(await User.exists({ username: candidate }))) return candidate;
+  }
+  return `rider_${Date.now()}`;
+}
+
+// Signs up with a name, an email or phone number, and a password. If that
+// email or phone number already has an account, says so (code 'exists').
 export async function signup(req, res) {
-  const { email, username, password } = req.body ?? {};
+  const { name, username, password } = req.body ?? {};
   if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
     throw httpError(400, `Use a password with at least ${MIN_PASSWORD_LENGTH} characters.`);
   }
   if (password.length > 200) throw httpError(400, 'That password is too long.');
+  const displayName = String(name ?? username ?? '').trim();
+  if (!displayName) throw httpError(400, 'Enter your name.');
 
-  if (await User.exists({ email: normalize(email) })) {
-    throw httpError(409, 'That email already has an account. Try logging in instead.');
+  const identifier = identifierFrom(req.body);
+  if (await User.exists(identifier)) {
+    throw authError(409, `You already have an account with this ${describe(identifier)}. Please log in.`, 'exists');
   }
-  if (await User.exists({ username: normalize(username) })) throw httpError(409, 'That username is taken.');
+  if (username !== undefined && (await User.exists({ username: normalize(username) }))) throw httpError(409, 'That username is taken.');
 
-  const user = await User.create({ email, username, passwordHash: await bcrypt.hash(password, 12) });
+  const user = await User.create({
+    ...identifier,
+    name: displayName,
+    username: username ?? (await makeUsername(displayName)),
+    passwordHash: await bcrypt.hash(password, 12),
+  });
   startSession(res, user);
   res.status(201).json(user);
 }
 
+// Logs in with an email or phone number and the password. An email or
+// number without an account is told so (code 'not_found'), with a way to sign up.
 export async function login(req, res) {
-  const { email, password } = req.body ?? {};
-  const user = await User.findOne({ email: normalize(email) }).select('+passwordHash');
-  const correct = user && typeof password === 'string' && (await bcrypt.compare(password, user.passwordHash));
-  // The same message either way, so nobody can test which emails have accounts.
-  if (!correct) throw httpError(401, 'Wrong email or password.');
+  const identifier = identifierFrom(req.body);
+  const user = await User.findOne(identifier).select('+passwordHash');
+  if (!user) throw authError(404, `There's no account with this ${describe(identifier)} yet. Sign up to create one.`, 'not_found');
+  if (!user.passwordHash) throw httpError(401, 'This account uses Google. Use "Continue with Google" to log in.');
+  const correct = typeof req.body?.password === 'string' && (await bcrypt.compare(req.body.password, user.passwordHash));
+  if (!correct) throw httpError(401, 'Wrong password. Try again.');
   startSession(res, user);
   res.json(user);
+}
+
+// "Continue with Google", on the log-in and sign-up pages alike: an account
+// already linked to this Google account logs in; one with the same email is
+// linked to it and logs in (existing: true); otherwise a new account is made
+// (201). The answer says which, so the page can tell the person.
+export async function google(req, res) {
+  const profile = await verifyGoogleCredential(req.body?.credential);
+  if (!profile) throw httpError(401, "Google sign-in didn't work. Please try again.");
+
+  let user = await User.findOne({ googleId: profile.googleId });
+  if (!user) {
+    user = await User.findOne({ email: profile.email });
+    if (user) {
+      user.googleId = profile.googleId;
+      user.name ||= profile.name;
+      await user.save();
+    }
+  }
+  if (user) {
+    startSession(res, user);
+    return res.json({ user, existing: true });
+  }
+
+  user = await User.create({
+    googleId: profile.googleId,
+    email: profile.email,
+    name: profile.name || profile.email.split('@')[0],
+    username: await makeUsername(profile.name || profile.email),
+  });
+  startSession(res, user);
+  res.status(201).json({ user, existing: false });
 }
 
 export function logout(req, res) {

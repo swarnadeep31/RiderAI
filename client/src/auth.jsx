@@ -25,10 +25,16 @@ export function AuthProvider({ children }) {
         setUser(created);
         return created;
       },
-      async login(email, password) {
-        const loggedIn = await api.login(email, password);
+      async login(credentials) {
+        const loggedIn = await api.login(credentials);
         setUser(loggedIn);
         return loggedIn;
+      },
+      // Returns { user, existing }: existing is true when the account was already there.
+      async loginWithGoogle(credential) {
+        const result = await api.loginWithGoogle(credential);
+        setUser(result.user);
+        return result;
       },
       async logout() {
         await api.logout();

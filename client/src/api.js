@@ -16,7 +16,8 @@ async function request(path, { method = 'GET', body } = {}) {
   const data = res.status === 204 ? null : await res.json().catch(() => null);
   if (!res.ok) {
     if (!data && res.status >= 500) throw new Error("Can't reach the TrailCast server. Is it running?");
-    throw new Error(data?.error ?? `Request failed (${res.status})`);
+    // code: something the page can act on, like 'exists' (an account is already there).
+    throw Object.assign(new Error(data?.error ?? `Request failed (${res.status})`), { code: data?.code, status: res.status });
   }
   return data;
 }
@@ -24,8 +25,12 @@ async function request(path, { method = 'GET', body } = {}) {
 export const api = {
   // Accounts
   me: () => request('/auth/me'),
+  // details: { name, password, and email or phone }
   signup: (details) => request('/auth/signup', { method: 'POST', body: details }),
-  login: (email, password) => request('/auth/login', { method: 'POST', body: { email, password } }),
+  // credentials: { password, and email or phone }
+  login: (credentials) => request('/auth/login', { method: 'POST', body: credentials }),
+  // credential: the token from Google's sign-in button. Answers { user, existing }.
+  loginWithGoogle: (credential) => request('/auth/google', { method: 'POST', body: { credential } }),
   logout: () => request('/auth/logout', { method: 'POST' }),
   saveOnboarding: (answers) => request('/auth/onboarding', { method: 'PUT', body: answers }),
   sendFeedback: (message) => request('/feedback', { method: 'POST', body: { message } }),
