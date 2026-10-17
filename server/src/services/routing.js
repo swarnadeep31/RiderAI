@@ -25,15 +25,51 @@ export async function routeSegments(points, style) {
   }
   try {
     const segments = [];
+    const offRoad = [];
     for (let first = 0; first < points.length - 1; first += MAX_WAYPOINTS - 1) {
-      segments.push(...(await fetchSegments(points.slice(first, first + MAX_WAYPOINTS), PROFILES[style])));
+      const piece = await legsAroundOffRoad(points.slice(first, first + MAX_WAYPOINTS), PROFILES[style]);
+      segments.push(...piece.segments);
+      offRoad.push(...piece.offRoad);
     }
-    return { segments, notice: null };
+    const names = [...new Set(offRoad.map((p) => p.name).filter(Boolean))];
+    const notice = offRoad.length
+      ? `${names.length ? names.join(', ') : 'Some places'} ${offRoad.length === 1 ? "isn't" : "aren't"} near a road, so straight lines join ${offRoad.length === 1 ? 'it' : 'them'} to the route. The rest follows the ${STYLE_NAMES[style]}.`
+      : null;
+    return { segments, notice };
   } catch (err) {
     return {
       segments: straightSegments(points),
       notice: `Couldn't follow the ${STYLE_NAMES[style]} (${err.message}), so straight lines were drawn instead.`,
     };
+  }
+}
+
+// OpenRouteService refuses a whole route when one place is more than 350 m
+// from any road (a summit, a lake, a viewpoint in the forest), and says which
+// one: "...of specified coordinate 3: ...". That place is left out and the
+// rest asked again, so the route still follows the roads everywhere else;
+// straight lines join the places off the road. Returns { segments, offRoad }.
+async function legsAroundOffRoad(points, profile) {
+  const skipped = new Set();
+  for (;;) {
+    const routable = points.map((_, i) => i).filter((i) => !skipped.has(i));
+    if (routable.length < 2) return { segments: straightSegments(points), offRoad: [...skipped].map((i) => points[i]) };
+    let roadLegs;
+    try {
+      roadLegs = await fetchSegments(routable.map((i) => points[i]), profile);
+    } catch (err) {
+      const offRoad = /routable point/i.test(err.message) && err.message.match(/coordinate (\d+)/);
+      if (!offRoad || routable[Number(offRoad[1])] === undefined) throw err;
+      skipped.add(routable[Number(offRoad[1])]);
+      continue;
+    }
+    // A road between neighbouring places that are both on a road; a straight line to and from the others.
+    const roadFrom = new Map(routable.slice(0, -1).map((from, k) => [from, { to: routable[k + 1], leg: roadLegs[k] }]));
+    const segments = points.slice(1).map((next, i) => {
+      const road = roadFrom.get(i);
+      return road?.to === i + 1 ? road.leg : [[points[i].lat, points[i].lng], [next.lat, next.lng]];
+    });
+    return { segments, offRoad: [...skipped].map((i) => points[i]) };
   }
 }
 
