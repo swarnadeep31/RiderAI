@@ -120,8 +120,9 @@ leave it empty; it must be set before TrailCast goes online.
 
 **Continue with Google (optional):** in the [Google Cloud console](https://console.cloud.google.com/apis/credentials),
 create an OAuth client ID of type "Web application", add `http://localhost:5173` (and your site's address once it's
-online) under "Authorised JavaScript origins", and put the client ID in `GOOGLE_CLIENT_ID` in `server/.env`. Without
-it, the Google button doesn't show and email and phone sign-up work as usual.
+online) under "Authorised JavaScript origins", and put the client ID in `GOOGLE_CLIENT_ID` in `server/.env`. Until
+then the "Continue with Google" button still shows, but says Google sign-in isn't switched on yet; email and phone
+sign-up work as usual.
 
 **Routes along roads (optional):** for routes drawn between key points to follow real roads and footpaths, get a free
 key at https://openrouteservice.org and set `ORS_API_KEY` in `server/.env`. Without it they're straight lines. The same
