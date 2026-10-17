@@ -169,6 +169,35 @@ products; on a paid plan it doesn't.
 a made-up 20-minute route near Manali with times, so the blue dot will move as the video plays (it won't match the
 real video, of course).
 
+## Put it online: website on Vercel, API on Render
+
+The website (`client/`) goes on Vercel and the API (`server/`) on Render. Vercel forwards every `/api` request to
+Render (`client/vercel.json`), so to the browser it's one site: logins work without cross-site cookies, and links
+like `/trails/...` open the app.
+
+1. **MongoDB Atlas:** under Network Access, allow connections from anywhere (`0.0.0.0/0`). Render's free plan has
+   no fixed address. Use a strong database password.
+2. **Render (API):** New → Blueprint → pick this repository and the branch to deploy. `render.yaml` sets everything
+   up; fill in `MONGODB_URI`, `GOOGLE_CLIENT_ID`, `ORS_API_KEY` and `GEMINI_API_KEY` when asked (`JWT_SECRET` is
+   made for you). When it's live, `https://trailcast-api.onrender.com/api/health` answers `{"ok":true}`. If Render
+   gave the service another address, put that address in `client/vercel.json`.
+3. **Vercel (website):** Add New → Project → import this repository. Set **Root Directory** to `client`; Vercel
+   recognises Vite and builds `dist/`. Nothing else to set.
+4. **Google sign-in:** in the Google Cloud console, add the Vercel address (`https://your-project.vercel.app`, and
+   your own domain later) to the OAuth client's Authorised JavaScript origins.
+5. **Existing trails:** to give trails saved earlier their heights, fuel stops and stats, run
+   `npm run backfill-route-extras -w server` once from your computer with `MONGODB_URI` set to the Atlas database.
+
+Good to know about the free plans:
+
+- Render's free API **sleeps after 15 minutes without visitors** and takes about a minute to wake up, so the first
+  visit after a quiet spell is slow (and may need a reload). Background work (AI analyses, fuel stops) only runs
+  while it's awake; it carries on where it stopped. Render's paid plan ($7 a month) stays awake.
+- Render's Node servers don't have **FFmpeg**, so the AI route builder's "use the video file" option won't work
+  there; YouTube links do. Big uploads would also go through Vercel's forwarding, which isn't made for them.
+- OpenStreetMap's own map tiles are meant for light use. Before real traffic, switch to a tile provider with a free
+  tier (see the roadmap).
+
 ## Commands
 
 | Command | What it does |
