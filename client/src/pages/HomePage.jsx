@@ -8,6 +8,7 @@ import { CampScene, HeroScene } from '../components/art/Scenery.jsx';
 import ErrorMessage from '../components/ErrorMessage.jsx';
 import { ACTIVITIES } from '../lib/activities.js';
 import { cardSummary } from '../lib/stats.js';
+import { useConfirm, useToast } from '../notices.jsx';
 
 const MADE_FOR = [
   ['ride', 'Moto vloggers'],
@@ -114,6 +115,8 @@ function LoadingCards() {
 
 export default function HomePage() {
   const { user } = useAuth();
+  const confirm = useConfirm();
+  const toast = useToast();
   const [trails, setTrails] = useState(null);
   const [error, setError] = useState(null);
 
@@ -123,13 +126,18 @@ export default function HomePage() {
 
   // Deletes a trail the user added: its route, key points and everything worked out for it.
   async function deleteTrail(trail) {
-    if (!window.confirm(`Delete “${trail.title}”? This cannot be undone.`)) return;
+    const yes = await confirm({
+      title: 'Are you sure you want to delete this trail?',
+      message: `“${trail.title}” and everything worked out for it (the route, heights and fuel stops) will be deleted. This can't be undone.`,
+      confirmLabel: 'Delete trail',
+    });
+    if (!yes) return;
     try {
-      setError(null);
       await api.deleteTrail(trail._id);
       setTrails((list) => list.filter((t) => t._id !== trail._id));
+      toast(`“${trail.title}” was successfully deleted.`);
     } catch (err) {
-      setError(err.message);
+      toast(err.message, { tone: 'error' });
     }
   }
 

@@ -17,6 +17,7 @@ import ServicesPanel, { ServiceBadge } from '../components/ServicesPanel.jsx';
 import TrailMap from '../components/TrailMap.jsx';
 import TripStats from '../components/TripStats.jsx';
 import { useRouteServices } from '../hooks/useRouteServices.js';
+import { useConfirm, useToast } from '../notices.jsx';
 import { useYouTubePlayer } from '../hooks/useYouTubePlayer.js';
 import { FUEL_CAVEAT, KIND_ORDER, fuelGapChip, fuelGapSentence } from '../lib/services.js';
 import {
@@ -149,6 +150,8 @@ export default function TrailPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+  const confirm = useConfirm();
+  const toast = useToast();
 
   const [trail, setTrail] = useState(null);
   const [loadError, setLoadError] = useState(null);
@@ -334,11 +337,17 @@ export default function TrailPage() {
   }
 
   async function deletePoint(point) {
-    if (!window.confirm(`Delete "${point.name}"?`)) return;
+    const yes = await confirm({
+      title: 'Are you sure you want to delete this key point?',
+      message: `“${point.name}” will be removed from the trail and the map.`,
+      confirmLabel: 'Delete key point',
+    });
+    if (!yes) return;
     try {
       applyUpdate(await api.deletePoint(trail._id, point._id));
+      toast(`“${point.name}” was successfully deleted.`);
     } catch (err) {
-      setNotice(err.message);
+      toast(err.message, { tone: 'error' });
     }
   }
 
@@ -363,12 +372,19 @@ export default function TrailPage() {
   }
 
   async function deleteTrail() {
-    if (!window.confirm('Delete this whole trail? This cannot be undone.')) return;
+    const yes = await confirm({
+      title: 'Are you sure you want to delete this trail?',
+      message: `“${trail.title}” and everything worked out for it (the route, heights and fuel stops) will be deleted. This can't be undone.`,
+      confirmLabel: 'Delete trail',
+    });
+    if (!yes) return;
     try {
       await api.deleteTrail(trail._id);
+      // The message stays on screen on the home page.
+      toast(`“${trail.title}” was successfully deleted.`);
       navigate('/');
     } catch (err) {
-      setNotice(err.message);
+      toast(err.message, { tone: 'error' });
     }
   }
 

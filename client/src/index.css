@@ -142,6 +142,10 @@
 @utility btn-ghost {
   @apply btn text-stone-700 hover:bg-stone-900/5 focus-visible:ring-stone-300;
 }
+/* For actions that can't be undone, like deleting. */
+@utility btn-danger {
+  @apply btn bg-red-600 text-white shadow-md shadow-red-600/25 hover:bg-red-500 focus-visible:ring-red-300;
+}
 @utility btn-ai {
   @apply btn bg-violet-700 text-white shadow-md shadow-violet-700/25 hover:-translate-y-0.5 hover:bg-violet-600 focus-visible:ring-violet-300;
 }
