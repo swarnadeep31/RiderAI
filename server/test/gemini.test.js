@@ -156,6 +156,10 @@ test('explains errors, and says which are worth retrying', async () => {
   reply = [400, { error: { code: 400, message: 'Video is not public', status: 'INVALID_ARGUMENT' } }];
   await assert.rejects(extractPlaces({ youtubeId: 'aBcD3fGh1_-' }), (err) => !err.retryable && /public/.test(err.message));
 
+  // A wrong key also comes back as 400: it must say it's the key, not the video.
+  reply = [400, { error: { code: 400, message: 'API key not valid. Please pass a valid API key.', status: 'INVALID_ARGUMENT', details: [{ reason: 'API_KEY_INVALID' }] } }];
+  await assert.rejects(extractPlaces({ youtubeId: 'aBcD3fGh1_-' }), (err) => !err.retryable && /refused the API key/.test(err.message) && !/public/.test(err.message));
+
   reply = [
     200,
     { candidates: [{ content: { role: 'model', parts: [{ text: 'Sorry, I cannot help.' }] } }], usageMetadata: {} },

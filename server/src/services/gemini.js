@@ -121,6 +121,10 @@ function explain(err) {
     return new GeminiError(`Gemini doesn't know the model. Check GEMINI_MODEL. (${detail})`, { status, restMs: 24 * 60 * MINUTE });
   }
   if (status === 404) return new GeminiError(`Gemini doesn't know the model or video. Check GEMINI_MODEL. (${detail})`, { status });
+  // Gemini answers a wrong key with 400 (API_KEY_INVALID), not 401: say it's the key, not the video.
+  if (status === 400 && /API_KEY_INVALID|API key not valid/i.test(detail)) {
+    return new GeminiError("Gemini refused the API key. Check GEMINI_API_KEY on the server (it may be pasted wrong or no longer valid).", { status });
+  }
   if (status === 400) return new GeminiError(`Gemini couldn't use this video. Is it public? (${detail})`, { status });
   if (err.name === 'AbortError' || err.name === 'TimeoutError') return new GeminiError('Gemini took too long to answer.', { retryable: true });
   return new GeminiError(`Couldn't reach Gemini. (${detail})`, { retryable: true });
