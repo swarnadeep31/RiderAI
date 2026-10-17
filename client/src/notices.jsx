@@ -35,10 +35,11 @@ function ConfirmDialog({ request, onAnswer }) {
       }}
       // A click on the dim backdrop (the dialog itself, outside its panel) cancels.
       onClick={(event) => event.target === ref.current && onAnswer(false)}
-      className="m-auto max-w-[calc(100%-2rem)] bg-transparent p-0 backdrop:bg-pine-950/60 backdrop:backdrop-blur-sm"
+      // overflow-visible: the browser gives dialogs scroll bars, which would flash while the panel animates in.
+      className="m-auto max-w-[calc(100%-2rem)] overflow-visible bg-transparent p-0 backdrop:bg-pine-950/60 backdrop:backdrop-blur-sm"
     >
       {request && (
-        <div className="card w-96 max-w-full p-6 motion-safe:animate-pop">
+        <div className="card w-96 max-w-full p-6 motion-safe:animate-dialog-in">
           <div className="flex items-start gap-4">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
               <Icon name={request.icon ?? 'trash'} className="h-5 w-5" />
