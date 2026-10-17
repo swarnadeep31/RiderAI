@@ -69,3 +69,38 @@ test('explains problems', async () => {
   assert.equal(res.status, 502);
   assert.match(res.body.error, /click the map/);
 });
+
+test('when Nominatim refuses (as it often does on shared cloud servers), OpenRouteService answers instead', async () => {
+  const ors = await startFakeService(() => [
+    200,
+    {
+      features: [
+        {
+          geometry: { coordinates: [75.298, 34.304] },
+          properties: { name: 'Sonamarg', locality: 'Sonamarg', county: 'Ganderbal', region: 'Jammu and Kashmir', country: 'Pakistan', label: 'Sonamarg, Pakistan' },
+        },
+      ],
+    },
+  ]);
+  process.env.ORS_BASE_URL = ors.url;
+  process.env.ORS_API_KEY = 'test-key';
+  failing = true;
+  try {
+    clearPlaceCache();
+    const agent = await signedUpAgent();
+    const res = await agent.get('/api/places').query({ q: 'Sonamarg' });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    // The position from OpenRouteService, and a label without its country (it puts Kashmir in Pakistan).
+    assert.deepEqual(res.body, [{ name: 'Sonamarg', description: 'Sonamarg, Ganderbal, Jammu and Kashmir', lat: 34.304, lng: 75.298 }]);
+    const sent = ors.requests.at(-1);
+    assert.match(sent.url, /^\/geocode\/search\?/);
+    assert.equal(new URL(sent.url, 'http://x').searchParams.get('text'), 'Sonamarg');
+    assert.equal(sent.headers.authorization, 'test-key', 'the key goes in a header, not the address');
+    assert.equal(new URL(sent.url, 'http://x').searchParams.get('api_key'), null);
+  } finally {
+    failing = false;
+    delete process.env.ORS_API_KEY;
+    delete process.env.ORS_BASE_URL;
+    await ors.close();
+  }
+});
