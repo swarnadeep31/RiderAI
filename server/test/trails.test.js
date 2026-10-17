@@ -292,5 +292,5 @@ describe('routes drawn from key points', () => {
 
 test('the config says what the server can do', async () => {
   const res = await request(app).get('/api/config');
-  assert.deepEqual(res.body, { roadRouting: false, aiRoute: false, routeServices: true, fuelGapWarnKm: 150 });
+  assert.deepEqual(res.body, { roadRouting: false, aiRoute: false, routeServices: true, fuelGapWarnKm: 150, googleClientId: '' });
 });

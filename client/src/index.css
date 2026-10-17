@@ -509,3 +509,79 @@
     display: none !important;
   }
 }
+
+/* The onboarding tour's little animated pictures (pages/TourPage.jsx). Each
+   one starts when its slide is shown. Without motion they show their last frame. */
+@keyframes tour-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes tour-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes tour-sweep {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(var(--sweep, 260px));
+  }
+}
+@keyframes tour-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes tour-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.tour-progress {
+  transform-box: fill-box;
+  transform-origin: left center;
+}
+.tour-draw {
+  stroke-dasharray: 1;
+}
+.tour-pop,
+.tour-rise {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tour-progress {
+    animation: tour-progress 6s ease-in-out infinite;
+  }
+  .tour-draw {
+    animation: tour-draw 1.6s var(--delay, 0s) cubic-bezier(0.5, 0, 0.3, 1) both;
+  }
+  .tour-sweep {
+    animation: tour-sweep 4s ease-in-out infinite alternate;
+  }
+  .tour-pop {
+    animation: tour-pop 0.45s var(--delay, 0s) cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  }
+  .tour-rise {
+    animation: tour-rise 0.6s var(--delay, 0s) ease-out both;
+  }
+}

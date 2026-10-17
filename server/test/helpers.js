@@ -9,6 +9,8 @@ import { createApp } from '../src/app.js';
 // finds nothing listening here, instead of the real Overpass server.
 process.env.OVERPASS_URL ??= 'http://127.0.0.1:9/api/interpreter';
 process.env.YOUTUBE_OEMBED_URL ??= 'http://127.0.0.1:9/oembed';
+process.env.GOOGLE_TOKENINFO_URL ??= 'http://127.0.0.1:9/tokeninfo';
+delete process.env.GOOGLE_CLIENT_ID;
 // And tests don't wait between Overpass requests or before retrying.
 process.env.OVERPASS_SPACING_MS ??= '0';
 process.env.OVERPASS_RETRY_DELAY_SEC ??= '0';

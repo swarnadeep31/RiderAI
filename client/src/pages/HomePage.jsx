@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, Navigate } from 'react-router';
 import { api } from '../api.js';
 import { useAuth } from '../auth.jsx';
 import ActivityBadge from '../components/ActivityBadge.jsx';
@@ -9,6 +9,7 @@ import ErrorMessage from '../components/ErrorMessage.jsx';
 import { ACTIVITIES } from '../lib/activities.js';
 import { cardSummary } from '../lib/stats.js';
 import { useConfirm, useToast } from '../notices.jsx';
+import { tourSeen } from './TourPage.jsx';
 
 const MADE_FOR = [
   ['ride', 'Moto vloggers'],
@@ -114,7 +115,7 @@ function LoadingCards() {
 }
 
 export default function HomePage() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const confirm = useConfirm();
   const toast = useToast();
   const [trails, setTrails] = useState(null);
@@ -142,6 +143,9 @@ export default function HomePage() {
   }
 
   const shareLink = user ? '/new' : '/signup?next=%2Fnew';
+
+  // A first-time visitor (not logged in) sees the short tour first, once.
+  if (!loading && !user && !tourSeen()) return <Navigate to="/tour" replace />;
 
   return (
     <main>
@@ -187,6 +191,9 @@ export default function HomePage() {
               </a>
               <Link to={shareLink} className="btn-secondary px-6 py-3 text-base">
                 Share your trip <Icon name="arrowRight" className="h-4 w-4" />
+              </Link>
+              <Link to="/tour" className="btn-ghost px-4 py-3 text-base">
+                <Icon name="video" className="h-4 w-4 text-orange-600" /> Take the tour
               </Link>
             </div>
           </div>

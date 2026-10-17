@@ -8,6 +8,7 @@ import { feedbackRouter } from './routes/feedback.js';
 import { jobsRouter } from './routes/jobs.js';
 import { placesRouter } from './routes/places.js';
 import { trailsRouter } from './routes/trails.js';
+import { googleClientId } from './services/google.js';
 import { roadRoutingAvailable } from './services/routing.js';
 
 export function createApp() {
@@ -25,6 +26,8 @@ export function createApp() {
       aiRoute: aiRouteAvailable(),
       routeServices: routeConfig().services,
       fuelGapWarnKm: routeConfig().fuelGapWarnKm,
+      // For the "Continue with Google" button (empty: no button).
+      googleClientId: googleClientId(),
     }),
   );
   app.use('/api/auth', authRouter);
