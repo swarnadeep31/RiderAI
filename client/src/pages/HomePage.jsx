@@ -38,10 +38,11 @@ const STEPS = [
   },
 ];
 
-function TrailCard({ trail, index }) {
+// onDelete: only for the person who added the trail (the server allows nobody else).
+function TrailCard({ trail, index, onDelete }) {
   const aiRoute = trail.routeSource === 'keypoints' && trail.points.some((p) => p.origin === 'ai');
   return (
-    <li className="motion-safe:animate-fade-up" style={{ animationDelay: `${Math.min(index, 8) * 70}ms` }}>
+    <li className="relative motion-safe:animate-fade-up" style={{ animationDelay: `${Math.min(index, 8) * 70}ms` }}>
       <Link
         to={`/trails/${trail._id}`}
         className="card group block h-full overflow-hidden p-2 transition duration-300 hover:-translate-y-1.5 hover:shadow-[0_20px_40px_-16px_rgb(21_57_46/0.35)]"
@@ -81,6 +82,18 @@ function TrailCard({ trail, index }) {
           </p>
         </div>
       </Link>
+      {/* Outside the link, so deleting doesn't open the trail. */}
+      {onDelete && (
+        <button
+          type="button"
+          onClick={() => onDelete(trail)}
+          aria-label={`Delete “${trail.title}”`}
+          title="Delete this trail"
+          className="absolute top-5 right-5 flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-red-600 shadow-md transition hover:bg-red-600 hover:text-white focus-visible:ring-4 focus-visible:ring-red-300 focus-visible:outline-none"
+        >
+          <Icon name="trash" className="h-4 w-4" />
+        </button>
+      )}
     </li>
   );
 }
@@ -107,6 +120,18 @@ export default function HomePage() {
   useEffect(() => {
     api.listTrails().then(setTrails, (err) => setError(err.message));
   }, []);
+
+  // Deletes a trail the user added: its route, key points and everything worked out for it.
+  async function deleteTrail(trail) {
+    if (!window.confirm(`Delete “${trail.title}”? This cannot be undone.`)) return;
+    try {
+      setError(null);
+      await api.deleteTrail(trail._id);
+      setTrails((list) => list.filter((t) => t._id !== trail._id));
+    } catch (err) {
+      setError(err.message);
+    }
+  }
 
   const shareLink = user ? '/new' : '/signup?next=%2Fnew';
 
@@ -228,7 +253,7 @@ export default function HomePage() {
         {trails?.length > 0 && (
           <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {trails.map((trail, i) => (
-              <TrailCard key={trail._id} trail={trail} index={i} />
+              <TrailCard key={trail._id} trail={trail} index={i} onDelete={user && trail.owner?._id === user._id ? deleteTrail : null} />
             ))}
           </ul>
         )}
