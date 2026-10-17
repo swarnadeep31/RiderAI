@@ -131,6 +131,37 @@ describe('routeSegments', () => {
     assert.match(notice, /Could not find routable point/);
   });
 
+  test('a place off the road gets straight lines; the rest of the route still follows the roads', async () => {
+    // The third place is in the forest: OpenRouteService refuses any route through it.
+    const places = [
+      { name: 'Manali', lat: 32.24, lng: 77.19 },
+      { name: 'Kothi', lat: 32.3, lng: 77.2 },
+      { name: 'Beas Kund', lat: 32.54, lng: 77.2 },
+      { name: 'Marhi', lat: 32.37, lng: 77.25 },
+    ];
+    ors = await startFakeService(({ body }) => {
+      const index = body.coordinates.findIndex(([lng, lat]) => lat === 32.54);
+      if (index !== -1) {
+        return [404, { error: { code: 2010, message: `Could not find routable point within the maximum possible radius of 350.0 meters of specified coordinate ${index}: 77.2 32.54.` } }];
+      }
+      // A road with a bend between each pair of places.
+      const coordinates = body.coordinates.flatMap(([lng, lat], i) => (i === 0 ? [[lng, lat]] : [[lng + 0.01, lat - 0.01], [lng, lat]]));
+      return [200, { features: [{ geometry: { coordinates }, properties: { way_points: body.coordinates.map((_, i) => i * 2) } }] }];
+    });
+    process.env.ORS_BASE_URL = ors.url;
+    process.env.ORS_API_KEY = 'test-key';
+
+    const { segments, notice } = await routeSegments(places, 'roads');
+    assert.equal(segments.length, 3);
+    assert.ok(segments[0].length > 2, 'Manali to Kothi follows the road');
+    assert.deepEqual(segments[1], [[32.3, 77.2], [32.54, 77.2]], 'straight to the place off the road');
+    assert.deepEqual(segments[2], [[32.54, 77.2], [32.37, 77.25]], 'and straight back');
+    assert.match(notice, /^Beas Kund isn't near a road, so straight lines join it to the route\. The rest follows the roads\.$/);
+    // Asked once with every place, then again without the one off the road.
+    assert.equal(ors.requests.length, 2);
+    assert.equal(ors.requests[1].body.coordinates.length, 3);
+  });
+
   test('long routes are asked for in pieces', async () => {
     const many = Array.from({ length: 30 }, (_, i) => ({ lat: 32 + i / 100, lng: 77 }));
     ors = await startFakeService(({ body }) => {
