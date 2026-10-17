@@ -1,0 +1,40 @@
+# Render Blueprint for the TrailCast API (server/). In Render: New > Blueprint,
+# pick this repository, fill in the secrets it asks for, and deploy.
+# The website is on Vercel (client/vercel.json), which forwards /api here.
+services:
+  - type: web
+    name: trailcast-api # gives https://trailcast-api.onrender.com; if Render picks another address, change it in client/vercel.json
+    runtime: node
+    plan: free
+    region: singapore # the nearest to India; pick the one closest to your MongoDB Atlas cluster
+    # Uses the exact versions in the root package-lock.json, server packages only.
+    buildCommand: npm ci --workspace server --omit=dev
+    startCommand: npm start --workspace server
+    healthCheckPath: /api/health
+    # Only redeploy when the server changes, not for website-only changes.
+    buildFilter:
+      paths:
+        - server/**
+        - package.json
+        - package-lock.json
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "24"
+      # Signs login sessions: a long random value, made by Render.
+      - key: JWT_SECRET
+        generateValue: true
+      # The ones below are asked for when the Blueprint is created (sync: false).
+      - key: MONGODB_URI
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: ORS_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-flash-lite-latest
+      - key: GEMINI_FALLBACK_MODELS
+        value: gemini-3.1-flash-lite,gemini-3.5-flash-lite,gemini-3.5-flash

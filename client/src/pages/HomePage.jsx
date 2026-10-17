@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, Navigate } from 'react-router';
 import { api } from '../api.js';
 import { useAuth } from '../auth.jsx';
 import ActivityBadge from '../components/ActivityBadge.jsx';
@@ -7,6 +7,9 @@ import Icon from '../components/art/Icon.jsx';
 import { CampScene, HeroScene } from '../components/art/Scenery.jsx';
 import ErrorMessage from '../components/ErrorMessage.jsx';
 import { ACTIVITIES } from '../lib/activities.js';
+import { cardSummary } from '../lib/stats.js';
+import { useConfirm, useToast } from '../notices.jsx';
+import { tourSeen } from './TourPage.jsx';
 
 const MADE_FOR = [
   ['ride', 'Moto vloggers'],
@@ -37,10 +40,11 @@ const STEPS = [
   },
 ];
 
-function TrailCard({ trail, index }) {
+// onDelete: only for the person who added the trail (the server allows nobody else).
+function TrailCard({ trail, index, onDelete }) {
   const aiRoute = trail.routeSource === 'keypoints' && trail.points.some((p) => p.origin === 'ai');
   return (
-    <li className="motion-safe:animate-fade-up" style={{ animationDelay: `${Math.min(index, 8) * 70}ms` }}>
+    <li className="relative motion-safe:animate-fade-up" style={{ animationDelay: `${Math.min(index, 8) * 70}ms` }}>
       <Link
         to={`/trails/${trail._id}`}
         className="card group block h-full overflow-hidden p-2 transition duration-300 hover:-translate-y-1.5 hover:shadow-[0_20px_40px_-16px_rgb(21_57_46/0.35)]"
@@ -65,15 +69,33 @@ function TrailCard({ trail, index }) {
         </div>
         <div className="px-2 pt-3 pb-2">
           <h2 className="text-lg leading-snug font-bold text-ink group-hover:text-orange-700">{trail.title}</h2>
+          {cardSummary(trail.stats) && (
+            <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-stone-700">
+              <Icon name="route" className="h-4 w-4 shrink-0 text-pine-600 dark:text-pine-300" />
+              {cardSummary(trail.stats)}
+            </p>
+          )}
           <p className="mt-1 flex items-center gap-1.5 text-sm text-stone-500">
             <Icon name="pin" className="h-4 w-4 shrink-0 text-orange-500" />
             <span>
               {ACTIVITIES[trail.activity]} · {trail.points.length} key {trail.points.length === 1 ? 'point' : 'points'}
-              {trail.owner && ` · by @${trail.owner.username}`}
+              {(trail.creatorName || trail.channel?.name) && ` · by ${trail.creatorName || trail.channel.name}`}
             </span>
           </p>
         </div>
       </Link>
+      {/* Outside the link, so deleting doesn't open the trail. */}
+      {onDelete && (
+        <button
+          type="button"
+          onClick={() => onDelete(trail)}
+          aria-label={`Delete “${trail.title}”`}
+          title="Delete this trail"
+          className="absolute top-5 right-5 flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-red-600 shadow-md transition hover:bg-red-600 hover:text-white focus-visible:ring-4 focus-visible:ring-red-300 focus-visible:outline-none"
+        >
+          <Icon name="trash" className="h-4 w-4" />
+        </button>
+      )}
     </li>
   );
 }
@@ -93,7 +115,9 @@ function LoadingCards() {
 }
 
 export default function HomePage() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  const confirm = useConfirm();
+  const toast = useToast();
   const [trails, setTrails] = useState(null);
   const [error, setError] = useState(null);
 
@@ -101,7 +125,27 @@ export default function HomePage() {
     api.listTrails().then(setTrails, (err) => setError(err.message));
   }, []);
 
+  // Deletes a trail the user added: its route, key points and everything worked out for it.
+  async function deleteTrail(trail) {
+    const yes = await confirm({
+      title: 'Are you sure you want to delete this trail?',
+      message: `“${trail.title}” and everything worked out for it (the route, heights and fuel stops) will be deleted. This can't be undone.`,
+      confirmLabel: 'Delete trail',
+    });
+    if (!yes) return;
+    try {
+      await api.deleteTrail(trail._id);
+      setTrails((list) => list.filter((t) => t._id !== trail._id));
+      toast(`“${trail.title}” was successfully deleted.`);
+    } catch (err) {
+      toast(err.message, { tone: 'error' });
+    }
+  }
+
   const shareLink = user ? '/new' : '/signup?next=%2Fnew';
+
+  // A first-time visitor (not logged in) sees the short tour first, once.
+  if (!loading && !user && !tourSeen()) return <Navigate to="/tour" replace />;
 
   return (
     <main>
@@ -147,6 +191,9 @@ export default function HomePage() {
               </a>
               <Link to={shareLink} className="btn-secondary px-6 py-3 text-base">
                 Share your trip <Icon name="arrowRight" className="h-4 w-4" />
+              </Link>
+              <Link to="/tour" className="btn-ghost px-4 py-3 text-base">
+                <Icon name="video" className="h-4 w-4 text-orange-600" /> Take the tour
               </Link>
             </div>
           </div>
@@ -221,7 +268,7 @@ export default function HomePage() {
         {trails?.length > 0 && (
           <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {trails.map((trail, i) => (
-              <TrailCard key={trail._id} trail={trail} index={i} />
+              <TrailCard key={trail._id} trail={trail} index={i} onDelete={user && trail.owner?._id === user._id ? deleteTrail : null} />
             ))}
           </ul>
         )}

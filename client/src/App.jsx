@@ -12,6 +12,8 @@ import LoginPage from './pages/LoginPage.jsx';
 import NewTrailPage from './pages/NewTrailPage.jsx';
 import SignupPage from './pages/SignupPage.jsx';
 import WelcomePage from './pages/WelcomePage.jsx';
+import { NoticesProvider } from './notices.jsx';
+import TourPage from './pages/TourPage.jsx';
 
 // The map library is big, so the pages with a map load when first opened.
 const TrailPage = lazy(() => import('./pages/TrailPage.jsx'));
@@ -50,10 +52,10 @@ function HeaderLinks() {
           aria-hidden="true"
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-pine-700 font-display text-sm text-white uppercase"
         >
-          {user.username[0]}
+          {(user.name || user.username)[0]}
         </span>
-        {/* Phones show just the round letter; screen readers still hear the username. */}
-        <span className="sr-only sm:not-sr-only sm:truncate">@{user.username}</span>
+        {/* Phones show just the round letter; screen readers still hear the name. */}
+        <span className="sr-only sm:not-sr-only sm:truncate">{user.name || `@${user.username}`}</span>
       </Link>
     </div>
   );
@@ -140,64 +142,68 @@ function NotFound() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route element={<Layout />}>
-            <Route index element={<HomePage />} />
-            <Route path="login" element={<LoginPage />} />
-            <Route path="signup" element={<SignupPage />} />
+      <NoticesProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route index element={<HomePage />} />
+              <Route path="login" element={<LoginPage />} />
+              <Route path="signup" element={<SignupPage />} />
+              <Route
+                path="welcome"
+                element={
+                  <RequireAuth onboarded={false}>
+                    <WelcomePage />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="account"
+                element={
+                  <RequireAuth onboarded={false}>
+                    <AccountPage />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="feedback"
+                element={
+                  <RequireAuth>
+                    <FeedbackPage />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="new"
+                element={
+                  <RequireAuth>
+                    <NewTrailPage />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="trails/:id"
+                element={
+                  <Suspense fallback={<PageLoading />}>
+                    <TrailPage />
+                  </Suspense>
+                }
+              />
+              <Route path="*" element={<NotFound />} />
+            </Route>
+            {/* The onboarding tour: full screen, without the site's header and footer. */}
+            <Route path="tour" element={<TourPage />} />
             <Route
-              path="welcome"
-              element={
-                <RequireAuth onboarded={false}>
-                  <WelcomePage />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="account"
-              element={
-                <RequireAuth onboarded={false}>
-                  <AccountPage />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="feedback"
-              element={
-                <RequireAuth>
-                  <FeedbackPage />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="new"
-              element={
-                <RequireAuth>
-                  <NewTrailPage />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="trails/:id"
+              path="trails/:id/print"
               element={
                 <Suspense fallback={<PageLoading />}>
-                  <TrailPage />
+                  <PrintPage />
                 </Suspense>
               }
             />
-            <Route path="*" element={<NotFound />} />
-          </Route>
-          <Route
-            path="trails/:id/print"
-            element={
-              <Suspense fallback={<PageLoading />}>
-                <PrintPage />
-              </Suspense>
-            }
-          />
-        </Routes>
-      </BrowserRouter>
+          </Routes>
+        </BrowserRouter>
+      </NoticesProvider>
     </AuthProvider>
   );
 }

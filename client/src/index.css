@@ -33,6 +33,8 @@
   --animate-glow: glow 7s ease-in-out infinite;
   --animate-fade-up: fade-up 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   --animate-pop: pop 0.6s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+  /* Dialogs: a quick, gentle fade in that never grows past full size. */
+  --animate-dialog-in: dialog-in 0.18s ease-out both;
   --animate-flutter: flutter 1.6s ease-in-out infinite;
   --animate-flicker: flicker 0.9s ease-in-out infinite alternate;
   --animate-shimmer: shimmer 1.6s linear infinite;
@@ -62,6 +64,16 @@
     from {
       opacity: 0;
       transform: translateY(18px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes dialog-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.97);
     }
     to {
       opacity: 1;
@@ -141,6 +153,10 @@
 }
 @utility btn-ghost {
   @apply btn text-stone-700 hover:bg-stone-900/5 focus-visible:ring-stone-300;
+}
+/* For actions that can't be undone, like deleting. */
+@utility btn-danger {
+  @apply btn bg-red-600 text-white shadow-md shadow-red-600/25 hover:bg-red-500 focus-visible:ring-red-300;
 }
 @utility btn-ai {
   @apply btn bg-violet-700 text-white shadow-md shadow-violet-700/25 hover:-translate-y-0.5 hover:bg-violet-600 focus-visible:ring-violet-300;
@@ -348,6 +364,78 @@
     stop-color 0.8s ease !important;
 }
 
+/* The elevation chart: one green line over a light wash, and a blue line at the
+   video's current moment (the same blue as the marker on the map). The greens
+   were checked for contrast and colourfulness on the light and dark cards. */
+:root {
+  --chart-line: #1a8a5a;
+  --chart-cursor: #2563eb;
+}
+:root.dark {
+  --chart-line: #26a46c;
+  --chart-cursor: #3b82f6;
+}
+.elevation-line {
+  stroke: var(--chart-line);
+}
+.elevation-wash {
+  fill: var(--chart-line);
+  fill-opacity: 0.1;
+}
+.elevation-dot {
+  fill: var(--chart-line);
+  stroke: var(--color-surface);
+}
+.elevation-cursor {
+  stroke: var(--chart-cursor);
+}
+
+/* Services along the route on the map: a coloured circle with its own symbol and a white ring. */
+.service-icon {
+  display: flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #ffffff;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
+}
+/* The longest stretch without fuel: a dashed outline in ink, under the route. */
+.fuel-gap-outline {
+  stroke: var(--color-ink);
+}
+
+/* The rider's marker on the map: a blue dot that can be dragged along the route. */
+.rider-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: #2563eb;
+  border: 3px solid #ffffff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+}
+.leaflet-marker-draggable .rider-dot {
+  cursor: grab;
+}
+.leaflet-dragging .rider-dot {
+  cursor: grabbing;
+}
+.rider-marker:focus {
+  outline: none;
+}
+/* The invisible line that makes the route clickable. The marker is the keyboard
+   control, so the browser's box around a clicked line would only be noise. */
+.scrub-line:focus {
+  outline: none;
+}
+.rider-marker:focus-visible .rider-dot {
+  box-shadow: 0 0 0 5px rgb(37 99 235 / 0.45);
+}
+
 /* The map at night: the tiles are turned dark; routes and pins keep their colours. */
 .dark .leaflet-tile-pane {
   filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9) saturate(0.5);
@@ -419,5 +507,81 @@
 @media print {
   .no-print {
     display: none !important;
+  }
+}
+
+/* The onboarding tour's little animated pictures (pages/TourPage.jsx). Each
+   one starts when its slide is shown. Without motion they show their last frame. */
+@keyframes tour-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes tour-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes tour-sweep {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(var(--sweep, 260px));
+  }
+}
+@keyframes tour-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes tour-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.tour-progress {
+  transform-box: fill-box;
+  transform-origin: left center;
+}
+.tour-draw {
+  stroke-dasharray: 1;
+}
+.tour-pop,
+.tour-rise {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tour-progress {
+    animation: tour-progress 6s ease-in-out infinite;
+  }
+  .tour-draw {
+    animation: tour-draw 1.6s var(--delay, 0s) cubic-bezier(0.5, 0, 0.3, 1) both;
+  }
+  .tour-sweep {
+    animation: tour-sweep 4s ease-in-out infinite alternate;
+  }
+  .tour-pop {
+    animation: tour-pop 0.45s var(--delay, 0s) cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  }
+  .tour-rise {
+    animation: tour-rise 0.6s var(--delay, 0s) ease-out both;
   }
 }

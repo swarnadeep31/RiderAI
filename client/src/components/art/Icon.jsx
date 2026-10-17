@@ -97,9 +97,19 @@ const PATHS = {
     </>
   ),
   moon: <path d="M20 14.5A8 8 0 1 1 9.5 4 6.5 6.5 0 0 0 20 14.5z" />,
+  // Going up: total climb.
+  ascent: <path d="m3 18 6-6 4 4 8-8m-5 0h5v5" />,
+  // A summit with a flag: the highest point.
+  summit: (
+    <>
+      <path d="m2.5 20 7-11 3.5 5 2-3 6.5 9z" />
+      <path d="M9.5 9V3.5l4 1.5-4 1.5" />
+    </>
+  ),
   arrowRight: <path d="M5 12h14m-6-6 6 6-6 6" />,
   arrowDown: <path d="M12 5v14m-6-6 6 6 6-6" />,
   check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
+  trash: <path d="M4 7h16M10 11v6m4-6v6M9 7l1-3h4l1 3M6 7l1 13h10l1-13" />,
   edit: <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z" />,
   satellite: (
     <>

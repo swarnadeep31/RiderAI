@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { formatTime, parseTime } from '../lib/time.js';
+import Icon from './art/Icon.jsx';
 import ErrorMessage from './ErrorMessage.jsx';
 import PlaceSearch from './PlaceSearch.jsx';
 
@@ -8,6 +9,7 @@ import PlaceSearch from './PlaceSearch.jsx';
 export default function AddPointForm({ currentTime, location, onSave, onCancel, onPickPlace }) {
   const [name, setName] = useState('');
   const [note, setNote] = useState('');
+  const [overnight, setOvernight] = useState(false);
   const [timeText, setTimeText] = useState(formatTime(currentTime));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -20,7 +22,7 @@ export default function AddPointForm({ currentTime, location, onSave, onCancel, 
     setSaving(true);
     setError(null);
     try {
-      await onSave({ name, note, time, lat: location[0], lng: location[1] });
+      await onSave({ name, note, time, lat: location[0], lng: location[1], ...(overnight && { stopKind: 'overnight' }) });
     } catch (err) {
       setError(err.message);
       setSaving(false);
@@ -79,6 +81,12 @@ export default function AddPointForm({ currentTime, location, onSave, onCancel, 
           placeholder="Fuel pump, tea stall, best photo spot..."
           className="field mt-1 block w-full"
         />
+      </label>
+      <label className="flex items-center gap-2 text-sm font-semibold text-stone-800">
+        <input type="checkbox" checked={overnight} onChange={(e) => setOvernight(e.target.checked)} />
+        <Icon name="moon" className="h-4 w-4 text-sky-600" />
+        Stayed the night here
+        <span className="font-normal text-stone-500">(counts towards the riding days)</span>
       </label>
       {error && <ErrorMessage>{error}</ErrorMessage>}
       <div className="flex gap-2">

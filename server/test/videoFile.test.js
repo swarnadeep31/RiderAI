@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { hasFfmpeg, prepareVideo, probeVideo } from '../src/services/videoFile.js';
+import { extractSound, hasFfmpeg, prepareVideo, probeVideo } from '../src/services/videoFile.js';
 
 const ffmpeg = await hasFfmpeg();
 const skip = ffmpeg ? false : 'FFmpeg is not installed';
@@ -48,5 +48,20 @@ test('keeps the sound unless asked not to, and never makes the picture bigger', 
 });
 
 test('explains a file that is not a video', { skip }, async () => {
-  await assert.rejects(probeVideo(join(dir, 'missing.mp4')), /ffprobe failed/);
+  await assert.rejects(probeVideo(join(dir, 'missing.mp4')), /isn't a video file FFmpeg can read/);
+});
+
+test('can copy just one part of the video, starting at 0', { skip }, async () => {
+  const out = join(dir, 'part.mp4');
+  const info = await prepareVideo(ride, out, { start: 1, end: 3 });
+  assert.ok(Math.abs(info.durationSec - 2) < 1.1, `duration ${info.durationSec}`);
+});
+
+test('extracts just the sound, for listening to what is said', { skip }, async () => {
+  const out = join(dir, 'sound.m4a');
+  await extractSound(ride, out, { start: 1 });
+  const streams = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-print_format', 'json', '-show_streams', '-show_format', out], { encoding: 'utf8' }));
+  assert.deepEqual(streams.streams.map((stream) => stream.codec_type), ['audio']);
+  assert.equal(streams.streams[0].channels, 1);
+  assert.ok(Math.abs(Number(streams.format.duration) - 3) < 0.3, `duration ${streams.format.duration}`);
 });

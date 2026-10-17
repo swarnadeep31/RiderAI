@@ -35,6 +35,18 @@ describe('toGpx', () => {
     expect(back.trackTimes).toEqual(trail.trackTimes);
   });
 
+  test('can include fuel stops and other services as typed waypoints, with the caveat', () => {
+    const gpx = toGpx(
+      { title: 'T', youtubeId: 'abc', points: [], track: [] },
+      { services: [{ kind: 'fuel', name: 'HP Petrol Pump', brand: 'HP', lat: 32.1, lng: 77.2, hours: '24/7' }, { kind: 'atm', lat: 32.2, lng: 77.3 }] },
+    );
+    expect(gpx).toContain('<wpt lat="32.1" lon="77.2">');
+    expect(gpx).toContain('<name>HP Petrol Pump</name>');
+    expect(gpx).toContain('<type>Fuel</type>');
+    expect(gpx).toContain('<desc>HP · Open: 24/7 · Based on OpenStreetMap.');
+    expect(gpx).toContain('<name>ATM</name>');
+  });
+
   test('leaves out times the trail does not have', () => {
     expect(toGpx({ ...trail, trackTimes: [], recordedAt: null })).not.toContain('<time>');
   });

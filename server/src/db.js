@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { User } from './models/User.js';
 
 let memoryServer;
 
@@ -23,6 +24,9 @@ export async function connectDatabase(uri = process.env.MONGODB_URI) {
     uri = memoryServer.getUri(DEFAULT_DATABASE);
   }
   await mongoose.connect(uri, hasDatabaseName(uri) ? {} : { dbName: DEFAULT_DATABASE });
+  // Accounts can now have an email, a phone number or Google: bring the unique
+  // indexes of a database made before up to date (only those that changed).
+  await User.syncIndexes();
   // Says where the data goes, so it's easy to find in MongoDB Atlas (never prints the password).
   const { name, host } = mongoose.connection;
   console.log(`Connected to MongoDB: database "${name}" on ${host}`);

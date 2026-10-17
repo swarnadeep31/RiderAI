@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, test } from 'node:test';
 import request from 'supertest';
-import { app, signedUpAgent, useTestDatabase } from './helpers.js';
+import { Trail } from '../src/models/Trail.js';
+import { app, signedUpAgent, startFakeService, useTestDatabase } from './helpers.js';
 
 useTestDatabase();
 
@@ -40,8 +41,41 @@ describe('trails', () => {
     assert.deepEqual(trail.track[1], [32.3, 77.2]);
     assert.equal(trail.videoStartsAt, 0);
     assert.deepEqual(trail.points, []);
-    assert.equal(trail.owner.username, 'alice');
+    // Who owns it (so the page knows who may edit), but not their name or email.
+    assert.ok(trail.owner._id);
+    assert.equal(trail.owner.username, undefined);
     assert.equal(trail.owner.email, undefined);
+  });
+
+  test("credits the video's YouTube channel, or the creator's name if one is given", async () => {
+    const youtube = await startFakeService(({ url }) =>
+      url.includes('aBcD3fGh1_-')
+        ? [200, { title: 'Ride', author_name: 'Mohit Guleria', author_url: 'https://www.youtube.com/@MohiiitGuleria' }]
+        : [404, {}],
+    );
+    const saved = process.env.YOUTUBE_OEMBED_URL;
+    process.env.YOUTUBE_OEMBED_URL = `${youtube.url}/oembed`;
+    try {
+      const trail = await createTrail();
+      assert.deepEqual(trail.channel, { name: 'Mohit Guleria', url: 'https://www.youtube.com/@MohiiitGuleria' });
+      assert.equal(trail.creatorName, '');
+
+      const named = await alice.patch(`/api/trails/${trail._id}`).send({ creatorName: '  Mohit  ' });
+      assert.equal(named.body.creatorName, 'Mohit');
+
+      // A trail saved while YouTube couldn't be reached gets its channel when it's next viewed.
+      await Trail.updateOne({ _id: trail._id }, { $unset: { channel: 1 } });
+      const viewed = await request(app).get(`/api/trails/${trail._id}`);
+      assert.equal(viewed.body.channel.name, 'Mohit Guleria');
+    } finally {
+      process.env.YOUTUBE_OEMBED_URL = saved;
+      await youtube.close();
+    }
+  });
+
+  test('a trail is saved even when YouTube can\'t be reached', async () => {
+    const trail = await createTrail();
+    assert.equal(trail.channel, undefined);
   });
 
   test('needs a logged-in user to add a trail', async () => {
@@ -54,7 +88,7 @@ describe('trails', () => {
     const trail = await createTrail({ youtubeId: 'zzzzzzzzzzz', createdAt: '2000-01-01', owner: '000000000000000000000000' });
     assert.equal(trail.youtubeId, 'aBcD3fGh1_-');
     assert.notEqual(new Date(trail.createdAt).getFullYear(), 2000);
-    assert.equal(trail.owner.username, 'alice');
+    assert.equal(trail.owner._id, (await alice.get('/api/auth/me')).body.user._id);
   });
 
   test('explains what is wrong with bad input', async () => {
@@ -82,7 +116,8 @@ describe('trails', () => {
     assert.equal(res.status, 200);
     assert.deepEqual(res.body.map((t) => t.title), ['Second', 'First']);
     assert.equal(res.body[0].track, undefined);
-    assert.equal(res.body[0].owner.username, 'alice');
+    assert.ok(res.body[0].owner._id);
+    assert.equal(res.body[0].owner.username, undefined, "the uploader's name isn't shown");
   });
 
   test('the owner can get, update and delete a trail', async () => {
@@ -134,7 +169,7 @@ describe('key points', () => {
     const res = await alice.post(`/api/trails/${_id}/points`).send(point(60, 'Start'));
     assert.equal(res.status, 201);
     assert.deepEqual(res.body.points.map((p) => p.name), ['Start', 'Marhi']);
-    assert.equal(res.body.owner.username, 'alice');
+    assert.ok(res.body.owner._id);
   });
 
   test('can be edited and deleted by the owner', async () => {
@@ -257,5 +292,5 @@ describe('routes drawn from key points', () => {
 
 test('the config says what the server can do', async () => {
   const res = await request(app).get('/api/config');
-  assert.deepEqual(res.body, { roadRouting: false, aiRoute: false });
+  assert.deepEqual(res.body, { roadRouting: false, aiRoute: false, routeServices: true, fuelGapWarnKm: 150, googleClientId: '' });
 });

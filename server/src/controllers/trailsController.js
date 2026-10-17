@@ -1,19 +1,43 @@
+import { Job } from '../models/Job.js';
+import { RouteServices } from '../models/RouteServices.js';
 import { MAX_TRACK_POINTS, ROUTE_STYLES, Trail } from '../models/Trail.js';
+import { queueRouteEnrich } from '../routeExtras/enrich.js';
+import { profileForTrack } from '../routeExtras/profile.js';
 import { routeSegments } from '../services/routing.js';
+import { fetchChannel } from '../services/youtubeInfo.js';
 import { timedTrack } from '../utils/geo.js';
 import { httpError } from '../utils/httpError.js';
 import { parseYouTubeId } from '../utils/youtube.js';
 
 // Only these fields can be set from a request; anything else in the body is ignored.
-const TRAIL_FIELDS = ['title', 'description', 'activity', 'supportUrl', 'track', 'trackTimes', 'recordedAt', 'videoStartsAt'];
-const POINT_FIELDS = ['name', 'note', 'time', 'lat', 'lng'];
-// Show who added a trail, but nothing else about them.
-const OWNER_FIELDS = 'username';
+const TRAIL_FIELDS = ['title', 'description', 'activity', 'supportUrl', 'track', 'trackTimes', 'recordedAt', 'videoStartsAt', 'daysOverride', 'creatorName'];
+const POINT_FIELDS = ['name', 'note', 'time', 'lat', 'lng', 'stopKind'];
+// Only who owns a trail (so the page knows who may edit it), not their name:
+// the page credits the video's creator instead.
+const OWNER_FIELDS = '_id';
 
 function pick(body, fields) {
   const out = {};
   for (const field of fields) if (body?.[field] !== undefined) out[field] = body[field];
   return out;
+}
+
+// Heights sent with a GPX route: one per route point, a number or null.
+function elevationsFrom(body, track) {
+  const heights = body?.trackElevations;
+  if (heights === undefined || heights === null) return null;
+  const valid =
+    Array.isArray(heights) && heights.length === track.length && heights.every((h) => h === null || (typeof h === 'number' && Number.isFinite(h)));
+  if (!valid) throw httpError(400, 'The route heights must be one number (or null) per route point.');
+  return heights;
+}
+
+// Builds the elevation chart's profile from heights that belong to the
+// route's points. Without usable heights the trail gets none for now, and the
+// route-enrich job asks OpenRouteService's elevation service instead.
+function setProfile(trail, heights, source) {
+  const profile = heights ? profileForTrack(trail.track, heights, source) : null;
+  trail.elevationProfile = profile ? { ...profile, routeVersion: trail.routeVersion } : undefined;
 }
 
 function youtubeIdFrom(body) {
@@ -35,10 +59,32 @@ export async function findOwnTrail(req) {
   return trail;
 }
 
+// Finds the YouTube channel a trail's video is on, if it isn't known yet
+// (trails saved before, or when YouTube couldn't be reached), and saves it.
+async function fillChannel(trail) {
+  if (trail.channel?.name) return;
+  const channel = await fetchChannel(trail.youtubeId);
+  if (!channel) return;
+  trail.channel = channel;
+  await Trail.updateOne({ _id: trail._id }, { $set: { channel } });
+}
+
 // routeNotice: a message for the user when drawing the route didn't go as asked.
 export async function sendTrail(res, trail, { status = 200, routeNotice = null } = {}) {
   await trail.populate('owner', OWNER_FIELDS);
   res.status(status).json({ ...trail.toJSON(), routeNotice });
+}
+
+// A route with a new shape gets a new version, so what was worked out for the
+// old shape (heights, services along the route, stats) is redone.
+function bumpVersionIfReshaped(trail, previousTrack) {
+  if (JSON.stringify(trail.track) !== previousTrack) trail.routeVersion += 1;
+}
+
+// Saves the trail, and if its route has a new shape, queues the work for it.
+export async function saveTrail(trail, previousVersion) {
+  await trail.save();
+  if (trail.routeVersion !== previousVersion) await queueRouteEnrich(trail);
 }
 
 function sortPoints(trail) {
@@ -51,13 +97,19 @@ function sortPoints(trail) {
 export async function drawRouteFromPoints(trail) {
   const points = [...trail.points].sort((a, b) => a.time - b.time);
   if (points.length < 2) {
-    trail.set({ track: [], trackTimes: [] });
+    if (trail.track.length > 0) trail.routeVersion += 1;
+    trail.set({ track: [], trackTimes: [], elevationProfile: undefined });
     return null;
   }
+  const previousTrack = JSON.stringify(trail.track);
   const { segments, notice } = await routeSegments(points, trail.routeStyle);
-  const { track, trackTimes } = timedTrack(points, segments, MAX_TRACK_POINTS);
+  const { track, trackTimes, trackElevations } = timedTrack(points, segments, MAX_TRACK_POINTS);
   // The times are video times already, so the video and route need no lining up.
   trail.set({ track, trackTimes, routeSource: 'keypoints', videoStartsAt: 0, recordedAt: undefined });
+  const version = trail.routeVersion;
+  bumpVersionIfReshaped(trail, previousTrack);
+  // Roads and footpaths come with heights from OpenRouteService; straight lines don't.
+  if (trail.routeVersion !== version) setProfile(trail, trackElevations.some((h) => h !== null) ? trackElevations : null, 'ors');
   return notice;
 }
 
@@ -69,40 +121,64 @@ export async function listTrails(req, res) {
   const trails = await Trail.find()
     .sort({ createdAt: -1, _id: -1 })
     .limit(100)
-    .select('-track -trackTimes')
+    .select('-track -trackTimes -elevationProfile')
     .populate('owner', OWNER_FIELDS)
     .lean();
   res.json(trails);
+  // Older trails without their channel: look a few up for next time.
+  for (const trail of trails.filter((t) => !t.channel?.name).slice(0, 5)) fillChannel(trail).catch(() => {});
 }
 
 export async function createTrail(req, res) {
   const fields = pick(req.body, TRAIL_FIELDS);
-  const trail = await Trail.create({
+  const trail = new Trail({
     ...fields,
     youtubeId: youtubeIdFrom(req.body),
     owner: req.user._id,
     routeSource: fields.track?.length ? 'gpx' : undefined,
+    routeVersion: fields.track?.length ? 1 : 0,
   });
+  if (fields.track?.length) setProfile(trail, elevationsFrom(req.body, fields.track), 'gpx');
+  trail.channel = (await fetchChannel(trail.youtubeId)) ?? undefined;
+  await saveTrail(trail, 0);
   await sendTrail(res, trail, { status: 201 });
 }
 
 export async function getTrail(req, res) {
-  await sendTrail(res, await findTrail(req.params.id));
+  const trail = await findTrail(req.params.id);
+  await fillChannel(trail);
+  await sendTrail(res, trail);
 }
 
 export async function updateTrail(req, res) {
   const trail = await findOwnTrail(req);
+  const version = trail.routeVersion;
+  const previousTrack = JSON.stringify(trail.track);
   const fields = pick(req.body, TRAIL_FIELDS);
   trail.set(fields);
   if (fields.track?.length) trail.routeSource = 'gpx';
-  if (req.body?.youtubeUrl !== undefined) trail.youtubeId = youtubeIdFrom(req.body);
-  await trail.save();
+  if (fields.track !== undefined) {
+    bumpVersionIfReshaped(trail, previousTrack);
+    const heights = elevationsFrom(req.body, fields.track);
+    if (trail.routeVersion !== version || heights) setProfile(trail, heights, 'gpx');
+  }
+  if (req.body?.youtubeUrl !== undefined) {
+    const youtubeId = youtubeIdFrom(req.body);
+    if (youtubeId !== trail.youtubeId) {
+      trail.youtubeId = youtubeId;
+      trail.channel = (await fetchChannel(youtubeId)) ?? undefined;
+    }
+  }
+  await saveTrail(trail, version);
   await sendTrail(res, trail);
 }
 
 export async function deleteTrail(req, res) {
   const trail = await findOwnTrail(req);
   await trail.deleteOne();
+  // Work waiting for this trail's route, and what it found, are no longer needed.
+  await Job.updateMany({ type: 'route-enrich', trail: trail._id, state: 'queued' }, { state: 'cancelled' });
+  await RouteServices.deleteMany({ trail: trail._id });
   res.status(204).end();
 }
 
@@ -112,40 +188,44 @@ export async function drawRoute(req, res) {
   const style = req.body?.style ?? trail.routeStyle;
   if (!ROUTE_STYLES.includes(style)) throw httpError(400, `The route style must be one of: ${ROUTE_STYLES.join(', ')}.`);
   if (trail.points.length < 2) throw httpError(400, 'Add at least two key points first.');
+  const version = trail.routeVersion;
   trail.routeStyle = style;
   const routeNotice = await drawRouteFromPoints(trail);
-  await trail.save();
+  await saveTrail(trail, version);
   await sendTrail(res, trail, { routeNotice });
 }
 
 export async function addPoint(req, res) {
   const trail = await findOwnTrail(req);
+  const version = trail.routeVersion;
   trail.points.push(pick(req.body, POINT_FIELDS));
   sortPoints(trail);
   await trail.validate(); // check the new point before spending time on the route
   const routeNotice = await redrawIfDrawn(trail);
-  await trail.save();
+  await saveTrail(trail, version);
   await sendTrail(res, trail, { status: 201, routeNotice });
 }
 
 export async function updatePoint(req, res) {
   const trail = await findOwnTrail(req);
+  const version = trail.routeVersion;
   const point = trail.points.id(req.params.pointId);
   if (!point) throw httpError(404, 'Key point not found.');
   point.set(pick(req.body, POINT_FIELDS));
   sortPoints(trail);
   await trail.validate();
   const routeNotice = await redrawIfDrawn(trail);
-  await trail.save();
+  await saveTrail(trail, version);
   await sendTrail(res, trail, { routeNotice });
 }
 
 export async function deletePoint(req, res) {
   const trail = await findOwnTrail(req);
+  const version = trail.routeVersion;
   const point = trail.points.id(req.params.pointId);
   if (!point) throw httpError(404, 'Key point not found.');
   point.deleteOne();
   const routeNotice = await redrawIfDrawn(trail);
-  await trail.save();
+  await saveTrail(trail, version);
   await sendTrail(res, trail, { routeNotice });
 }

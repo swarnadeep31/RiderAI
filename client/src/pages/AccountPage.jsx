@@ -18,10 +18,10 @@ export default function AccountPage() {
         <div className="h-24 bg-linear-to-r from-sky-200 via-orange-100 to-amber-200" />
         <div className="-mt-12 px-6 pb-6">
           <span className="flex h-24 w-24 items-center justify-center rounded-full border-4 border-surface bg-pine-700 font-display text-4xl font-extrabold text-white uppercase shadow-lg">
-            {user.username[0]}
+            {(user.name || user.username)[0]}
           </span>
-          <h1 className="mt-3 text-3xl font-extrabold text-ink">@{user.username}</h1>
-          <p className="text-stone-600">{user.email}</p>
+          <h1 className="mt-3 text-3xl font-extrabold text-ink">{user.name || `@${user.username}`}</h1>
+          <p className="text-stone-600">{[user.email, user.phone, user.googleId && 'Signs in with Google'].filter(Boolean).join(' · ')}</p>
         </div>
       </section>
 

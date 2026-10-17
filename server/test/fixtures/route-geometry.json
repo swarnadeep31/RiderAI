@@ -1,0 +1,45 @@
+{
+  "about": "Shared cases for the route maths in server/src/utils/geo.js and client/src/lib/track.js. Routes run along the equator, where 0.01 degrees of longitude is 1111.949 m. Distances are checked to within 0.05 m, times to within 0.01 s.",
+  "tracks": {
+    "line": [[0, 0], [0, 0.01], [0, 0.02]],
+    "stop": [[0, 0], [0, 0.01], [0, 0.01], [0, 0.02]],
+    "outAndBack": [[0, 0], [0, 0.01], [0, 0]]
+  },
+  "times": {
+    "stop": [0, 100, 160, 400]
+  },
+  "cumulativeDistances": [
+    { "track": "line", "expected": [0, 1111.949, 2223.899] },
+    { "track": "stop", "expected": [0, 1111.949, 1111.949, 2223.899] },
+    { "track": "outAndBack", "expected": [0, 1111.949, 2223.899] }
+  ],
+  "projectOnTrack": [
+    { "name": "beside the middle of a segment", "track": "line", "location": [0.001, 0.005], "expected": { "alongM": 555.975, "offM": 111.195, "point": [0, 0.005] } },
+    { "name": "on the second segment", "track": "line", "location": [0, 0.015], "expected": { "alongM": 1667.924, "offM": 0, "point": [0, 0.015] } },
+    { "name": "exactly on a point", "track": "line", "location": [0, 0.01], "expected": { "alongM": 1111.949, "offM": 0, "point": [0, 0.01] } },
+    { "name": "before the start", "track": "line", "location": [0, -0.01], "expected": { "alongM": 0, "offM": 1111.949, "point": [0, 0] } },
+    { "name": "past the end", "track": "line", "location": [0, 0.03], "expected": { "alongM": 2223.899, "offM": 1111.949, "point": [0, 0.02] } },
+    { "name": "a road ridden twice: the whole route finds the way out", "track": "outAndBack", "location": [0.0001, 0.004], "expected": { "alongM": 444.780, "point": [0, 0.004] } },
+    { "name": "a road ridden twice: a window finds the way back", "track": "outAndBack", "location": [0.0001, 0.004], "window": { "from": 1, "to": 1 }, "expected": { "alongM": 1779.119, "point": [0, 0.004] } }
+  ],
+  "locationAtDistance": [
+    { "track": "line", "alongM": 555.975, "expected": [0, 0.005] },
+    { "track": "line", "alongM": 1667.924, "expected": [0, 0.015] },
+    { "track": "line", "alongM": -5, "expected": [0, 0] },
+    { "track": "line", "alongM": 99999, "expected": [0, 0.02] }
+  ],
+  "timeAtDistance": [
+    { "name": "halfway to the stop", "track": "stop", "alongM": 555.975, "expected": 50 },
+    { "name": "at the stop: the arrival time", "track": "stop", "alongM": 1111.949, "expected": 100 },
+    { "name": "after the stop", "track": "stop", "alongM": 1667.924, "expected": 280 },
+    { "name": "before the start", "track": "stop", "alongM": -10, "expected": 0 },
+    { "name": "past the end", "track": "stop", "alongM": 5000, "expected": 400 }
+  ],
+  "distanceAtTime": [
+    { "name": "riding to the stop", "track": "stop", "t": 50, "expected": 555.975 },
+    { "name": "waiting at the stop", "track": "stop", "t": 130, "expected": 1111.949 },
+    { "name": "riding on", "track": "stop", "t": 280, "expected": 1667.924 },
+    { "name": "before the recording", "track": "stop", "t": -5, "expected": 0 },
+    { "name": "after the recording", "track": "stop", "t": 999, "expected": 2223.899 }
+  ]
+}

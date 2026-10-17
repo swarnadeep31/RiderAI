@@ -4,17 +4,36 @@ import mongoose from 'mongoose';
 export const INTERESTS = ['riding', 'trekking', 'climbing', 'cycling', 'camping', 'travel', 'other'];
 export const REFERRAL_SOURCES = ['friend', 'youtube', 'instagram', 'search', 'other'];
 
+// "+919876543210": a + and 8 to 15 digits, the country code first.
+export const PHONE_PATTERN = /^\+\d{8,15}$/;
+
+// Turns what people type ("98765 43210", "+91 (987) 654-3210", "0091...")
+// into one form, so the same number always finds the same account. Ten digits
+// without a country code are taken as an Indian number. Null if it can't be a phone number.
+export function normalizePhone(text) {
+  if (typeof text !== 'string') return null;
+  let value = text.trim().replace(/[\s().-]/g, '');
+  if (value.startsWith('00')) value = `+${value.slice(2)}`;
+  if (/^\d{10}$/.test(value)) value = `+91${value}`;
+  else if (/^0\d{10}$/.test(value)) value = `+91${value.slice(1)}`;
+  return PHONE_PATTERN.test(value) ? value : null;
+}
+
 const userSchema = new mongoose.Schema(
   {
+    // What other people see: "Swarnadeep Roy".
+    name: { type: String, trim: true, maxlength: [60, 'Names can have at most 60 characters.'] },
+    // An account has at least one way in: an email, a phone number, or Google.
     email: {
       type: String,
-      required: [true, 'Enter your email address.'],
-      unique: true,
       lowercase: true,
       trim: true,
       maxlength: 254,
       match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Enter a valid email address.'],
     },
+    phone: { type: String, trim: true, match: [PHONE_PATTERN, 'Enter a phone number with its country code, like +91 98765 43210.'] },
+    // The Google account's id, for "Continue with Google".
+    googleId: { type: String },
     username: {
       type: String,
       required: [true, 'Choose a username.'],
@@ -25,8 +44,15 @@ const userSchema = new mongoose.Schema(
       maxlength: [30, 'Usernames can have at most 30 characters.'],
       match: [/^[a-z0-9_]+$/, 'Usernames can only use letters, numbers and _.'],
     },
-    // Never the password itself: a bcrypt hash of it. Left out of queries unless asked for.
-    passwordHash: { type: String, required: true, select: false },
+    // Never the password itself: a bcrypt hash of it. Left out of queries
+    // unless asked for. Accounts made with Google don't have one.
+    passwordHash: {
+      type: String,
+      select: false,
+      required: function needsPassword() {
+        return !this.googleId;
+      },
+    },
 
     // Asked once after signing up. "What will you use TrailCast for?" is required...
     interests: { type: [{ type: String, enum: INTERESTS }], default: [] },
@@ -47,5 +73,15 @@ const userSchema = new mongoose.Schema(
     },
   },
 );
+
+// Each email, phone number and Google account belongs to one account at most.
+// (Only counted when set: an account with just a phone number has no email.)
+for (const field of ['email', 'phone', 'googleId']) {
+  userSchema.index({ [field]: 1 }, { unique: true, partialFilterExpression: { [field]: { $type: 'string' } } });
+}
+
+userSchema.pre('validate', function needsAWayIn() {
+  if (!this.email && !this.phone && !this.googleId) this.invalidate('email', 'Enter your email address or phone number.');
+});
 
 export const User = mongoose.model('User', userSchema);

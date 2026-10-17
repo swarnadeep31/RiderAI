@@ -81,6 +81,24 @@ describe('routeSegments', () => {
     assert.deepEqual(segments[1], [[32.3, 77.2], [32.299, 77.201], [32.33, 77.23], [32.369, 77.249], [32.37, 77.25]]);
   });
 
+  test('keeps the heights OpenRouteService sends, and gives each key point the height of its road', async () => {
+    const answer = structuredClone(orsAnswer);
+    answer.features[0].geometry.coordinates = answer.features[0].geometry.coordinates.map(([lng, lat], i) => [lng, lat, 2000 + i * 10]);
+    ors = await startFakeService(() => [200, answer]);
+    process.env.ORS_BASE_URL = ors.url;
+    process.env.ORS_API_KEY = 'test-key';
+
+    const { segments } = await routeSegments(points, 'roads');
+    assert.equal(ors.requests[0].body.elevation, true);
+    assert.deepEqual(segments[0], [
+      [32.24, 77.19, 2000],
+      [32.241, 77.191, 2000],
+      [32.27, 77.195, 2010],
+      [32.299, 77.201, 2020],
+      [32.3, 77.2, 2020],
+    ]);
+  });
+
   test('uses footpaths for treks', async () => {
     ors = await startFakeService(() => [200, orsAnswer]);
     process.env.ORS_BASE_URL = ors.url;

@@ -25,7 +25,9 @@ export async function geocodeCandidates(candidates, { search = searchPlaces, onP
     for (const query of queriesFor(candidate)) {
       try {
         results = await search(query, previous ? { near: previous } : {});
-      } catch {
+      } catch (err) {
+        // Says why in the server's log: a place search that keeps failing shows every place as "not found".
+        console.warn(`Couldn't look up "${query}" on the map: ${err.message}`);
         results = [];
       }
       if (results.length) break;

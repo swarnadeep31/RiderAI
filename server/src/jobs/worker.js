@@ -3,15 +3,22 @@
 // in MongoDB, so nothing is lost when the server restarts or a free host sleeps.
 import { randomUUID } from 'node:crypto';
 import { Job } from '../models/Job.js';
-import { defaultServices, JobCancelled, runJob } from '../aiRoute/pipeline.js';
+import { defaultServices, JobCancelled, removeOldUploads, runJob } from '../aiRoute/pipeline.js';
+import { defaultEnrichServices, runEnrichJob } from '../routeExtras/enrich.js';
 
 const LEASE_MS = 2 * 60 * 1000;
 const HEARTBEAT_MS = 30 * 1000;
 const MAX_ATTEMPTS = 5;
 const workerId = randomUUID();
 
+// What runs each type of job. `services` replaces outside services in tests.
+const RUNNERS = {
+  'ai-route': (job, services) => runJob(job, { ...defaultServices, ...services }),
+  'route-enrich': (job, services) => runEnrichJob(job, { ...defaultEnrichServices, ...services }),
+};
+
 // Claims the oldest waiting job (or one whose worker stopped) and runs it.
-export async function processNextJob(services = defaultServices) {
+export async function processNextJob(services = {}) {
   const now = new Date();
   const job = await Job.findOneAndUpdate(
     { state: { $in: ['queued', 'running'] }, lockedUntil: { $lt: now } },
@@ -29,7 +36,7 @@ export async function processNextJob(services = defaultServices) {
     Job.updateOne({ _id: job._id, workerId }, { lockedUntil: new Date(Date.now() + LEASE_MS) }).catch(() => {});
   }, HEARTBEAT_MS);
   try {
-    await runJob(job, services);
+    await RUNNERS[job.type](job, services);
   } catch (err) {
     if (!(err instanceof JobCancelled)) {
       // The clips already answered stay saved: nothing paid for is lost.
@@ -45,6 +52,7 @@ export async function processNextJob(services = defaultServices) {
 }
 
 export function startWorker({ intervalMs = 2000 } = {}) {
+  removeOldUploads().catch((err) => console.error('Could not tidy old uploads:', err.message));
   let busy = false;
   const timer = setInterval(async () => {
     if (busy) return;

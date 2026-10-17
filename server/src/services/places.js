@@ -1,7 +1,11 @@
 // Finds places by name ("Rohtang Pass") using OpenStreetMap's free Nominatim service.
 // Its rules: identify the app, at most one search per second, no search-as-you-type,
 // and keep results instead of asking again. https://operations.osmfoundation.org/policies/nominatim/
+// Nominatim often refuses shared cloud servers (like Render's free plan), so
+// when it fails and there's an ORS_API_KEY, OpenRouteService's place search
+// answers instead. Nominatim stays first: it knows small Indian places better.
 import { httpError } from '../utils/httpError.js';
+import { orsUrl } from './routing.js';
 
 const nominatimUrl = () => process.env.NOMINATIM_BASE_URL || 'https://nominatim.openstreetmap.org';
 const USER_AGENT = 'TrailCast/0.1 (+https://github.com/swarnadeep31/RiderAI)';
@@ -39,6 +43,21 @@ export function clearPlaceCache() {
 const NEAR_DEGREES = 1.5; // about 150 km around the "near" point
 
 async function fetchPlaces(query, near) {
+  try {
+    return await fetchFromNominatim(query, near);
+  } catch (err) {
+    console.warn(`Place search (Nominatim) failed for "${query}": ${err.message}`);
+    if (!process.env.ORS_API_KEY) throw httpError(502, 'Place search is not working right now. Try again in a minute, or click the map instead.');
+  }
+  try {
+    return await fetchFromOrs(query, near);
+  } catch (err) {
+    console.warn(`Place search (OpenRouteService) failed for "${query}": ${err.message}`);
+    throw httpError(502, 'Place search is not working right now. Try again in a minute, or click the map instead.');
+  }
+}
+
+async function fetchFromNominatim(query, near) {
   const params = new URLSearchParams({ q: query, format: 'jsonv2', limit: '5', 'accept-language': 'en' });
   if (near) {
     const [lat, lng] = near;
@@ -53,9 +72,9 @@ async function fetchPlaces(query, near) {
       signal: AbortSignal.timeout(10000),
     });
   } catch {
-    res = null;
+    throw new Error("couldn't reach it");
   }
-  if (!res?.ok) throw httpError(502, 'Place search is not working right now. Try again in a minute, or click the map instead.');
+  if (!res.ok) throw new Error(`it answered ${res.status}`);
 
   const results = await res.json();
   return results
@@ -66,4 +85,38 @@ async function fetchPlaces(query, near) {
       lng: Number(r.lon),
     }))
     .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+}
+
+// OpenRouteService's place search (Pelias, from OpenStreetMap and other open
+// data). Labels leave out the country: its borders put places in Kashmir in
+// Pakistan, though their positions are right.
+async function fetchFromOrs(query, near) {
+  const params = new URLSearchParams({ text: query, size: '5', lang: 'en' });
+  if (near) {
+    // Rank places around here first (a preference, not a limit).
+    params.set('focus.point.lat', String(near[0]));
+    params.set('focus.point.lon', String(near[1]));
+  }
+  let res;
+  try {
+    res = await fetch(`${orsUrl()}/geocode/search?${params}`, {
+      headers: { Authorization: process.env.ORS_API_KEY },
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch {
+    throw new Error("couldn't reach it");
+  }
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error?.message ?? `it answered ${res.status}`);
+  return (data?.features ?? [])
+    .map(({ properties: p = {}, geometry }) => {
+      const name = p.name || String(p.label ?? '').split(',')[0];
+      return {
+        name,
+        description: [...new Set([name, p.locality, p.county, p.region].filter(Boolean))].join(', '),
+        lat: Number(geometry?.coordinates?.[1]),
+        lng: Number(geometry?.coordinates?.[0]),
+      };
+    })
+    .filter((p) => p.name && Number.isFinite(p.lat) && Number.isFinite(p.lng));
 }
