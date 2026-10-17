@@ -121,10 +121,38 @@ function Cloud({ y, s = 1, duration, delay, opacity = 0.95 }) {
 }
 
 // A map pin that pops up on the route.
-function MapPin({ x, y, delay }) {
+// The rider's lap along the hero's road: it rides the whole road in the first
+// RIDE_END of RIDE_LAP seconds, then fades out and starts again.
+const RIDE_LAP = 18;
+const RIDE_END = 0.88;
+
+// A pin on the road that drops in (from above, with a little bounce) just as
+// the rider reaches it, stays while the ride goes on, and lifts away when the
+// ride starts over. along: where it is on the road, as a share of the road's
+// length, so it keeps in step with the rider (both run on the same clock).
+// still: no motion wanted, so the pin just stands there.
+function MapPin({ x, y, along, still }) {
+  const arrive = along * RIDE_END;
+  const at = (offset) => Math.min(arrive + offset, 0.89).toFixed(4);
+  const lap = { dur: `${RIDE_LAP}s`, repeatCount: 'indefinite' };
   return (
     <g transform={`translate(${x} ${y})`}>
-      <g className="svg-bottom motion-safe:animate-pop" style={{ animationDelay: `${delay}s` }}>
+      <g opacity={still ? 1 : 0}>
+        {!still && (
+          <>
+            <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes={`0;${arrive.toFixed(4)};${at(0.006)};0.9;0.96;1`} {...lap} />
+            <animateTransform
+              attributeName="transform"
+              type="translate"
+              values="0 -46;0 -46;0 4;0 0;0 0;0 -46"
+              keyTimes={`0;${arrive.toFixed(4)};${at(0.016)};${at(0.026)};0.96;1`}
+              calcMode="spline"
+              // Falls faster and faster, then settles after the bounce.
+              keySplines="0 0 1 1;0.5 0 1 1;0 0 0.5 1;0 0 1 1;0 0 1 1"
+              {...lap}
+            />
+          </>
+        )}
         <path
           d="M0 0C-3-6-11-12-11-20a11 11 0 0 1 22 0C11-12 3-6 0 0z"
           fill="#ea580c"
@@ -285,9 +313,10 @@ export function HeroScene({ className = '' }) {
           strokeLinecap="round"
           fill="none"
         />
-        <MapPin x={300} y={505} delay={1} />
-        <MapPin x={690} y={452} delay={1.9} />
-        <MapPin x={1040} y={368} delay={2.8} />
+        {/* Each pin drops as the rider passes it (where it is along the road, measured on ROAD). */}
+        <MapPin x={300} y={505} along={0.269} still={reduced} />
+        <MapPin x={690} y={452} along={0.5934} still={reduced} />
+        <MapPin x={1040} y={368} along={0.8887} still={reduced} />
 
         {/* The rider, riding up to the flag again and again */}
         {reduced ? (
@@ -298,11 +327,11 @@ export function HeroScene({ className = '' }) {
           <g>
             <Rider beamId={`${id}-beam`} />
             <animateMotion
-              dur="18s"
+              dur={`${RIDE_LAP}s`}
               repeatCount="indefinite"
               rotate="auto"
               keyPoints="0;1;1"
-              keyTimes="0;0.88;1"
+              keyTimes={`0;${RIDE_END};1`}
               calcMode="linear"
             >
               <mpath href={`#${id}-road`} />
@@ -311,7 +340,7 @@ export function HeroScene({ className = '' }) {
               attributeName="opacity"
               values="0;1;1;0;0"
               keyTimes="0;0.04;0.9;0.96;1"
-              dur="18s"
+              dur={`${RIDE_LAP}s`}
               repeatCount="indefinite"
             />
           </g>
