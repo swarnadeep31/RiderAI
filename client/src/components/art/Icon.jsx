@@ -109,6 +109,7 @@ const PATHS = {
   arrowRight: <path d="M5 12h14m-6-6 6 6-6 6" />,
   arrowDown: <path d="M12 5v14m-6-6 6 6 6-6" />,
   check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
+  trash: <path d="M4 7h16M10 11v6m4-6v6M9 7l1-3h4l1 3M6 7l1 13h10l1-13" />,
   edit: <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z" />,
   satellite: (
     <>
