@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, before, beforeEach, describe, test } from 'node:test';
+import jwt from 'jsonwebtoken';
 import request from 'supertest';
 import { normalizePhone, User } from '../src/models/User.js';
 import { app, signedUpAgent, startFakeService, useTestDatabase } from './helpers.js';
@@ -191,6 +192,28 @@ describe('phone numbers and names', () => {
   });
 });
 
+describe('sessions', () => {
+  test('raising the session version logs the account out everywhere', async () => {
+    const agent = await signedUpAgent('alice');
+    assert.equal((await agent.get('/api/auth/me')).body.user.username, 'alice');
+    await User.updateOne({ username: 'alice' }, { $inc: { sessionVersion: 1 } });
+    assert.equal((await agent.get('/api/auth/me')).body.user, null);
+    // Logging in again works, with the new version.
+    const login = await agent.post('/api/auth/login').send({ email: 'alice@example.com', password: 'correct horse' });
+    assert.equal(login.status, 200);
+    assert.equal((await agent.get('/api/auth/me')).body.user.username, 'alice');
+  });
+
+  test('logins from before session versions existed still work', async () => {
+    await signedUpAgent('alice');
+    const user = await User.findOne({ username: 'alice' });
+    // A login made before: its token has no session version.
+    const oldToken = jwt.sign({ sub: user.id }, process.env.JWT_SECRET || 'dev-only-secret-do-not-use-in-production', { expiresIn: '1d' });
+    const me = await request(app).get('/api/auth/me').set('Cookie', `trailcast_session=${oldToken}`);
+    assert.equal(me.body.user.username, 'alice');
+  });
+});
+
 describe('Continue with Google', () => {
   // A stand-in for Google's tokeninfo endpoint: which tokens are genuine, and for whom.
   const tokens = {
@@ -230,13 +253,41 @@ describe('Continue with Google', () => {
 
   test('an account that already has the same email is used, not duplicated', async () => {
     await request(app).post('/api/auth/signup').send(newUser());
-    const res = await request(app).post('/api/auth/google').send({ credential: 'token-existing-email' });
+    const google = request.agent(app);
+    const res = await google.post('/api/auth/google').send({ credential: 'token-existing-email' });
     assert.equal(res.status, 200);
     assert.equal(res.body.existing, true);
     assert.equal(res.body.user.username, 'mountain_rider');
     assert.equal(await User.countDocuments(), 1);
-    // The password still works too.
-    assert.equal((await request(app).post('/api/auth/login').send({ email: 'rider@example.com', password: 'correct horse' })).status, 200);
+    assert.equal((await google.get('/api/auth/me')).body.user.username, 'mountain_rider');
+  });
+
+  test('linking Google to an account made with an unproven email removes its password and ends its other logins', async () => {
+    // Anyone can sign up with an email that isn't theirs: here, with the Google user's email.
+    const earlier = request.agent(app);
+    assert.equal((await earlier.post('/api/auth/signup').send(newUser())).status, 201);
+
+    const res = await request(app).post('/api/auth/google').send({ credential: 'token-existing-email' });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.passwordRemoved, true);
+    assert.equal(res.body.user.sessionVersion, undefined);
+
+    // Whoever made the account can't use its password any more, and is logged out.
+    const login = await request(app).post('/api/auth/login').send({ email: 'rider@example.com', password: 'correct horse' });
+    assert.equal(login.status, 401);
+    assert.match(login.body.error, /Continue with Google/);
+    assert.equal((await earlier.get('/api/auth/me')).body.user, null);
+    const saved = await User.findOne({ email: 'rider@example.com' });
+    assert.equal(saved.emailVerified, true);
+
+    // The next Google login is an ordinary one: nothing more is removed.
+    const again = await request(app).post('/api/auth/google').send({ credential: 'token-existing-email' });
+    assert.equal(again.body.passwordRemoved, false);
+  });
+
+  test('accounts made with Google have a proven email', async () => {
+    await request(app).post('/api/auth/google').send({ credential: 'token-new' });
+    assert.equal((await User.findOne({ email: 'new@gmail.com' })).emailVerified, true);
   });
 
   test("fake, foreign or unverified tokens don't get in", async () => {

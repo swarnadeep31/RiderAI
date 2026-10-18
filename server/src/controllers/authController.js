@@ -88,32 +88,47 @@ export async function login(req, res) {
 // already linked to this Google account logs in; one with the same email is
 // linked to it and logs in (existing: true); otherwise a new account is made
 // (201). The answer says which, so the page can tell the person.
+//
+// Google has checked that the email belongs to the person signing in. An
+// account made earlier with that email and a password never proved it: anyone
+// can type someone else's email when signing up. So when Google is linked to
+// such an account, its password is removed and its other logins end, and the
+// account is the Google account owner's alone (passwordRemoved: true, so the
+// page can say to log in with Google from now on).
 export async function google(req, res) {
   const profile = await verifyGoogleCredential(req.body?.credential);
   if (!profile) throw httpError(401, "Google sign-in didn't work. Please try again.");
 
   let user = await User.findOne({ googleId: profile.googleId });
+  let passwordRemoved = false;
   if (!user) {
-    user = await User.findOne({ email: profile.email });
+    user = await User.findOne({ email: profile.email }).select('+passwordHash');
     if (user) {
+      if (!user.emailVerified) {
+        passwordRemoved = Boolean(user.passwordHash);
+        user.passwordHash = undefined;
+        user.sessionVersion = (user.sessionVersion ?? 0) + 1;
+      }
       user.googleId = profile.googleId;
+      user.emailVerified = true;
       user.name ||= profile.name;
       await user.save();
     }
   }
   if (user) {
     startSession(res, user);
-    return res.json({ user, existing: true });
+    return res.json({ user, existing: true, passwordRemoved });
   }
 
   user = await User.create({
     googleId: profile.googleId,
     email: profile.email,
+    emailVerified: true,
     name: profile.name || profile.email.split('@')[0],
     username: await makeUsername(profile.name || profile.email),
   });
   startSession(res, user);
-  res.status(201).json({ user, existing: false });
+  res.status(201).json({ user, existing: false, passwordRemoved });
 }
 
 export function logout(req, res) {

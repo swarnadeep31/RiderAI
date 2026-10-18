@@ -20,8 +20,9 @@ const cookieOptions = () => ({
   secure: process.env.NODE_ENV === 'production', // HTTPS only once the site is online
 });
 
+// sv: the account's session version when this login started (see loadUser).
 export function startSession(res, user) {
-  const token = jwt.sign({ sub: user.id }, jwtSecret(), { expiresIn: `${SESSION_DAYS}d` });
+  const token = jwt.sign({ sub: user.id, sv: user.sessionVersion ?? 0 }, jwtSecret(), { expiresIn: `${SESSION_DAYS}d` });
   res.cookie(COOKIE_NAME, token, { ...cookieOptions(), maxAge: SESSION_DAYS * 24 * 60 * 60 * 1000 });
 }
 
@@ -30,16 +31,19 @@ export function endSession(res) {
 }
 
 // Runs on every request: if a valid session cookie came with it, req.user is that user.
+// A login from before the account's session version was raised no longer counts
+// (logins from before session versions existed count as version 0).
 export async function loadUser(req, res, next) {
   const token = req.cookies?.[COOKIE_NAME];
   if (!token) return next();
-  let userId;
+  let session;
   try {
-    userId = jwt.verify(token, jwtSecret()).sub;
+    session = jwt.verify(token, jwtSecret());
   } catch {
     return next(); // expired or tampered with: treat as logged out
   }
-  req.user = await User.findById(userId);
+  const user = await User.findById(session.sub);
+  if (user && (user.sessionVersion ?? 0) === (session.sv ?? 0)) req.user = user;
   next();
 }
 

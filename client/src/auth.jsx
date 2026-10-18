@@ -30,7 +30,8 @@ export function AuthProvider({ children }) {
         setUser(loggedIn);
         return loggedIn;
       },
-      // Returns { user, existing }: existing is true when the account was already there.
+      // Returns { user, existing, passwordRemoved }: existing is true when the account
+      // was already there; passwordRemoved when Google replaced its password.
       async loginWithGoogle(credential) {
         const result = await api.loginWithGoogle(credential);
         setUser(result.user);
