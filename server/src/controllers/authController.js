@@ -4,8 +4,16 @@ import { endSession, startSession } from '../middleware/auth.js';
 import { normalizePhone, User } from '../models/User.js';
 import { verifyGoogleCredential } from '../services/google.js';
 import { httpError } from '../utils/httpError.js';
+import { concurrencyLimit } from '../utils/limit.js';
 
 const MIN_PASSWORD_LENGTH = 8;
+const HASH_ROUNDS = 12;
+
+// Hashing or checking a password takes about a fifth of a second of a whole
+// processor (several times longer on a small server), so only two run at once.
+// A burst waits its turn, or past 30 waiting is told the server is busy,
+// and the rest of the site stays quick meanwhile.
+const passwordWork = concurrencyLimit(2, { maxWaiting: 30 });
 const normalize = (text) => String(text ?? '').trim().toLowerCase();
 
 // An error the sign-up and log-in pages can act on: code 'exists' (offer to
@@ -65,7 +73,7 @@ export async function signup(req, res) {
     ...identifier,
     name: displayName,
     username: username ?? (await makeUsername(displayName)),
-    passwordHash: await bcrypt.hash(password, 12),
+    passwordHash: await passwordWork.run(() => bcrypt.hash(password, HASH_ROUNDS)),
   });
   startSession(res, user);
   res.status(201).json(user);
@@ -78,7 +86,9 @@ export async function login(req, res) {
   const user = await User.findOne(identifier).select('+passwordHash');
   if (!user) throw authError(404, `There's no account with this ${describe(identifier)} yet. Sign up to create one.`, 'not_found');
   if (!user.passwordHash) throw httpError(401, 'This account uses Google. Use "Continue with Google" to log in.');
-  const correct = typeof req.body?.password === 'string' && (await bcrypt.compare(req.body.password, user.passwordHash));
+  const { password } = req.body ?? {};
+  // (No password is longer than sign-up allows, so a huge one isn't worth checking.)
+  const correct = typeof password === 'string' && password.length <= 200 && (await passwordWork.run(() => bcrypt.compare(password, user.passwordHash)));
   if (!correct) throw httpError(401, 'Wrong password. Try again.');
   startSession(res, user);
   res.json(user);

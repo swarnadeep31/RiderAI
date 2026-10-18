@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { Job } from '../models/Job.js';
 import { RouteServices } from '../models/RouteServices.js';
 import { MAX_TRACK_POINTS, ROUTE_STYLES, Trail } from '../models/Trail.js';
@@ -7,6 +8,7 @@ import { routeSegments } from '../services/routing.js';
 import { fetchChannel } from '../services/youtubeInfo.js';
 import { timedTrack } from '../utils/geo.js';
 import { httpError } from '../utils/httpError.js';
+import { concurrencyLimit } from '../utils/limit.js';
 import { parseYouTubeId } from '../utils/youtube.js';
 
 // Only these fields can be set from a request; anything else in the body is ignored.
@@ -15,6 +17,40 @@ const POINT_FIELDS = ['name', 'note', 'time', 'lat', 'lng', 'stopKind'];
 // Only who owns a trail (so the page knows who may edit it), not their name:
 // the page credits the video's creator instead.
 const OWNER_FIELDS = '_id';
+
+// What the home page's cards need: not the route, the description, or the key
+// points themselves (only whether the AI found them).
+const CARD_FIELDS = 'title activity youtubeId creatorName channel routeSource stats owner createdAt points.origin';
+const LIST_PAGE = 24;
+const LIST_MAX = 100;
+
+// Trails are read for viewing as plain data rather than full Mongoose
+// documents: a long GPS route as a document holds about 15 MB while it is
+// sent, as plain data about 3 MB. Plain data skips the schema's defaults, so
+// a trail saved before a field existed gets these (kept equal to Trail.js by a test).
+export const TRAIL_DEFAULTS = {
+  description: '',
+  activity: 'ride',
+  creatorName: '',
+  supportUrl: '',
+  track: [],
+  trackTimes: [],
+  videoStartsAt: 0,
+  routeVersion: 0,
+  routeStyle: 'roads',
+  points: [],
+  hiddenRanges: [],
+};
+export const POINT_DEFAULTS = { note: '', origin: 'manual' };
+
+export function withDefaults(trail) {
+  const filled = { ...TRAIL_DEFAULTS, ...trail };
+  filled.points = filled.points.map((point) => ({ ...POINT_DEFAULTS, ...point }));
+  return filled;
+}
+
+// A few full trails are read and sent at once; the rest of a crowd waits its turn.
+const trailReads = concurrencyLimit(6, { maxWaiting: 150 });
 
 function pick(body, fields) {
   const out = {};
@@ -116,12 +152,15 @@ export async function drawRouteFromPoints(trail) {
 // A route drawn from key points is redrawn whenever the key points change.
 const redrawIfDrawn = (trail) => (trail.routeSource === 'keypoints' ? drawRouteFromPoints(trail) : null);
 
+// The newest trails, a page at a time: ?before=<the last trail's _id> gives
+// the next page, ?limit= its size (24 by default, at most 100).
 export async function listTrails(req, res) {
-  // The route can be thousands of points, so leave it out of the list.
-  const trails = await Trail.find()
-    .sort({ createdAt: -1, _id: -1 })
-    .limit(100)
-    .select('-track -trackTimes -elevationProfile')
+  const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || LIST_PAGE, 1), LIST_MAX);
+  const before = String(req.query.before ?? '');
+  const trails = await Trail.find(mongoose.isValidObjectId(before) ? { _id: { $lt: before } } : {})
+    .sort({ _id: -1 })
+    .limit(limit)
+    .select(CARD_FIELDS)
     .populate('owner', OWNER_FIELDS)
     .lean();
   res.json(trails);
@@ -145,9 +184,12 @@ export async function createTrail(req, res) {
 }
 
 export async function getTrail(req, res) {
-  const trail = await findTrail(req.params.id);
-  await fillChannel(trail);
-  await sendTrail(res, trail);
+  await trailReads.run(async () => {
+    const trail = await Trail.findById(req.params.id).populate('owner', OWNER_FIELDS).lean();
+    if (!trail) throw httpError(404, 'Trail not found.');
+    await fillChannel(trail);
+    res.json({ ...withDefaults(trail), routeNotice: null });
+  });
 }
 
 export async function updateTrail(req, res) {

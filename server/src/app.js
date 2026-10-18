@@ -1,7 +1,9 @@
+import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import express from 'express';
 import { loadUser } from './middleware/auth.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
+import { applyRateLimits, rateLimitsOn } from './middleware/rateLimits.js';
 import { aiRouteAvailable, routeConfig } from './config.js';
 import { authRouter } from './routes/auth.js';
 import { feedbackRouter } from './routes/feedback.js';
@@ -13,10 +15,14 @@ import { roadRoutingAvailable } from './services/routing.js';
 
 export function createApp() {
   const app = express();
+  // Answers are JSON, which gzip makes about five times smaller: a long route
+  // goes from ~760 KB to ~150 KB.
+  app.use(compression());
   // Routes from long GPS recordings can be a few MB.
   app.use(express.json({ limit: '5mb' }));
   app.use(cookieParser());
   app.use(loadUser);
+  if (rateLimitsOn()) applyRateLimits(app);
 
   app.get('/api/health', (req, res) => res.json({ ok: true }));
   // What this server can do, so the website can explain missing features.
