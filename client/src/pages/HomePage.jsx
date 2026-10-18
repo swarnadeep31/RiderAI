@@ -11,6 +11,9 @@ import { cardSummary } from '../lib/stats.js';
 import { useConfirm, useToast } from '../notices.jsx';
 import { tourSeen } from './TourPage.jsx';
 
+// How many trails the server sends at a time (see listTrails on the server).
+const PAGE_SIZE = 24;
+
 const MADE_FOR = [
   ['ride', 'Moto vloggers'],
   ['hike', 'Trekkers'],
@@ -120,10 +123,31 @@ export default function HomePage() {
   const toast = useToast();
   const [trails, setTrails] = useState(null);
   const [error, setError] = useState(null);
+  // Whether the server may have older trails, and whether they're loading.
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
-    api.listTrails().then(setTrails, (err) => setError(err.message));
+    api.listTrails().then(
+      (page) => {
+        setTrails(page);
+        setHasMore(page.length === PAGE_SIZE);
+      },
+      (err) => setError(err.message),
+    );
   }, []);
+
+  async function showMore() {
+    setLoadingMore(true);
+    try {
+      const page = await api.listTrails(trails.at(-1)._id);
+      setTrails((list) => [...list, ...page.filter((trail) => !list.some((t) => t._id === trail._id))]);
+      setHasMore(page.length === PAGE_SIZE);
+    } catch (err) {
+      toast(err.message, { tone: 'error' });
+    }
+    setLoadingMore(false);
+  }
 
   // Deletes a trail the user added: its route, key points and everything worked out for it.
   async function deleteTrail(trail) {
@@ -271,6 +295,13 @@ export default function HomePage() {
               <TrailCard key={trail._id} trail={trail} index={i} onDelete={user && trail.owner?._id === user._id ? deleteTrail : null} />
             ))}
           </ul>
+        )}
+        {hasMore && (
+          <div className="mt-8 flex justify-center">
+            <button type="button" onClick={showMore} disabled={loadingMore} className="btn-secondary px-6 py-3 text-base">
+              {loadingMore ? 'Loading...' : 'Show more trails'}
+            </button>
+          </div>
         )}
       </section>
     </main>

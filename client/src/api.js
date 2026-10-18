@@ -40,7 +40,8 @@ export const api = {
   searchPlaces: (query) => request(`/places?q=${encodeURIComponent(query)}`),
 
   // Trails
-  listTrails: () => request('/trails'),
+  // The newest trails, a page at a time: `before` is the last trail already shown.
+  listTrails: (before) => request(before ? `/trails?before=${encodeURIComponent(before)}` : '/trails'),
   getTrail: (id) => request(`/trails/${id}`),
   createTrail: (trail) => request('/trails', { method: 'POST', body: trail }),
   updateTrail: (id, changes) => request(`/trails/${id}`, { method: 'PATCH', body: changes }),
