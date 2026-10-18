@@ -34,6 +34,11 @@ const userSchema = new mongoose.Schema(
     phone: { type: String, trim: true, match: [PHONE_PATTERN, 'Enter a phone number with its country code, like +91 98765 43210.'] },
     // The Google account's id, for "Continue with Google".
     googleId: { type: String },
+    // True once the email is known to belong to this person: Google says so.
+    // (Anyone can type any email when signing up with a password.)
+    emailVerified: { type: Boolean, default: false },
+    // Part of every login: raising it logs the account out everywhere.
+    sessionVersion: { type: Number, default: 0 },
     username: {
       type: String,
       required: [true, 'Choose a username.'],
@@ -67,6 +72,7 @@ const userSchema = new mongoose.Schema(
     toJSON: {
       transform(doc, user) {
         delete user.passwordHash;
+        delete user.sessionVersion;
         delete user.__v;
         return user;
       },

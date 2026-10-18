@@ -44,12 +44,15 @@ export default function SignupPage() {
   async function withGoogle(credential) {
     setError(null);
     try {
-      const { user: loggedIn, existing } = await loginWithGoogle(credential);
-      toast(
-        existing
-          ? `You already have an account, ${loggedIn.name?.split(' ')[0] ?? 'rider'}, so we logged you in.`
-          : 'Your account is ready. Welcome to TrailCast!',
-      );
+      const { user: loggedIn, existing, passwordRemoved } = await loginWithGoogle(credential);
+      // The account was made with a password before: Google now replaces it.
+      if (passwordRemoved) toast('Your Google account is now linked. From now on, log in with Google.');
+      else
+        toast(
+          existing
+            ? `You already have an account, ${loggedIn.name?.split(' ')[0] ?? 'rider'}, so we logged you in.`
+            : 'Your account is ready. Welcome to TrailCast!',
+        );
     } catch (err) {
       setError(err);
     }
