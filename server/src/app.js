@@ -1,3 +1,4 @@
+import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import express from 'express';
 import { loadUser } from './middleware/auth.js';
@@ -13,6 +14,9 @@ import { roadRoutingAvailable } from './services/routing.js';
 
 export function createApp() {
   const app = express();
+  // Answers are JSON, which gzip makes about five times smaller: a long route
+  // goes from ~760 KB to ~150 KB.
+  app.use(compression());
   // Routes from long GPS recordings can be a few MB.
   app.use(express.json({ limit: '5mb' }));
   app.use(cookieParser());

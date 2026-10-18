@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, test } from 'node:test';
+import mongoose from 'mongoose';
 import request from 'supertest';
+import { POINT_DEFAULTS, TRAIL_DEFAULTS } from '../src/controllers/trailsController.js';
 import { Trail } from '../src/models/Trail.js';
 import { app, signedUpAgent, startFakeService, useTestDatabase } from './helpers.js';
 
@@ -118,6 +120,62 @@ describe('trails', () => {
     assert.equal(res.body[0].track, undefined);
     assert.ok(res.body[0].owner._id);
     assert.equal(res.body[0].owner.username, undefined, "the uploader's name isn't shown");
+  });
+
+  test('the list comes a page at a time, with only what the cards need', async () => {
+    for (let i = 1; i <= 26; i++) await createTrail({ title: `Trail ${i}`, description: 'A long story about the ride.' });
+    const first = await request(app).get('/api/trails');
+    assert.equal(first.body.length, 24);
+    assert.equal(first.body[0].title, 'Trail 26');
+    assert.equal(first.body[0].description, undefined);
+    assert.equal(first.body[0].trackTimes, undefined);
+
+    const next = await request(app).get(`/api/trails?before=${first.body.at(-1)._id}`);
+    assert.deepEqual(next.body.map((t) => t.title), ['Trail 2', 'Trail 1']);
+    assert.equal((await request(app).get('/api/trails?limit=5')).body.length, 5);
+    assert.equal((await request(app).get('/api/trails?limit=5000')).body.length, 26, 'at most 100');
+    assert.equal((await request(app).get('/api/trails?before=nonsense')).body.length, 24);
+  });
+
+  test('cards say how many key points a trail has and whether the AI found them, not what they are', async () => {
+    const { _id } = await createTrail();
+    await alice.post(`/api/trails/${_id}/points`).send({ name: 'Manali', note: 'Tea here', time: 10, lat: 32.24, lng: 77.19 });
+    const [card] = (await request(app).get('/api/trails')).body;
+    assert.deepEqual(card.points, [{ origin: 'manual' }]);
+  });
+
+  test('a trail saved before newer fields existed reads with their defaults', async () => {
+    const { insertedId } = await Trail.collection.insertOne({
+      owner: new mongoose.Types.ObjectId(),
+      title: 'Old trail',
+      youtubeId: 'aBcD3fGh1_-',
+      points: [{ _id: new mongoose.Types.ObjectId(), name: 'Manali', time: 0, lat: 32.24, lng: 77.19 }],
+    });
+    const res = await request(app).get(`/api/trails/${insertedId}`);
+    assert.equal(res.status, 200);
+    assert.equal(res.body.videoStartsAt, 0);
+    assert.deepEqual(res.body.hiddenRanges, []);
+    assert.equal(res.body.routeStyle, 'roads');
+    assert.deepEqual([res.body.points[0].note, res.body.points[0].origin], ['', 'manual']);
+    assert.equal(res.body.routeNotice, null);
+  });
+
+  test("the defaults for old trails match the schema's", () => {
+    const fresh = new Trail({ owner: new mongoose.Types.ObjectId(), title: 'x', youtubeId: 'aBcD3fGh1_-', points: [{ name: 'p', time: 1, lat: 1, lng: 1 }] }).toObject();
+    // Everything left once the fields given above are taken out is a default.
+    for (const key of ['_id', 'owner', 'title', 'youtubeId']) delete fresh[key];
+    const [point] = fresh.points;
+    for (const key of ['_id', 'name', 'time', 'lat', 'lng']) delete point[key];
+    assert.deepEqual({ ...fresh, points: [] }, TRAIL_DEFAULTS);
+    assert.deepEqual(point, POINT_DEFAULTS);
+  });
+
+  test('answers are gzipped for browsers that take it', async () => {
+    const track = Array.from({ length: 2000 }, (_, i) => [32 + i * 0.0001, 77]);
+    const { _id } = await createTrail({ track, trackTimes: track.map((_, i) => i) });
+    const res = await request(app).get(`/api/trails/${_id}`).set('Accept-Encoding', 'gzip');
+    assert.equal(res.headers['content-encoding'], 'gzip');
+    assert.equal(res.body.track.length, 2000);
   });
 
   test('the owner can get, update and delete a trail', async () => {
