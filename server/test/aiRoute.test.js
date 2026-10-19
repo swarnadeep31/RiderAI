@@ -171,7 +171,11 @@ describe('AI route jobs', () => {
       },
     });
     const { body: job } = await start();
-    await processNextJob(flaky.services);
+    // Each turn is one try; with no wait between retries, the job is due again a moment later.
+    for (let turn = 0; turn < 10 && (await Job.findById(job._id)).state !== 'failed'; turn++) {
+      await processNextJob(flaky.services);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
     assert.equal(tries, 3); // the first try + 2 retries
     const failed = await alice.get(`/api/jobs/${job._id}`);
     assert.equal(failed.body.state, 'failed');
@@ -182,6 +186,61 @@ describe('AI route jobs', () => {
     const { body: second } = await start(alice, { fresh: true });
     await processNextJob(privateVideo.services);
     assert.equal((await alice.get(`/api/jobs/${second._id}`)).body.error, 'This video is private.');
+  });
+
+  test('a busy Gemini puts the analysis back in the queue, and the worker gets on with other work', async () => {
+    process.env.AI_RETRY_DELAYS = '120,600';
+    let tries = 0;
+    const busy = fakeServices({
+      extract: async () => {
+        tries += 1;
+        throw new GeminiError('Gemini is busy.', { retryable: true });
+      },
+    });
+    const { body: job } = await start();
+    const startedAt = Date.now();
+    await processNextJob(busy.services);
+    assert.equal(tries, 1);
+    assert.ok(Date.now() - startedAt < 5000, "the worker doesn't wait with it");
+
+    // The page shows when it tries again, and why.
+    const waiting = (await alice.get(`/api/jobs/${job._id}`)).body;
+    assert.equal(waiting.state, 'queued');
+    assert.match(waiting.retryReason, /busy/);
+    const waitSec = (new Date(waiting.retryAt) - startedAt) / 1000;
+    assert.ok(waitSec >= 119 && waitSec < 130, `waits ${waitSec} s`);
+    // Not due yet: nothing to do. (A stop is counted only for real stops.)
+    assert.equal(await processNextJob(busy.services), null);
+    assert.equal((await Job.findById(job._id)).attempts, 0);
+
+    // Once due, it carries on where it was: the second try.
+    await Job.updateOne({ _id: job._id }, { lockedUntil: new Date(Date.now() - 1000) });
+    await processNextJob(busy.services);
+    assert.equal(tries, 2);
+    const again = await Job.findById(job._id);
+    assert.equal(again.clips[0].attempts, 2);
+    assert.ok(again.retryAt - Date.now() > 590 * 1000, 'then waits the next delay');
+  });
+
+  test('when every model is resting, the retry waits until the first one is back', async () => {
+    const backAt = new Date(Date.now() + 60 * 60 * 1000);
+    const resting = fakeServices({
+      extract: async () => {
+        throw new GeminiError('Every AI model has reached its limit.', { retryable: true, retryAt: backAt });
+      },
+    });
+    const { body: job } = await start();
+    await processNextJob(resting.services);
+    const { retryAt } = (await alice.get(`/api/jobs/${job._id}`)).body;
+    assert.ok(Math.abs(new Date(retryAt) - backAt) < 2000, `retries at ${retryAt}`);
+  });
+
+  test("a line of work only takes its own jobs: route work doesn't wait behind AI analyses", async () => {
+    const { body: job } = await start();
+    const { services, calls } = fakeServices();
+    assert.equal(await processNextJob(services, { types: ['route-enrich'] }), null);
+    assert.equal(calls.extract, 0);
+    assert.equal((await processNextJob(services, { types: ['ai-route'] }))._id.toString(), job._id);
   });
 
   test('a job left by a stopped server is picked up again where it stopped', async () => {

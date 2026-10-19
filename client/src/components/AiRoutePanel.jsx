@@ -108,6 +108,7 @@ function confidenceColour(confidence) {
 }
 
 const isRunning = (job) => job && ['queued', 'running'].includes(job.state);
+const clockTime = (date) => new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 const usd = (amount) => `$${amount.toFixed(amount < 0.1 ? 3 : 2)}`;
 
 // One place the AI found, as the owner reviews it.
@@ -404,13 +405,15 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
       {running && (
         <div className="card space-y-2 p-4">
           <p className="font-medium">
-            {job.state === 'queued' ? 'Waiting to start...' : `${stageText(job)}...`}
+            {job.state === 'running' ? `${stageText(job)}...` : job.retryAt ? `Trying again at ${clockTime(job.retryAt)}...` : 'Waiting to start...'}
             {job.state === 'running' && job.progress?.total > 1 && (
               <span className="ml-1 text-stone-500">
                 ({job.progress.done} of {job.progress.total})
               </span>
             )}
           </p>
+          {/* Gemini was busy or at its limit: the analysis waits its turn again, nothing is lost. */}
+          {job.retryAt && job.retryReason && <p className="text-stone-600">{job.retryReason}</p>}
           <p className="text-stone-600">This takes a minute or two for a short video. You can leave this page and come back.</p>
           <button type="button" onClick={cancel} className="text-red-700 hover:underline">
             Cancel

@@ -8,6 +8,7 @@ import { after, afterEach, before, beforeEach, describe, test } from 'node:test'
 import { removeOldUploads } from '../src/aiRoute/pipeline.js';
 import { processNextJob } from '../src/jobs/worker.js';
 import { Job } from '../src/models/Job.js';
+import { GeminiError } from '../src/services/gemini.js';
 import { hasFfmpeg } from '../src/services/videoFile.js';
 import { signedUpAgent, useTestDatabase } from './helpers.js';
 
@@ -121,6 +122,18 @@ describe('analysing an uploaded video file', () => {
     const res = await upload(ride);
     assert.equal(res.status, 413);
     assert.deepEqual(await readdir(uploads), []);
+  });
+
+  test('an analysis waiting to try again keeps its file', { skip }, async () => {
+    process.env.AI_RETRY_DELAYS = '60';
+    const res = await upload(ride);
+    await processNextJob({
+      extractFromUpload: async () => {
+        throw new GeminiError('Gemini is busy.', { retryable: true });
+      },
+    });
+    assert.equal((await Job.findById(res.body._id)).state, 'queued');
+    assert.equal((await readdir(uploads)).length, 1);
   });
 
   test('cancelling a waiting analysis deletes its file', { skip }, async () => {
