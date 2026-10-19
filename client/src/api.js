@@ -32,6 +32,7 @@ export const api = {
   // credential: the token from Google's sign-in button. Answers { user, existing }.
   loginWithGoogle: (credential) => request('/auth/google', { method: 'POST', body: { credential } }),
   logout: () => request('/auth/logout', { method: 'POST' }),
+  logoutEverywhere: () => request('/auth/logout-everywhere', { method: 'POST' }),
   saveOnboarding: (answers) => request('/auth/onboarding', { method: 'PUT', body: answers }),
   sendFeedback: (message) => request('/feedback', { method: 'POST', body: { message } }),
 

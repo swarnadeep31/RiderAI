@@ -39,6 +39,13 @@ const userSchema = new mongoose.Schema(
     emailVerified: { type: Boolean, default: false },
     // Part of every login: raising it logs the account out everywhere.
     sessionVersion: { type: Number, default: 0 },
+    // The logins in use, one per device (the newest MAX_SESSIONS). Logging
+    // out removes that device's, so a copy of its cookie stops working too.
+    sessions: {
+      type: [{ id: { type: String, required: true }, startedAt: { type: Date, default: Date.now }, _id: false }],
+      default: [],
+      select: false,
+    },
     username: {
       type: String,
       required: [true, 'Choose a username.'],
@@ -73,6 +80,7 @@ const userSchema = new mongoose.Schema(
       transform(doc, user) {
         delete user.passwordHash;
         delete user.sessionVersion;
+        delete user.sessions;
         delete user.__v;
         return user;
       },

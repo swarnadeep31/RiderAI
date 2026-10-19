@@ -80,10 +80,14 @@ describe('log in and out', () => {
     assert.match(unknownEmail.body.error, /no account with this email yet\. Sign up/);
   });
 
-  test('logging out ends the session', async () => {
-    const agent = await signedUpAgent();
+  test('logging out ends the session, even for a copy of its cookie', async () => {
+    const agent = request.agent(app);
+    const signup = await agent.post('/api/auth/signup').send(newUser());
+    const cookie = signup.headers['set-cookie'][0].split(';')[0];
     assert.equal((await agent.post('/api/auth/logout')).status, 204);
     assert.equal((await agent.get('/api/auth/me')).body.user, null);
+    // Someone who copied the cookie before the logout is logged out too.
+    assert.equal((await request(app).get('/api/auth/me').set('Cookie', cookie)).body.user, null);
   });
 
   test('a forged session cookie is ignored', async () => {
@@ -192,7 +196,64 @@ describe('phone numbers and names', () => {
   });
 });
 
+// Logs in as someone already signed up; returns the cookie, as a device would keep it.
+async function loginCookie(email = 'alice@example.com') {
+  const res = await request(app).post('/api/auth/login').send({ email, password: 'correct horse' });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  return res.headers['set-cookie'][0].split(';')[0];
+}
+const meWith = async (cookie) => (await request(app).get('/api/auth/me').set('Cookie', cookie)).body.user;
+
 describe('sessions', () => {
+  test('logging out on one device leaves the others logged in', async () => {
+    await signedUpAgent('alice');
+    const phone = await loginCookie();
+    const laptop = await loginCookie();
+    assert.equal((await request(app).post('/api/auth/logout').set('Cookie', phone)).status, 204);
+    assert.equal(await meWith(phone), null);
+    assert.equal((await meWith(laptop)).username, 'alice');
+  });
+
+  test('"log out on all devices" ends every login, this one included', async () => {
+    await signedUpAgent('alice');
+    const phone = await loginCookie();
+    const laptop = await loginCookie();
+    assert.equal((await request(app).post('/api/auth/logout-everywhere').set('Cookie', laptop)).status, 204);
+    assert.equal(await meWith(phone), null);
+    assert.equal(await meWith(laptop), null);
+    assert.equal((await request(app).post('/api/auth/logout-everywhere')).status, 401, 'needs a login');
+    // Logging in again works.
+    assert.equal((await meWith(await loginCookie())).username, 'alice');
+  });
+
+  test('past the newest ten logins, the oldest device is logged out', async () => {
+    const first = await signedUpAgent('alice'); // signing up is the first login
+    const devices = [];
+    for (let i = 0; i < 10; i++) devices.push(await loginCookie());
+    assert.equal((await first.get('/api/auth/me')).body.user, null);
+    for (const device of devices) assert.equal((await meWith(device)).username, 'alice');
+    assert.equal((await User.findOne({ username: 'alice' }).select('+sessions')).sessions.length, 10);
+  });
+
+  test('logging out with a login from before logins were kept logs out everywhere', async () => {
+    await signedUpAgent('alice');
+    const user = await User.findOne({ username: 'alice' });
+    const oldToken = jwt.sign({ sub: user.id, sv: 0 }, process.env.JWT_SECRET || 'dev-only-secret-do-not-use-in-production', { expiresIn: '1d' });
+    const oldCookie = `trailcast_session=${oldToken}`;
+    const laptop = await loginCookie();
+    assert.equal((await meWith(oldCookie)).username, 'alice');
+    assert.equal((await request(app).post('/api/auth/logout').set('Cookie', oldCookie)).status, 204);
+    assert.equal(await meWith(oldCookie), null);
+    assert.equal(await meWith(laptop), null);
+  });
+
+  test('the list of logins is never sent to the browser', async () => {
+    const agent = await signedUpAgent('alice');
+    const { user } = (await agent.get('/api/auth/me')).body;
+    assert.equal(user.sessions, undefined);
+    assert.equal(user.sessionVersion, undefined);
+  });
+
   test('raising the session version logs the account out everywhere', async () => {
     const agent = await signedUpAgent('alice');
     assert.equal((await agent.get('/api/auth/me')).body.user.username, 'alice');
