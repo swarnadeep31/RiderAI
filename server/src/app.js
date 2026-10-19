@@ -4,7 +4,7 @@ import express from 'express';
 import { loadUser } from './middleware/auth.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { applyRateLimits, rateLimitsOn } from './middleware/rateLimits.js';
-import { aiRouteAvailable, routeConfig } from './config.js';
+import { aiConfig, aiRouteAvailable, routeConfig } from './config.js';
 import { authRouter } from './routes/auth.js';
 import { feedbackRouter } from './routes/feedback.js';
 import { jobsRouter } from './routes/jobs.js';
@@ -30,6 +30,8 @@ export function createApp() {
     res.json({
       roadRouting: roadRoutingAvailable(),
       aiRoute: aiRouteAvailable(),
+      // The biggest video file the AI takes, so the page can say so before uploading.
+      aiMaxUploadMb: aiConfig().maxUploadMb,
       routeServices: routeConfig().services,
       fuelGapWarnKm: routeConfig().fuelGapWarnKm,
       // For the "Continue with Google" button (empty: no button).

@@ -1,7 +1,7 @@
 // Starting an AI analysis of a trail's video, and accepting its reviewed places.
 import { createHash, randomUUID } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir, rm, statfs } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -131,6 +131,29 @@ export async function startAiRoute(req, res) {
   res.status(202).json(jobView(job));
 }
 
+// Who is uploading a file right now (user ids). Uploaded files wait on this
+// server's disk until their analysis ends, so each person uploads one at a
+// time, and only so many wait at once.
+const receiving = new Set();
+// Room left on the disk after a file, for everything else the server writes.
+const DISK_MARGIN_BYTES = 200 * 1048576;
+
+const WAITING_UPLOAD = { type: 'ai-route', source: 'upload', state: { $in: ['queued', 'running'] } };
+
+async function checkRoomForUpload(user, config, maxBytes, declaredBytes) {
+  if (await Job.exists({ ...WAITING_UPLOAD, user: user._id })) {
+    throw httpError(409, 'One of your uploaded videos is still with the AI. Wait for it to finish, then upload the next one.');
+  }
+  // (receiving counts this upload too.)
+  if ((await Job.countDocuments(WAITING_UPLOAD)) + receiving.size > config.maxWaitingUploads) {
+    throw httpError(503, 'Too many uploaded videos are waiting for the AI right now. Try again later, or use the YouTube link.');
+  }
+  const disk = await statfs(config.uploadDir).catch(() => null);
+  if (disk && disk.bavail * disk.bsize < (declaredBytes || maxBytes) + DISK_MARGIN_BYTES) {
+    throw httpError(503, "The server doesn't have room for this file right now. Try a smaller copy, or use the YouTube link.");
+  }
+}
+
 // Saves the uploaded file (the request body) to `path`, stopping at
 // `maxBytes`, and returns its size and fingerprint (SHA-256).
 async function receiveFile(req, path, maxBytes) {
@@ -157,17 +180,31 @@ async function receiveFile(req, path, maxBytes) {
 // same video), highDetail. The X-File-Name header: the file's name.
 export async function uploadAiVideo(req, res) {
   const config = aiConfig();
+  const userId = String(req.user._id);
+  if (receiving.has(userId)) throw httpError(409, "You're already uploading a video. Wait for it to finish, then upload the next one.");
+  receiving.add(userId);
+  try {
+    await receiveUpload(req, res, config);
+  } finally {
+    receiving.delete(userId);
+  }
+}
+
+// The upload itself, once it's the only one of this user's.
+async function receiveUpload(req, res, config) {
   const trail = await trailReadyForAi(req, config);
   const mediaMode = req.query.mode ?? 'full';
   if (!MEDIA_MODES.includes(mediaMode)) throw httpError(400, `The mode must be one of: ${MEDIA_MODES.join(', ')}.`);
   const youtubeSec = checkDuration(req.query.durationSec, config);
   const maxBytes = config.maxUploadMb * 1048576;
-  if (Number(req.headers['content-length']) > maxBytes) {
+  const declaredBytes = Number(req.headers['content-length']) || 0;
+  if (declaredBytes > maxBytes) {
     throw httpError(413, `The file is too big: the most this server takes is ${config.maxUploadMb} MB.`);
   }
   await checkLimits(req.user, config);
 
   await mkdir(config.uploadDir, { recursive: true });
+  await checkRoomForUpload(req.user, config, maxBytes, declaredBytes);
   const uploadPath = join(config.uploadDir, `${randomUUID()}.video`);
   let keep = false;
   try {

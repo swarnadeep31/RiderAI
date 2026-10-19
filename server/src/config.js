@@ -33,7 +33,10 @@ export function aiConfig() {
     inrPerUsd: number('AI_INR_PER_USD', 88),
     // Video files uploaded for the AI wait here until their analysis ends.
     uploadDir: process.env.AI_UPLOAD_DIR || join(tmpdir(), 'trailcast-uploads'),
-    maxUploadMb: number('AI_MAX_UPLOAD_MB', 2048),
+    // Files wait on the server's disk until their analysis ends, so the size
+    // and the number waiting at once (all users together) are limited.
+    maxUploadMb: number('AI_MAX_UPLOAD_MB', 500),
+    maxWaitingUploads: number('AI_MAX_WAITING_UPLOADS', 3),
   };
 }
 

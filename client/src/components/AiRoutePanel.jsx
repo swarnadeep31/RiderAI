@@ -31,10 +31,12 @@ const MEDIA_MODES = [
 // Instead of the YouTube link: the same video as a file from the owner's
 // computer. TrailCast can then choose what Gemini gets (only the sound, for
 // example), and it works for private and unlisted videos too.
-function UploadOption({ busy, onUpload }) {
+// maxMb: the biggest file the server takes (checked here too, before uploading).
+function UploadOption({ busy, onUpload, maxMb }) {
   const [file, setFile] = useState(null);
   const [mode, setMode] = useState('full');
   const [progress, setProgress] = useState(null);
+  const tooBig = Boolean(file && maxMb && file.size > maxMb * 1048576);
 
   async function upload() {
     setProgress(0);
@@ -49,6 +51,7 @@ function UploadOption({ busy, onUpload }) {
         <p className="text-stone-600">
           Use the same video you put on YouTube, so the places line up with it. This also works for private and unlisted
           videos. The file goes to Google's Gemini, and is deleted from TrailCast and Gemini when the analysis ends.
+          {maxMb && ` Files up to ${maxMb} MB: for a bigger one, export a smaller copy (720p is plenty).`}
         </p>
         <input
           type="file"
@@ -76,9 +79,17 @@ function UploadOption({ busy, onUpload }) {
             <p className="text-xs text-stone-600">{progress < 1 ? `Uploading... ${Math.round(progress * 100)}%` : 'Checking the file...'}</p>
           </div>
         ) : (
-          <button type="button" onClick={upload} disabled={busy || !file} className="btn-ai">
-            Upload and build the route
-          </button>
+          <>
+            {tooBig && (
+              <ErrorMessage>
+                This file is {Math.round(file.size / 1048576)} MB, and the most TrailCast takes is {maxMb} MB. Export a smaller copy
+                (720p is plenty), or use the YouTube link.
+              </ErrorMessage>
+            )}
+            <button type="button" onClick={upload} disabled={busy || !file || tooBig} className="btn-ai">
+              Upload and build the route
+            </button>
+          </>
         )}
       </div>
     </details>
@@ -241,6 +252,7 @@ function HiddenRangeRow({ range, onChange, onRemove }) {
 // it passes; the owner checks them, and the route is drawn between them.
 export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, onAccepted }) {
   const [available, setAvailable] = useState(null);
+  const [maxUploadMb, setMaxUploadMb] = useState(null);
   const [job, setJob] = useState(null);
   const [places, setPlaces] = useState([]);
   const [hidden, setHidden] = useState([]);
@@ -252,7 +264,13 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
   onPreviewRef.current = onPreview;
 
   useEffect(() => {
-    api.getConfig().then((config) => setAvailable(config.aiRoute), () => setAvailable(false));
+    api.getConfig().then(
+      (config) => {
+        setAvailable(config.aiRoute);
+        setMaxUploadMb(config.aiMaxUploadMb ?? null);
+      },
+      () => setAvailable(false),
+    );
     api.latestAiRoute(trail._id).then(setJob, () => {});
   }, [trail._id]);
 
@@ -398,7 +416,7 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
           >
             {busy ? 'Starting...' : job?.state === 'accepted' ? 'Analyse the video again' : 'Build the route with AI'}
           </button>
-          <UploadOption busy={busy} onUpload={uploadFile} />
+          <UploadOption busy={busy} onUpload={uploadFile} maxMb={maxUploadMb} />
         </>
       )}
 
