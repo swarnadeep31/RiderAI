@@ -175,6 +175,11 @@ The website (`client/`) goes on Vercel and the API (`server/`) on Render. Vercel
 Render (`client/vercel.json`), so to the browser it's one site: logins work without cross-site cookies, and links
 like `/trails/...` open the app.
 
+`client/vercel.json` also sends the website's security headers. Its Content-Security-Policy lists the only outside
+sites the pages may load from (the YouTube player and thumbnails, OpenStreetMap tiles, Google sign-in); a page that
+starts using another one needs it added there. It also allows the small script in `client/index.html` by its
+SHA-256 hash, so changing that script means updating the hash (`npm test -w client` says when they differ).
+
 1. **MongoDB Atlas:** under Network Access, allow connections from anywhere (`0.0.0.0/0`). Render's free plan has
    no fixed address. Use a strong database password.
 2. **Render (API):** New → Blueprint → pick this repository and the branch to deploy. `render.yaml` sets everything
