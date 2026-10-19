@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { extractSound, hasFfmpeg, prepareVideo, probeVideo } from '../src/services/videoFile.js';
+import { extractSound, hasFfmpeg, prepareVideo, probeVideo, runTool } from '../src/services/videoFile.js';
 
 const ffmpeg = await hasFfmpeg();
 const skip = ffmpeg ? false : 'FFmpeg is not installed';
@@ -64,4 +64,17 @@ test('extracts just the sound, for listening to what is said', { skip }, async (
   assert.deepEqual(streams.streams.map((stream) => stream.codec_type), ['audio']);
   assert.equal(streams.streams[0].channels, 1);
   assert.ok(Math.abs(Number(streams.format.duration) - 3) < 0.3, `duration ${streams.format.duration}`);
+});
+
+test('a playlist dressed up as a video is refused, so FFmpeg never follows its links', { skip }, async () => {
+  const playlist = join(dir, 'playlist.video');
+  await writeFile(playlist, '#EXTM3U\n#EXT-X-TARGETDURATION:1\n#EXTINF:1,\nhttp://127.0.0.1:9/segment.ts\n#EXT-X-ENDLIST\n');
+  await assert.rejects(probeVideo(playlist), /isn't a video file/);
+  await assert.rejects(prepareVideo(playlist, join(dir, 'out.mp4')), /ffmpeg failed/);
+});
+
+test('a tool that runs too long is stopped', async () => {
+  const startedAt = Date.now();
+  await assert.rejects(runTool(process.execPath, ['-e', 'setTimeout(() => {}, 10000)'], { timeoutMs: 200 }), /took too long/);
+  assert.ok(Date.now() - startedAt < 5000);
 });

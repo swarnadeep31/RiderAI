@@ -10,7 +10,8 @@ import { processNextJob } from '../src/jobs/worker.js';
 import { Job } from '../src/models/Job.js';
 import { GeminiError } from '../src/services/gemini.js';
 import { hasFfmpeg } from '../src/services/videoFile.js';
-import { signedUpAgent, useTestDatabase } from './helpers.js';
+import request from 'supertest';
+import { app, signedUpAgent, useTestDatabase } from './helpers.js';
 
 useTestDatabase();
 
@@ -44,7 +45,7 @@ beforeEach(async () => {
   trailId = res.body._id;
 });
 afterEach(() => {
-  for (const name of ['GEMINI_API_KEY', 'AI_UPLOAD_DIR', 'AI_MAX_UPLOAD_MB']) delete process.env[name];
+  for (const name of ['GEMINI_API_KEY', 'AI_UPLOAD_DIR', 'AI_MAX_UPLOAD_MB', 'AI_MAX_WAITING_UPLOADS']) delete process.env[name];
 });
 
 const upload = async (file, query = {}) =>
@@ -134,6 +135,38 @@ describe('analysing an uploaded video file', () => {
     });
     assert.equal((await Job.findById(res.body._id)).state, 'queued');
     assert.equal((await readdir(uploads)).length, 1);
+  });
+
+  test('one uploaded video at a time per person, while it waits for the AI', { skip }, async () => {
+    assert.equal((await upload(ride)).status, 202);
+    const other = await alice.post('/api/trails').send({ title: 'Another ride', youtubeUrl: 'https://youtu.be/aBcD3fGh1_-' });
+    const second = await alice
+      .post(`/api/trails/${other.body._id}/ai-route/upload`)
+      .query({ mode: 'sound', durationSec: 4 })
+      .set('Content-Type', 'video/mp4')
+      .send(await readFile(ride));
+    assert.equal(second.status, 409);
+    assert.match(second.body.error, /still with the AI/);
+    assert.equal((await readdir(uploads)).length, 1);
+  });
+
+  test('only so many uploaded videos wait at once, for everyone together', { skip }, async () => {
+    process.env.AI_MAX_WAITING_UPLOADS = '1';
+    assert.equal((await upload(ride)).status, 202);
+    const bob = await signedUpAgent('bob');
+    const bobsTrail = await bob.post('/api/trails').send({ title: "Bob's ride", youtubeUrl: 'https://youtu.be/aBcD3fGh1_-' });
+    const res = await bob
+      .post(`/api/trails/${bobsTrail.body._id}/ai-route/upload`)
+      .query({ mode: 'sound', durationSec: 4 })
+      .set('Content-Type', 'video/mp4')
+      .send(await readFile(ride));
+    assert.equal(res.status, 503);
+    assert.match(res.body.error, /Too many uploaded videos are waiting/);
+    assert.equal((await readdir(uploads)).length, 1);
+  });
+
+  test('the page is told the biggest file the server takes', async () => {
+    assert.equal((await request(app).get('/api/config')).body.aiMaxUploadMb, 500);
   });
 
   test('cancelling a waiting analysis deletes its file', { skip }, async () => {
