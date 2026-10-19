@@ -73,12 +73,14 @@ function client() {
 // An error from Gemini, with a readable message and whether trying again might
 // help. restMs: the problem is with this model (its limit is reached, it's too
 // busy, or it's gone), so rest it that long and ask another model meanwhile.
+// retryAt: no model can answer before then.
 export class GeminiError extends Error {
-  constructor(message, { retryable = false, status, restMs = null } = {}) {
+  constructor(message, { retryable = false, status, restMs = null, retryAt = null } = {}) {
     super(message);
     this.retryable = retryable;
     this.status = status;
     this.restMs = restMs;
+    this.retryAt = retryAt;
   }
 }
 
@@ -201,7 +203,10 @@ export async function extractPlacesWithFallback(options) {
   const ready = chain.filter((model) => (restingUntil.get(model) ?? 0) <= now);
   if (ready.length === 0) {
     const soonest = Math.min(...chain.map((model) => restingUntil.get(model)));
-    throw new GeminiError(`Every AI model has reached its limit or is busy until about ${clock(soonest)}. TrailCast will try again.`, { retryable: true });
+    throw new GeminiError(`Every AI model has reached its limit or is busy until about ${clock(soonest)}. TrailCast will try again.`, {
+      retryable: true,
+      retryAt: new Date(soonest),
+    });
   }
   let lastError;
   for (const model of ready) {

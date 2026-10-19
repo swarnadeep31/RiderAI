@@ -23,6 +23,9 @@ export function jobView(job) {
     stage: job.stage,
     progress: job.progress,
     error: job.error ?? null,
+    // Waiting to try again: when, and why (e.g. "Gemini is busy...").
+    retryAt: job.state === 'queued' ? (job.retryAt ?? null) : null,
+    retryReason: job.state === 'queued' ? (job.retryReason ?? null) : null,
     videoTitle: job.videoTitle ?? '',
     model: job.model,
     // The models that answered: a backup when the main one had reached its limit.

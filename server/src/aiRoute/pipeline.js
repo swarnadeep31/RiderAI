@@ -16,6 +16,16 @@ import { geocodeCandidates } from './geocode.js';
 
 export class JobCancelled extends Error {}
 
+// A try that failed but may work later (Gemini busy, a limit reached): the job
+// goes back in the queue until `at`, and the worker gets on with other work
+// meanwhile instead of waiting with it.
+export class RetryLater extends Error {
+  constructor(at, message) {
+    super(message);
+    this.at = at;
+  }
+}
+
 // One clip of a video file the owner uploaded: cut out (and shrunk, or just
 // its sound) with FFmpeg, uploaded to Gemini, asked about, then deleted from
 // Gemini and from here. The clip starts at 0, so its times count from the
@@ -47,33 +57,36 @@ async function extractFromUpload({ job, clip }) {
 // extract switches to a backup model when the job's model has reached its limit (see GEMINI_FALLBACK_MODELS).
 export const defaultServices = { extract: extractPlacesWithFallback, extractFromUpload, checkVideo, geocode: geocodeCandidates };
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
 async function stopIfCancelled(job) {
   if (await Job.exists({ _id: job._id, state: 'cancelled' })) throw new JobCancelled();
 }
 
-async function extractWithRetries(job, clip, services) {
-  const { retryDelays } = aiConfig();
-  for (let attempt = 0; ; attempt++) {
-    try {
-      if (job.source === 'upload') return await services.extractFromUpload({ job, clip });
-      return await services.extract({
-        youtubeId: job.youtubeId,
-        // One clip covering the whole video is sent without offsets.
-        clipStart: clip.start,
-        clipEnd: clip.start === 0 && clip.end >= job.durationSec ? null : clip.end,
-        model: job.model,
-        highDetail: job.highDetail,
-      });
-    } catch (err) {
-      clip.attempts = attempt + 1;
-      // Gemini says whether trying again might help; other errors (a network hiccup) get another go.
-      const retryable = err.retryable ?? true;
-      if (!retryable || attempt >= retryDelays.length) throw err;
-      await sleep(retryDelays[attempt] * 1000);
-      await stopIfCancelled(job);
-    }
+// Asks Gemini about one clip, once. A failure that might pass is tried again
+// later (RetryLater), after each of AI_RETRY_DELAYS in turn; after the last,
+// the job fails with Gemini's reason. The tries are saved with the clip, so
+// they add up across the job's turns in the queue.
+async function extractClip(job, clip, services) {
+  try {
+    if (job.source === 'upload') return await services.extractFromUpload({ job, clip });
+    return await services.extract({
+      youtubeId: job.youtubeId,
+      // One clip covering the whole video is sent without offsets.
+      clipStart: clip.start,
+      clipEnd: clip.start === 0 && clip.end >= job.durationSec ? null : clip.end,
+      model: job.model,
+      highDetail: job.highDetail,
+    });
+  } catch (err) {
+    const { retryDelays } = aiConfig();
+    clip.attempts = (clip.attempts ?? 0) + 1;
+    job.markModified('clips');
+    await job.save();
+    // Gemini says whether trying again might help; other errors (a network hiccup) get another go.
+    const retryable = err.retryable ?? true;
+    if (!retryable || clip.attempts > retryDelays.length) throw err;
+    // When every model is resting, there's no point trying before the first is back.
+    const waitMs = Math.max(retryDelays[clip.attempts - 1] * 1000, (err.retryAt?.getTime() ?? 0) - Date.now());
+    throw new RetryLater(new Date(Date.now() + waitMs), err.message);
   }
 }
 
@@ -89,12 +102,17 @@ export async function removeOldUploads(dir = aiConfig().uploadDir, maxAgeMs = 2 
 }
 
 // An uploaded video file is deleted when its analysis ends, however it ends
-// (if the server stops, it stays for the analysis to carry on).
+// (if the server stops, or the analysis waits to try again, it stays for the
+// analysis to carry on).
 export async function runJob(job, services = defaultServices) {
+  let waiting = false;
   try {
     return await runStages(job, services);
+  } catch (err) {
+    waiting = err instanceof RetryLater;
+    throw err;
   } finally {
-    if (job.source === 'upload' && job.uploadPath) await rm(job.uploadPath, { force: true });
+    if (!waiting && job.source === 'upload' && job.uploadPath) await rm(job.uploadPath, { force: true });
   }
 }
 
@@ -121,7 +139,7 @@ async function runStages(job, services) {
     for (const clip of job.clips) {
       if (clip.status === 'done') continue;
       await stopIfCancelled(job);
-      const result = await extractWithRetries(job, clip, services);
+      const result = await extractClip(job, clip, services);
       // Priced (and remembered) by the model that actually answered, which may be a backup.
       const usage = { ...summarizeUsage(result.model ?? job.model, result.usage), model: result.model ?? job.model };
       Object.assign(clip, { status: 'done', raw: result.raw, answer: result.data, usage });

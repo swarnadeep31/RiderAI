@@ -71,6 +71,9 @@ const jobSchema = new mongoose.Schema(
     reusedFrom: { type: mongoose.Schema.Types.ObjectId, ref: 'Job' },
     error: String,
     attempts: { type: Number, default: 0 },
+    // While waiting to try again (Gemini was busy): when, and why.
+    retryAt: Date,
+    retryReason: String,
 
     // A worker "leases" the job while running it. If the server stops, the
     // lease runs out and the job continues from its last saved stage.
