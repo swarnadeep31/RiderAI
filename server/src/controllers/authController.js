@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto';
 import bcrypt from 'bcryptjs';
-import { endSession, startSession } from '../middleware/auth.js';
+import { endAllSessions, endSession, startSession } from '../middleware/auth.js';
 import { normalizePhone, User } from '../models/User.js';
 import { verifyGoogleCredential } from '../services/google.js';
 import { httpError } from '../utils/httpError.js';
@@ -75,7 +75,7 @@ export async function signup(req, res) {
     username: username ?? (await makeUsername(displayName)),
     passwordHash: await passwordWork.run(() => bcrypt.hash(password, HASH_ROUNDS)),
   });
-  startSession(res, user);
+  await startSession(res, user);
   res.status(201).json(user);
 }
 
@@ -90,7 +90,7 @@ export async function login(req, res) {
   // (No password is longer than sign-up allows, so a huge one isn't worth checking.)
   const correct = typeof password === 'string' && password.length <= 200 && (await passwordWork.run(() => bcrypt.compare(password, user.passwordHash)));
   if (!correct) throw httpError(401, 'Wrong password. Try again.');
-  startSession(res, user);
+  await startSession(res, user);
   res.json(user);
 }
 
@@ -126,7 +126,7 @@ export async function google(req, res) {
     }
   }
   if (user) {
-    startSession(res, user);
+    await startSession(res, user);
     return res.json({ user, existing: true, passwordRemoved });
   }
 
@@ -137,12 +137,18 @@ export async function google(req, res) {
     name: profile.name || profile.email.split('@')[0],
     username: await makeUsername(profile.name || profile.email),
   });
-  startSession(res, user);
+  await startSession(res, user);
   res.status(201).json({ user, existing: false, passwordRemoved });
 }
 
-export function logout(req, res) {
-  endSession(res);
+export async function logout(req, res) {
+  await endSession(req, res);
+  res.status(204).end();
+}
+
+// "Log out on all devices": for a lost phone, or a computer logged in somewhere else.
+export async function logoutEverywhere(req, res) {
+  await endAllSessions(req, res);
   res.status(204).end();
 }
 

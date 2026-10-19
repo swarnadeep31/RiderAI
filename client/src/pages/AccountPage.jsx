@@ -2,14 +2,36 @@ import { Link, useNavigate } from 'react-router';
 import { useAuth } from '../auth.jsx';
 import Icon, { INTEREST_ICON } from '../components/art/Icon.jsx';
 import { INTERESTS } from '../lib/onboarding.js';
+import { useConfirm, useToast } from '../notices.jsx';
 
 export default function AccountPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, logoutEverywhere } = useAuth();
   const navigate = useNavigate();
+  const confirm = useConfirm();
+  const toast = useToast();
 
+  // Home first: once logged out, this page would send you to the login page instead.
   async function handleLogout() {
-    await logout();
     navigate('/');
+    await logout();
+  }
+
+  // For a lost phone, or a computer you forgot to log out of.
+  async function handleLogoutEverywhere() {
+    const yes = await confirm({
+      title: 'Log out on all devices?',
+      message: 'Every phone and computer logged in to your account will be logged out, this one too. You can log in again any time.',
+      confirmLabel: 'Log out everywhere',
+      icon: 'globe',
+    });
+    if (!yes) return;
+    navigate('/');
+    try {
+      await logoutEverywhere();
+      toast('You were logged out on all your devices.');
+    } catch (err) {
+      toast(err.message, { tone: 'error' });
+    }
   }
 
   return (
@@ -56,6 +78,9 @@ export default function AccountPage() {
         </Link>
         <button type="button" onClick={handleLogout} className="btn-secondary">
           Log out
+        </button>
+        <button type="button" onClick={handleLogoutEverywhere} className="btn-ghost">
+          Log out on all devices
         </button>
       </div>
     </main>

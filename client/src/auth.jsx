@@ -41,6 +41,11 @@ export function AuthProvider({ children }) {
         await api.logout();
         setUser(null);
       },
+      // Every device this account is logged in on, this one included.
+      async logoutEverywhere() {
+        await api.logoutEverywhere();
+        setUser(null);
+      },
     }),
     [user],
   );
