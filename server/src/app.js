@@ -13,8 +13,26 @@ import { trailsRouter } from './routes/trails.js';
 import { googleClientId } from './services/google.js';
 import { roadRoutingAvailable } from './services/routing.js';
 
+// Sent with every answer. The API only answers with data (JSON), never pages,
+// so: nothing in an answer may run or load anything, no answer is shown inside
+// another site's frame, the browser never guesses a different content type,
+// and no address is passed on as the referrer.
+const SECURITY_HEADERS = {
+  'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
+  'X-Frame-Options': 'DENY',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'Cross-Origin-Resource-Policy': 'same-origin',
+};
+
 export function createApp() {
   const app = express();
+  // Don't announce what the server runs on.
+  app.disable('x-powered-by');
+  app.use((req, res, next) => {
+    res.set(SECURITY_HEADERS);
+    next();
+  });
   // Answers are JSON, which gzip makes about five times smaller: a long route
   // goes from ~760 KB to ~150 KB.
   app.use(compression());
