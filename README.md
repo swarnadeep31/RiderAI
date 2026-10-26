@@ -1,6 +1,6 @@
 # TrailCast
 
-**Adventure videos with the map beside them.**
+**Adventure videos with the map beside them.***
 
 Riders, trekkers and climbers post their trips on YouTube. TrailCast puts a map next to the video: the route they
 took, a dot that follows the video as it plays, and the places they talk about. Viewers can click a place to jump to
