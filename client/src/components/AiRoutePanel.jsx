@@ -4,6 +4,7 @@ import { formatTime, parseTime } from '../lib/time.js';
 import Icon from './art/Icon.jsx';
 import ErrorMessage from './ErrorMessage.jsx';
 import PlaceSearch from './PlaceSearch.jsx';
+import TripEnds from './TripEnds.jsx';
 
 const POLL_MS = 3000;
 
@@ -109,8 +110,13 @@ export const HIDDEN_REASONS = {
 const FLAGS = {
   not_found: "Couldn't find this on the map. Pick it with Change, or leave it unticked.",
   detour: 'This would send the route far off its way. Probably a different place with the same name.',
+  outside_area: 'Only found far from the way between the start and the end. Probably a different place with the same name.',
+  region_only: 'Only found as a whole state or region, not a spot on the route. Pick the town with Change.',
+  before_start: 'This comes before the ride sets off from the start, so it was left out.',
   low_confidence: 'The AI is not sure about this one.',
 };
+
+const ANCHORS = { start: 'Start', end: 'End' };
 
 function confidenceColour(confidence) {
   if (confidence >= 0.75) return 'bg-forest';
@@ -154,6 +160,7 @@ function CandidateRow({ place, onChange, onSeek }) {
               title={`AI confidence ${Math.round(place.confidence * 100)}%`}
             />
             <span className="font-semibold">{place.name}</span>
+            {place.anchor && <span className="tag ml-1.5 bg-ink text-paper">{ANCHORS[place.anchor]}</span>}
             {place.presence === 'mentioned' && <span className="ml-1 text-small text-ink-soft">(only mentioned)</span>}
           </p>
           {located ? (
@@ -162,7 +169,7 @@ function CandidateRow({ place, onChange, onSeek }) {
             <p className="text-small text-ink-soft">Not on the map yet</p>
           )}
           <p className="text-small text-ink-soft">
-            {EVIDENCE[place.evidence]}
+            {place.anchor ? `You gave this ${place.anchor === 'start' ? 'start' : 'end'}` : EVIDENCE[place.evidence]}
             {place.quote && <span className="italic"> · “{place.quote}”</span>}
           </p>
           <label className="mt-0.5 flex w-fit items-center gap-1.5 text-small text-ink">
@@ -248,9 +255,47 @@ function HiddenRangeRow({ range, onChange, onRemove }) {
   );
 }
 
+// Where the trip starts and ends, saved with the trail as soon as it's picked.
+// A trail added before the title was asked for gets YouTube's title to read them from.
+function TripSetting({ trail, onSaved }) {
+  const [ends, setEnds] = useState({ start: trail.startPlace ?? null, end: trail.endPlace ?? null });
+  const [title, setTitle] = useState(trail.videoTitle ?? '');
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (trail.videoTitle) return undefined;
+    let cancelled = false;
+    api.videoInfo(trail.youtubeId).then(
+      (info) => !cancelled && setTitle(info.title),
+      () => {},
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [trail.youtubeId, trail.videoTitle]);
+
+  async function save(next) {
+    setEnds(next);
+    setError(null);
+    try {
+      onSaved(await api.updateTrail(trail._id, { startPlace: next.start, endPlace: next.end, ...(!trail.videoTitle && title && { videoTitle: title }) }));
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  return (
+    <div className="space-y-2 rounded-[3px] bg-surface p-3 ring-1 ring-ink/15">
+      {title && <p className="text-small text-ink-soft">Video title: “{title}”</p>}
+      <TripEnds title={title} value={ends} onChange={save} />
+      {error && <ErrorMessage>{error}</ErrorMessage>}
+    </div>
+  );
+}
+
 // For videos without a GPX file: Gemini watches the video and lists the places
 // it passes; the owner checks them, and the route is drawn between them.
-export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, onAccepted }) {
+export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, onAccepted, onTrailChange }) {
   const [available, setAvailable] = useState(null);
   const [maxUploadMb, setMaxUploadMb] = useState(null);
   const [job, setJob] = useState(null);
@@ -382,6 +427,7 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
             Google's Gemini watches the video and lists the towns and landmarks it passes, with the moment each one
             appears. You check the list, then TrailCast draws the route through them. Works with public videos only.
           </p>
+          <TripSetting trail={trail} onSaved={onTrailChange} />
           {job?.state === 'failed' && <ErrorMessage>{job.error || 'The analysis failed.'}</ErrorMessage>}
           {job?.state === 'cancelled' && <p className="text-ink-soft">The last analysis was cancelled.</p>}
           {job?.state === 'needs_review' && (
@@ -448,6 +494,7 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
             <p className="text-ink-soft">
               Ticked places are added to the ride, and the route goes through them in order (blue on the map). Untick
               anything wrong, and use Change if a place landed in the wrong spot.
+              {job.trip && ' The start and end you gave are pinned on, and places were only looked for around the way between them.'}
               {job.reused
                 ? ' This video was analysed before, so this cost nothing.'
                 : job.costUsd > 0 && ` This analysis cost about ${usd(job.costUsd)}.`}

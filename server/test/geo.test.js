@@ -8,6 +8,7 @@ import {
   locationAtDistance,
   projectOnTrack,
   simplify,
+  thinSegments,
   timeAtDistance,
   timedTrack,
 } from '../src/utils/geo.js';
@@ -162,4 +163,24 @@ test('timedTrack carries heights through stops and thinning out', () => {
 
   const flat = timedTrack(points, [[[0, 0], [0, 0.02]]]);
   assert.ok(flat.trackElevations.every((h) => h === null), 'straight lines have no heights');
+});
+
+test('thinSegments keeps the shape of a road and the key points, with far fewer points', () => {
+  // A straight road with a point every ~11 m, then a sharp bend.
+  const straight = Array.from({ length: 101 }, (_, i) => [0, i / 10000, 100 + i]);
+  const bend = Array.from({ length: 50 }, (_, i) => [(i + 1) / 10000, 0.01]);
+  const [thinned] = thinSegments([[...straight, ...bend]]);
+  assert.deepEqual(thinned, [[0, 0, 100], [0, 0.01, 200], [0.005, 0.01]]);
+
+  // Still too many for maxPoints: thinned harder until it fits, ends kept.
+  const wiggly = Array.from({ length: 1000 }, (_, i) => [(i % 2) * 0.0005, i / 1000]);
+  const fitted = thinSegments([wiggly, wiggly.slice(0, 2)], 100);
+  assert.ok(fitted[0].length + fitted[1].length <= 100);
+  assert.deepEqual([fitted[0][0], fitted[0].at(-1)], [wiggly[0], wiggly.at(-1)]);
+  assert.deepEqual(fitted[1], wiggly.slice(0, 2));
+});
+
+test('timedTrack rounds drawn routes to about a metre', () => {
+  const { track } = timedTrack([{ time: 0 }, { time: 10 }], [[[22.1234567, 88.7654321], [22.2, 88.8]]]);
+  assert.deepEqual(track[0], [22.12346, 88.76543]);
 });

@@ -8,6 +8,7 @@ import { summarizeUsage } from '../src/aiRoute/cost.js';
 import { defaultServices } from '../src/aiRoute/pipeline.js';
 import {
   buildPrompt,
+  PLACES_SCHEMA,
   deleteUploadedVideo,
   extractPlaces,
   extractPlacesWithFallback,
@@ -75,6 +76,20 @@ test('fewer frames a second can be asked for, to use fewer tokens', async () => 
   const [videoPart, textPart] = gemini.requests[0].body.contents[0].parts;
   assert.deepEqual(videoPart.videoMetadata, { fps: 0.5 });
   assert.doesNotMatch(textPart.text, /NO SOUND/);
+});
+
+test("the prompt says where the trip starts and ends, as the trail's owner gave them", () => {
+  const prompt = buildPrompt({
+    wholeVideo: true,
+    trip: { title: 'Kolkata to Ladakh | EP1 Kolkata to Dehri', start: { name: 'Kolkata' }, end: { name: 'Dehri' } },
+  });
+  assert.match(prompt, /The video is called "Kolkata to Ladakh \| EP1 Kolkata to Dehri"\. The person who added it says the trip in it goes from "Kolkata" to "Dehri"\./);
+  assert.match(prompt, /start_time is when the traveller sets off from "Kolkata"; anything before that is the intro/);
+  assert.match(prompt, /end_time is when they reach "Dehri"/);
+  // The owner's words stay inside their quotes.
+  assert.match(buildPrompt({ wholeVideo: true, trip: { title: 'Manali "to"\nLeh' } }), /The video is called "Manali to Leh"\. Titles often say/);
+  assert.doesNotMatch(buildPrompt({ wholeVideo: true }), /The video is called/);
+  assert.ok(PLACES_SCHEMA.properties.start_time && PLACES_SCHEMA.properties.end_time);
 });
 
 test('the prompt only mentions sound when the video has none', () => {

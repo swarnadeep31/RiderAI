@@ -75,6 +75,44 @@ describe('trails', () => {
     }
   });
 
+  test("takes the video's full title from YouTube, which says where the trip starts and ends", async () => {
+    const youtube = await startFakeService(({ url }) =>
+      url.includes('aBcD3fGh1_-') ? [200, { title: 'Kolkata to Ladakh | EP1 Kolkata to Dehri', author_name: 'Rider' }] : [404, {}],
+    );
+    const saved = process.env.YOUTUBE_OEMBED_URL;
+    process.env.YOUTUBE_OEMBED_URL = `${youtube.url}/oembed`;
+    try {
+      // While adding a trail, the form asks what the video is called.
+      const info = await alice.get('/api/trails/video-info').query({ url: 'https://youtu.be/aBcD3fGh1_-' });
+      assert.equal(info.status, 200, JSON.stringify(info.body));
+      assert.deepEqual(info.body, { youtubeId: 'aBcD3fGh1_-', title: 'Kolkata to Ladakh | EP1 Kolkata to Dehri', channel: { name: 'Rider' } });
+      assert.equal((await alice.get('/api/trails/video-info').query({ url: 'https://youtu.be/zzzzzzzzzzz' })).status, 404);
+      assert.equal((await alice.get('/api/trails/video-info').query({ url: 'not a link' })).status, 400);
+      assert.equal((await request(app).get('/api/trails/video-info').query({ url: 'https://youtu.be/aBcD3fGh1_-' })).status, 401);
+
+      // Saved with the trail when the form doesn't send one; the owner's own wins.
+      assert.equal((await createTrail()).videoTitle, 'Kolkata to Ladakh | EP1 Kolkata to Dehri');
+      assert.equal((await createTrail({ videoTitle: 'Kolkata to Dehri' })).videoTitle, 'Kolkata to Dehri');
+    } finally {
+      process.env.YOUTUBE_OEMBED_URL = saved;
+      await youtube.close();
+    }
+  });
+
+  test('keeps where the trip starts and ends, checked like any place', async () => {
+    const kolkata = { name: ' Kolkata ', label: 'Kolkata, West Bengal, India', lat: 22.5726, lng: 88.3639, extra: 'ignored' };
+    const trail = await createTrail({ startPlace: kolkata, endPlace: { name: 'Dehri', lat: 24.9, lng: 84.18 } });
+    assert.deepEqual(trail.startPlace, { name: 'Kolkata', label: 'Kolkata, West Bengal, India', lat: 22.5726, lng: 88.3639 });
+    assert.deepEqual(trail.endPlace, { name: 'Dehri', label: '', lat: 24.9, lng: 84.18 });
+
+    const bad = await alice.patch(`/api/trails/${trail._id}`).send({ endPlace: { name: 'Nowhere', lat: 95, lng: 84 } });
+    assert.equal(bad.status, 400);
+    assert.match(bad.body.error, /Latitude/);
+    const cleared = await alice.patch(`/api/trails/${trail._id}`).send({ endPlace: null });
+    assert.equal(cleared.body.endPlace, null);
+    assert.equal(cleared.body.startPlace.name, 'Kolkata');
+  });
+
   test('a trail is saved even when YouTube can\'t be reached', async () => {
     const trail = await createTrail();
     assert.equal(trail.channel, undefined);

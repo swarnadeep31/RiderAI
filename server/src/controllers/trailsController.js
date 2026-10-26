@@ -1,18 +1,32 @@
 import mongoose from 'mongoose';
 import { Job } from '../models/Job.js';
 import { RouteServices } from '../models/RouteServices.js';
-import { MAX_TRACK_POINTS, ROUTE_STYLES, Trail } from '../models/Trail.js';
+import { ROUTE_STYLES, Trail } from '../models/Trail.js';
 import { queueRouteEnrich } from '../routeExtras/enrich.js';
 import { profileForTrack } from '../routeExtras/profile.js';
 import { routeSegments } from '../services/routing.js';
-import { fetchChannel } from '../services/youtubeInfo.js';
-import { timedTrack } from '../utils/geo.js';
+import { fetchChannel, fetchVideoInfo } from '../services/youtubeInfo.js';
+import { thinSegments, timedTrack } from '../utils/geo.js';
 import { httpError } from '../utils/httpError.js';
 import { concurrencyLimit } from '../utils/limit.js';
 import { parseYouTubeId } from '../utils/youtube.js';
 
 // Only these fields can be set from a request; anything else in the body is ignored.
-const TRAIL_FIELDS = ['title', 'description', 'activity', 'supportUrl', 'track', 'trackTimes', 'recordedAt', 'videoStartsAt', 'daysOverride', 'creatorName'];
+const TRAIL_FIELDS = [
+  'title',
+  'description',
+  'activity',
+  'supportUrl',
+  'track',
+  'trackTimes',
+  'recordedAt',
+  'videoStartsAt',
+  'daysOverride',
+  'creatorName',
+  'videoTitle',
+  'startPlace',
+  'endPlace',
+];
 const POINT_FIELDS = ['name', 'note', 'time', 'lat', 'lng', 'stopKind'];
 // Only who owns a trail (so the page knows who may edit it), not their name:
 // the page credits the video's creator instead.
@@ -32,6 +46,7 @@ export const TRAIL_DEFAULTS = {
   description: '',
   activity: 'ride',
   creatorName: '',
+  videoTitle: '',
   supportUrl: '',
   track: [],
   trackTimes: [],
@@ -128,6 +143,10 @@ function sortPoints(trail) {
   trail.markModified('points');
 }
 
+// A drawn route is an estimate: this many points is plenty for its shape, and
+// keeps a long trip quick to send, and smooth to follow on a phone.
+export const MAX_DRAWN_POINTS = 10000;
+
 // Draws the route through the key points in video order, with estimated times
 // so the map can follow the video. Returns a notice if it fell back to straight lines.
 export async function drawRouteFromPoints(trail) {
@@ -139,7 +158,7 @@ export async function drawRouteFromPoints(trail) {
   }
   const previousTrack = JSON.stringify(trail.track);
   const { segments, notice } = await routeSegments(points, trail.routeStyle);
-  const { track, trackTimes, trackElevations } = timedTrack(points, segments, MAX_TRACK_POINTS);
+  const { track, trackTimes, trackElevations } = timedTrack(points, thinSegments(segments, MAX_DRAWN_POINTS), MAX_DRAWN_POINTS);
   // The times are video times already, so the video and route need no lining up.
   trail.set({ track, trackTimes, routeSource: 'keypoints', videoStartsAt: 0, recordedAt: undefined });
   const version = trail.routeVersion;
@@ -178,9 +197,21 @@ export async function createTrail(req, res) {
     routeVersion: fields.track?.length ? 1 : 0,
   });
   if (fields.track?.length) setProfile(trail, elevationsFrom(req.body, fields.track), 'gpx');
-  trail.channel = (await fetchChannel(trail.youtubeId)) ?? undefined;
+  const info = await fetchVideoInfo(trail.youtubeId);
+  trail.channel = info?.channel ?? undefined;
+  if (!trail.videoTitle && info?.title) trail.videoTitle = info.title;
   await saveTrail(trail, 0);
   await sendTrail(res, trail, { status: 201 });
+}
+
+// A YouTube video's title and channel, for the form that adds a trail: the
+// title usually says where the trip starts and ends.
+export async function videoInfo(req, res) {
+  const youtubeId = parseYouTubeId(String(req.query.url ?? ''));
+  if (!youtubeId) throw httpError(400, "That doesn't look like a YouTube video link.");
+  const info = await fetchVideoInfo(youtubeId);
+  if (!info) throw httpError(404, "YouTube didn't say what this video is called (it may be private, or YouTube can't be reached). Type the title instead.");
+  res.json({ youtubeId, title: info.title, channel: info.channel });
 }
 
 export async function getTrail(req, res) {
@@ -208,7 +239,9 @@ export async function updateTrail(req, res) {
     const youtubeId = youtubeIdFrom(req.body);
     if (youtubeId !== trail.youtubeId) {
       trail.youtubeId = youtubeId;
-      trail.channel = (await fetchChannel(youtubeId)) ?? undefined;
+      const info = await fetchVideoInfo(youtubeId);
+      trail.channel = info?.channel ?? undefined;
+      if (fields.videoTitle === undefined) trail.videoTitle = info?.title ?? '';
     }
   }
   await saveTrail(trail, version);

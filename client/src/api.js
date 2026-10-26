@@ -44,6 +44,8 @@ export const api = {
   // The newest trails, a page at a time: `before` is the last trail already shown.
   listTrails: (before) => request(before ? `/trails?before=${encodeURIComponent(before)}` : '/trails'),
   getTrail: (id) => request(`/trails/${id}`),
+  // A YouTube video's title and channel (the title usually says where the trip goes).
+  videoInfo: (url) => request(`/trails/video-info?url=${encodeURIComponent(url)}`),
   createTrail: (trail) => request('/trails', { method: 'POST', body: trail }),
   updateTrail: (id, changes) => request(`/trails/${id}`, { method: 'PATCH', body: changes }),
   deleteTrail: (id) => request(`/trails/${id}`, { method: 'DELETE' }),

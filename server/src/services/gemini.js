@@ -8,8 +8,10 @@ import { aiConfig } from '../config.js';
 import { formatClock } from '../utils/time.js';
 
 // A new version means analyses made with an older prompt aren't reused.
-// v2 adds stay_kind (a break, or a night's stay).
-export const PROMPT_VERSION = 'videoPlaces.v2';
+// v2 adds stay_kind (a break, or a night's stay). v3 tells Gemini where the
+// trip starts and ends (from the video's title), and asks when it sets off
+// (start_time) and arrives (end_time).
+export const PROMPT_VERSION = 'videoPlaces.v3';
 const PROMPT = readFileSync(new URL(`../prompts/${PROMPT_VERSION}.md`, import.meta.url), 'utf8');
 
 // The answer Gemini must give (JSON Schema). The server checks it again before use.
@@ -36,6 +38,8 @@ export const PLACES_SCHEMA = {
         },
       },
     },
+    start_time: { type: 'string', description: 'H:MM:SS or MM:SS: when the traveller sets off from the start' },
+    end_time: { type: 'string', description: 'H:MM:SS or MM:SS: when the traveller reaches the end' },
     hidden_ranges: {
       type: 'array',
       items: {
@@ -51,7 +55,26 @@ export const PLACES_SCHEMA = {
   },
 };
 
-export function buildPrompt({ clipStart, clipEnd, wholeVideo, noAudio = false, soundOnly = false }) {
+// Text from the trail's owner goes into the prompt as plain words in quotes.
+const quoted = (value) => `"${String(value ?? '').replace(/["\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200)}"`;
+
+// What the owner said about the trip: the video's title, and where it starts
+// and ends (trip: { title, start: { name }, end: { name } }, any of them may be missing).
+function tripNote(trip) {
+  const title = trip?.title?.trim() ? ` The video is called ${quoted(trip.title)}.` : '';
+  const start = trip?.start?.name;
+  const end = trip?.end?.name;
+  if (!start && !end) return title && `${title} Titles often say where the trip starts and ends.`;
+  const way = start && end ? `from ${quoted(start)} to ${quoted(end)}` : start ? `from ${quoted(start)}` : `to ${quoted(end)}`;
+  return (
+    `${title} The person who added it says the trip in it goes ${way}.` +
+    (start ? ` Its start_time is when the traveller sets off from ${quoted(start)}; anything before that is the intro.` : '') +
+    (end ? ` Its end_time is when they reach ${quoted(end)}.` : '') +
+    ' A place far off the way between the start and the end is usually only talked about (a plan, a memory): use presence = "mentioned" unless the traveller is clearly there.'
+  );
+}
+
+export function buildPrompt({ clipStart, clipEnd, wholeVideo, noAudio = false, soundOnly = false, trip = null }) {
   const part = wholeVideo ? 'all' : `the part from ${formatClock(clipStart)} to ${formatClock(clipEnd)}`;
   const timeNote = wholeVideo ? '' : ', counted from the start of the whole video';
   let soundNote = '';
@@ -60,7 +83,7 @@ export function buildPrompt({ clipStart, clipEnd, wholeVideo, noAudio = false, s
     soundNote =
       ' You only have the SOUND of this video, no picture: use what is said. Evidence is "speech" unless a sign or milestone is read out.';
   }
-  return PROMPT.replace('{{part}}', part).replace('{{timeNote}}', timeNote).replace('{{soundNote}}', soundNote);
+  return PROMPT.replace('{{part}}', part).replace('{{trip}}', tripNote(trip)).replace('{{timeNote}}', timeNote).replace('{{soundNote}}', soundNote);
 }
 
 function client() {
@@ -138,7 +161,8 @@ function explain(err) {
 // 0.5 = one frame every 2 seconds, half the picture tokens). noAudio: the file
 // has no sound, so the prompt says to rely on what is seen. soundOnly: the
 // file is only the sound, so the prompt says to rely on what is said.
-export async function extractPlaces({ youtubeId, file, clipStart = 0, clipEnd = null, model, highDetail, thinkingLevel, fps, noAudio = false, soundOnly = false }) {
+// trip: what the owner said about the trip (see tripNote).
+export async function extractPlaces({ youtubeId, file, clipStart = 0, clipEnd = null, model, highDetail, thinkingLevel, fps, noAudio = false, soundOnly = false, trip = null }) {
   const config = aiConfig();
   model ??= config.model;
   highDetail ??= config.highDetail;
@@ -159,7 +183,7 @@ export async function extractPlaces({ youtubeId, file, clipStart = 0, clipEnd = 
   try {
     response = await client().models.generateContent({
       model,
-      contents: [{ role: 'user', parts: [videoPart, { text: buildPrompt({ clipStart, clipEnd, wholeVideo, noAudio, soundOnly }) }] }],
+      contents: [{ role: 'user', parts: [videoPart, { text: buildPrompt({ clipStart, clipEnd, wholeVideo, noAudio, soundOnly, trip }) }] }],
       config: {
         responseMimeType: 'application/json',
         responseJsonSchema: PLACES_SCHEMA,

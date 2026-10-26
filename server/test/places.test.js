@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import request from 'supertest';
-import { clearPlaceCache } from '../src/services/places.js';
+import { clearPlaceCache, searchPlaces } from '../src/services/places.js';
 import { app, signedUpAgent, startFakeService, useTestDatabase } from './helpers.js';
 
 useTestDatabase();
@@ -39,6 +39,7 @@ test('finds places by name, for logged-in users', async () => {
     description: 'Rohtang Pass, Kullu, Himachal Pradesh, India',
     lat: 32.3716,
     lng: 77.2466,
+    coarse: false,
   });
   assert.equal(res.body[1].name, 'Rohtang');
 
@@ -91,12 +92,65 @@ test('when Nominatim refuses (as it often does on shared cloud servers), OpenRou
     const res = await agent.get('/api/places').query({ q: 'Sonamarg' });
     assert.equal(res.status, 200, JSON.stringify(res.body));
     // The position from OpenRouteService, and a label without its country (it puts Kashmir in Pakistan).
-    assert.deepEqual(res.body, [{ name: 'Sonamarg', description: 'Sonamarg, Ganderbal, Jammu and Kashmir', lat: 34.304, lng: 75.298 }]);
+    assert.deepEqual(res.body, [{ name: 'Sonamarg', description: 'Sonamarg, Ganderbal, Jammu and Kashmir', lat: 34.304, lng: 75.298, coarse: false }]);
     const sent = ors.requests.at(-1);
     assert.match(sent.url, /^\/geocode\/search\?/);
     assert.equal(new URL(sent.url, 'http://x').searchParams.get('text'), 'Sonamarg');
     assert.equal(sent.headers.authorization, 'test-key', 'the key goes in a header, not the address');
     assert.equal(new URL(sent.url, 'http://x').searchParams.get('api_key'), null);
+  } finally {
+    failing = false;
+    delete process.env.ORS_API_KEY;
+    delete process.env.ORS_BASE_URL;
+    await ors.close();
+  }
+});
+
+test('can keep to a box, and says which results are whole regions', async () => {
+  const nominatimBox = await startFakeService(() => [
+    200,
+    [
+      { name: 'Bihar', display_name: 'Bihar, India', lat: '25.6', lon: '85.1', place_rank: 8 },
+      { name: 'Dehri', display_name: 'Dehri, Rohtas, Bihar, India', lat: '24.9', lon: '84.18', place_rank: 16 },
+    ],
+  ]);
+  const saved = process.env.NOMINATIM_BASE_URL;
+  process.env.NOMINATIM_BASE_URL = nominatimBox.url;
+  try {
+    clearPlaceCache();
+    const found = await searchPlaces('Dehri', { near: [24, 85], within: { south: 21, west: 82.7, north: 26.4, east: 89.9 } });
+    assert.deepEqual(found.map((p) => [p.name, p.coarse]), [['Bihar', true], ['Dehri', false]]);
+    const sent = new URL(nominatimBox.requests.at(-1).url, 'http://x').searchParams;
+    assert.equal(sent.get('viewbox'), '82.7,26.4,89.9,21');
+    assert.equal(sent.get('bounded'), '1');
+  } finally {
+    process.env.NOMINATIM_BASE_URL = saved;
+    await nominatimBox.close();
+  }
+});
+
+test('OpenRouteService keeps to the box too, and its whole regions are marked', async () => {
+  const ors = await startFakeService(() => [
+    200,
+    {
+      features: [
+        { geometry: { coordinates: [88, 24] }, properties: { name: 'West Bengal', layer: 'region' } },
+        { geometry: { coordinates: [87.31, 23.52] }, properties: { name: 'Durgapur', layer: 'locality', region: 'West Bengal' } },
+      ],
+    },
+  ]);
+  process.env.ORS_BASE_URL = ors.url;
+  process.env.ORS_API_KEY = 'test-key';
+  failing = true;
+  try {
+    clearPlaceCache();
+    const found = await searchPlaces('Durgapur', { near: [22.57, 88.36], within: { south: 21, west: 82.7, north: 26.4, east: 89.9 } });
+    assert.deepEqual(found.map((p) => [p.name, p.coarse]), [['West Bengal', true], ['Durgapur', false]]);
+    const sent = new URL(ors.requests.at(-1).url, 'http://x').searchParams;
+    assert.deepEqual(
+      ['boundary.rect.min_lat', 'boundary.rect.min_lon', 'boundary.rect.max_lat', 'boundary.rect.max_lon', 'focus.point.lat'].map((key) => sent.get(key)),
+      ['21', '82.7', '26.4', '89.9', '22.57'],
+    );
   } finally {
     failing = false;
     delete process.env.ORS_API_KEY;

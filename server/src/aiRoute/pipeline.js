@@ -13,6 +13,7 @@ import { checkVideo } from '../services/youtubeInfo.js';
 import { addUsage, summarizeUsage } from './cost.js';
 import { cleanClip, mergeClips, planClips } from './clean.js';
 import { geocodeCandidates } from './geocode.js';
+import { pinTripEnds, tripArea } from './trip.js';
 
 export class JobCancelled extends Error {}
 
@@ -46,7 +47,7 @@ async function extractFromUpload({ job, clip }) {
       throw err;
     }
     uploaded = await uploadVideo(path, { mimeType: soundOnly ? 'audio/mp4' : 'video/mp4' });
-    return await extractPlacesWithFallback({ file: uploaded, model: job.model, highDetail: job.highDetail, noAudio, soundOnly });
+    return await extractPlacesWithFallback({ file: uploaded, model: job.model, highDetail: job.highDetail, noAudio, soundOnly, trip: tripFor(job) });
   } finally {
     if (uploaded) await deleteUploadedVideo(uploaded.name);
     await rm(dir, { recursive: true, force: true });
@@ -56,6 +57,11 @@ async function extractFromUpload({ job, clip }) {
 // The outside services, replaceable in tests.
 // extract switches to a backup model when the job's model has reached its limit (see GEMINI_FALLBACK_MODELS).
 export const defaultServices = { extract: extractPlacesWithFallback, extractFromUpload, checkVideo, geocode: geocodeCandidates };
+
+// What the trail's owner said about the trip: { title, start, end } (see trip.js).
+function tripFor(job) {
+  return { title: job.trip?.title ?? '', start: job.trip?.start ?? null, end: job.trip?.end ?? null };
+}
 
 async function stopIfCancelled(job) {
   if (await Job.exists({ _id: job._id, state: 'cancelled' })) throw new JobCancelled();
@@ -75,6 +81,7 @@ async function extractClip(job, clip, services) {
       clipEnd: clip.start === 0 && clip.end >= job.durationSec ? null : clip.end,
       model: job.model,
       highDetail: job.highDetail,
+      trip: tripFor(job),
     });
   } catch (err) {
     const { retryDelays } = aiConfig();
@@ -128,6 +135,8 @@ async function runStages(job, services) {
       const video = await services.checkVideo(job.youtubeId);
       if (!video.ok) throw new Error(video.reason);
       job.videoTitle = video.title;
+      // The owner didn't give the title: YouTube's tells Gemini where the trip goes.
+      if (!job.trip?.title && video.title) job.set('trip.title', video.title);
     }
     job.clips = planClips(job.durationSec, config.clipMinutes).map((c) => ({ ...c, status: 'pending' }));
     job.stage = 'extract';
@@ -155,7 +164,9 @@ async function runStages(job, services) {
   if (job.stage === 'clean') {
     // Clips cut from an uploaded file start at 0, so their times count from the clip's start.
     const cleaned = job.clips.map((clip) => cleanClip(clip.answer, clip, job.durationSec, { relative: job.source === 'upload' }));
-    const { candidates, hiddenRanges } = mergeClips(cleaned, { minConfidence: config.minConfidence });
+    const merged = mergeClips(cleaned, { minConfidence: config.minConfidence });
+    // The start and end the owner gave are pinned on, with the intro before the start.
+    const { candidates, hiddenRanges } = pinTripEnds(merged, tripFor(job), job.durationSec);
     job.result = { candidates, hiddenRanges };
     job.stage = 'geocode';
     job.progress = { done: 0, total: candidates.length };
@@ -164,7 +175,10 @@ async function runStages(job, services) {
 
   if (job.stage === 'geocode') {
     const candidates = job.result.candidates;
+    const trip = tripFor(job);
     await services.geocode(candidates, {
+      start: trip.start,
+      area: tripArea(trip),
       onProgress: async (done, total) => {
         job.progress = { done, total };
         if (done % 5 === 0 || done === total) {

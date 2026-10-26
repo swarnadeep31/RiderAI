@@ -151,6 +151,18 @@ export function simplify(track, toleranceM) {
   return [...keep.keys()].filter((i) => keep[i]);
 }
 
+// Routes drawn along roads come with a point every few metres. Thinning each
+// piece to within toleranceM of the road keeps its shape, and the key points
+// at its ends, and makes it several times lighter to send and to draw. A
+// route that still has more than maxPoints is thinned more, until it fits.
+export function thinSegments(segments, maxPoints = Infinity, toleranceM = 5) {
+  for (let tolerance = toleranceM; ; tolerance *= 2) {
+    const thinned = segments.map((segment) => simplify(segment, tolerance).map((i) => segment[i]));
+    const total = thinned.reduce((sum, segment) => sum + segment.length, 0);
+    if (total <= maxPoints || tolerance > 10000) return thinned;
+  }
+}
+
 // Joins the route pieces between neighbouring key points into one track, and
 // estimates when (in video seconds) each track point is passed: between two
 // key points, time moves on in step with the distance travelled. A key point
@@ -163,7 +175,8 @@ export function timedTrack(points, segments, maxPoints = Infinity) {
   let trackTimes = [];
   let trackElevations = [];
   const push = (location, time) => {
-    track.push([round(location[0], 6), round(location[1], 6)]);
+    // 5 decimals: about a metre, closer than any drawn route is.
+    track.push([round(location[0], 5), round(location[1], 5)]);
     trackTimes.push(round(time, 1));
     trackElevations.push(Number.isFinite(location[2]) ? round(location[2], 1) : null);
   };

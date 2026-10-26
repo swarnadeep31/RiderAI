@@ -126,3 +126,15 @@ test('planClips splits long videos with a minute of overlap', () => {
     { start: 7080, end: 9000 },
   ]);
 });
+
+test('when the trip sets off and arrives: from each clip, then the earliest and the latest', () => {
+  const first = cleanClip({ places: [], hidden_ranges: [], start_time: '5:18' }, { start: 0, end: 1200 }, 3000);
+  const second = cleanClip({ places: [], hidden_ranges: [], start_time: '1:00', end_time: '8:00' }, { start: 1140, end: 2340 }, 3000);
+  const neither = cleanClip({ places: [], hidden_ranges: [], start_time: 'soon' }, { start: 2280, end: 3000 }, 3000);
+  assert.deepEqual([first.startTime, first.endTime], [318, null]);
+  // Clip times: this clip starts at 19:00.
+  assert.deepEqual([second.startTime, second.endTime], [1200, 1620]);
+  assert.deepEqual([neither.startTime, neither.endTime], [null, null]);
+  const merged = mergeClips([first, second, neither], { minConfidence: 0.5 });
+  assert.deepEqual([merged.startTime, merged.endTime], [318, 1620]);
+});

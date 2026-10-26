@@ -5,6 +5,7 @@ import { mkdir, rm, statfs } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { tripKey, tripOf } from '../aiRoute/trip.js';
 import { aiConfig } from '../config.js';
 import { Job, MEDIA_MODES } from '../models/Job.js';
 import { PROMPT_VERSION } from '../services/gemini.js';
@@ -27,6 +28,8 @@ export function jobView(job) {
     retryAt: job.state === 'queued' ? (job.retryAt ?? null) : null,
     retryReason: job.state === 'queued' ? (job.retryReason ?? null) : null,
     videoTitle: job.videoTitle ?? '',
+    // The start and end the places were pinned between, if the owner gave them.
+    trip: job.trip?.start || job.trip?.end ? { start: job.trip.start ?? null, end: job.trip.end ?? null } : null,
     model: job.model,
     // The models that answered: a backup when the main one had reached its limit.
     modelsUsed: [...new Set((job.clips ?? []).map((clip) => clip.usage?.model).filter(Boolean))],
@@ -88,8 +91,10 @@ async function checkLimits(user, config) {
 // An earlier analysis with the same settings, given again for free.
 async function reuse(previous, { trail, user, durationSec }) {
   if (!previous?.result?.candidates) return null;
-  const { type, source, mediaMode, youtubeId, fileHash, model, promptVersion, highDetail, videoTitle, result } = previous;
+  const { type, source, mediaMode, youtubeId, fileHash, model, promptVersion, highDetail, videoTitle, trip, tripKey: key, result } = previous;
   return Job.create({
+    trip,
+    tripKey: key,
     type,
     source,
     mediaMode,
@@ -117,7 +122,9 @@ export async function startAiRoute(req, res) {
   const trail = await trailReadyForAi(req, config);
   const durationSec = checkDuration(req.body?.durationSec, config);
   const highDetail = highDetailFrom(req.body?.highDetail, config);
-  const settings = { type: 'ai-route', youtubeId: trail.youtubeId, model: config.model, promptVersion: PROMPT_VERSION, highDetail };
+  // Where the trip starts and ends: the same video with other ends is another analysis.
+  const trip = tripOf(trail);
+  const settings = { type: 'ai-route', youtubeId: trail.youtubeId, model: config.model, promptVersion: PROMPT_VERSION, highDetail, tripKey: tripKey(trip) };
 
   // Someone already analysed this video with the same settings: reuse it, free.
   if (!req.body?.fresh) {
@@ -127,7 +134,7 @@ export async function startAiRoute(req, res) {
   }
 
   await checkLimits(req.user, config);
-  const job = await Job.create({ ...settings, trail: trail._id, user: req.user._id, durationSec });
+  const job = await Job.create({ ...settings, trip, trail: trail._id, user: req.user._id, durationSec });
   res.status(202).json(jobView(job));
 }
 
@@ -237,7 +244,18 @@ async function receiveUpload(req, res, config) {
     } catch {
       // A name that isn't properly encoded: keep the plain title.
     }
-    const settings = { type: 'ai-route', source: 'upload', mediaMode, youtubeId: trail.youtubeId, fileHash, model: config.model, promptVersion: PROMPT_VERSION, highDetail };
+    const trip = tripOf(trail);
+    const settings = {
+      type: 'ai-route',
+      source: 'upload',
+      mediaMode,
+      youtubeId: trail.youtubeId,
+      fileHash,
+      model: config.model,
+      promptVersion: PROMPT_VERSION,
+      highDetail,
+      tripKey: tripKey(trip),
+    };
 
     // The same file was analysed the same way before: reuse it, free.
     const previous = await Job.findOne({ ...settings, state: READY }).sort({ createdAt: -1 });
@@ -247,7 +265,7 @@ async function receiveUpload(req, res, config) {
       return res.status(201).json(jobView(reused));
     }
 
-    const job = await Job.create({ ...settings, uploadPath, videoTitle, trail: trail._id, user: req.user._id, durationSec });
+    const job = await Job.create({ ...settings, trip, uploadPath, videoTitle, trail: trail._id, user: req.user._id, durationSec });
     keep = true;
     res.status(202).json(jobView(job));
   } finally {

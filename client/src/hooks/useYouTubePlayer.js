@@ -31,11 +31,15 @@ const PLAYER_ERRORS = {
 };
 
 const PLAYING = 1; // YT.PlayerState.PLAYING
+const MAX_GLIDE_S = 1;
 
 // Puts a YouTube player inside the element `containerRef` points to, and
 // reports the playback time 4 times a second so the map can follow along.
 // `clock.now()` estimates the time between those reports (from how long ago
-// the last one was and the playback speed), so the map marker can glide.
+// the last one was and the playback speed), so the map marker can glide. It
+// never runs more than a second past the last report: when reports stall (a
+// busy phone, the video buffering), the marker waits instead of running
+// ahead and jumping back.
 export function useYouTubePlayer(videoId) {
   const containerRef = useRef(null);
   const playerRef = useRef(null);
@@ -49,7 +53,7 @@ export function useYouTubePlayer(videoId) {
       playing: false,
       rate: 1,
       now() {
-        return this.playing ? this.time + ((performance.now() - this.at) / 1000) * this.rate : this.time;
+        return this.playing ? this.time + Math.min((performance.now() - this.at) / 1000, MAX_GLIDE_S) * this.rate : this.time;
       },
     };
   }

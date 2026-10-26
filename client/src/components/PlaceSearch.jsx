@@ -4,8 +4,9 @@ import ErrorMessage from './ErrorMessage.jsx';
 
 // "Rohtang Pass" -> a list of matching places to pick from. Searches only when
 // asked (button or Enter), as the free OpenStreetMap search service requires.
-export default function PlaceSearch({ onPick }) {
-  const [query, setQuery] = useState('');
+// initialQuery: a name to start from (e.g. read from the video's title).
+export default function PlaceSearch({ onPick, initialQuery = '', label = 'Search for a place', placeholder = 'Search for a place, e.g. Rohtang Pass' }) {
+  const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
   const [searching, setSearching] = useState(false);
@@ -42,8 +43,8 @@ export default function PlaceSearch({ onPick }) {
               search();
             }
           }}
-          placeholder="Search for a place, e.g. Rohtang Pass"
-          aria-label="Search for a place"
+          placeholder={placeholder}
+          aria-label={label}
           className="field min-w-0 flex-1"
         />
         <button
