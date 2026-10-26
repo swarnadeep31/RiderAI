@@ -34,17 +34,17 @@ export default function RoutePanel({ trail, onDrawn }) {
   }
 
   return (
-    <div className="space-y-2 text-sm">
-      <h3 className="font-display text-base font-bold text-ink">No GPS file? Draw the route from your key points</h3>
+    <div className="space-y-3">
+      <h3 className="font-display text-[1.3rem] leading-tight font-semibold">No GPS file? Draw the route through your places</h3>
       {trail.points.length < 2 ? (
-        <p className="text-stone-600">
-          Add a key point each time the video reaches a new place (where it starts, the next town, the pass...).
+        <p className="text-ink-soft">
+          Add a place each time the video reaches a new one (where it starts, the next town, the pass...).
           With two or more, TrailCast can join them into a route.
         </p>
       ) : (
         <>
-          <p className="text-stone-600">
-            TrailCast joins your key points in video order, and the blue dot moves between them as the video plays.
+          <p className="text-ink-soft">
+            TrailCast joins your places in video order, and the blue dot moves between them as the video plays.
           </p>
           <fieldset className="space-y-1">
             <legend className="sr-only">How should the route travel?</legend>
@@ -56,7 +56,7 @@ export default function RoutePanel({ trail, onDrawn }) {
             ))}
           </fieldset>
           {!roadRouting && style !== 'straight' && (
-            <p className="text-amber-800">
+            <p className="text-contour">
               This server has no OpenRouteService key yet (ORS_API_KEY), so you'll get straight lines for now.
             </p>
           )}
@@ -69,7 +69,7 @@ export default function RoutePanel({ trail, onDrawn }) {
           >
             {drawing ? 'Drawing...' : drawn ? 'Redraw route' : 'Draw route'}
           </button>
-          {drawn && <p className="text-stone-600">The route updates by itself when you add, move or remove key points.</p>}
+          {drawn && <p className="text-ink-soft">The route updates by itself when you add, move or remove places.</p>}
         </>
       )}
     </div>

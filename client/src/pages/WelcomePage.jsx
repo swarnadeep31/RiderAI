@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { api } from '../api.js';
 import { useAuth } from '../auth.jsx';
 import Icon, { INTEREST_ICON } from '../components/art/Icon.jsx';
-import { CampScene } from '../components/art/Scenery.jsx';
 import ErrorMessage from '../components/ErrorMessage.jsx';
 import { INTERESTS, REFERRAL_SOURCES } from '../lib/onboarding.js';
 import { safeNext } from '../lib/redirect.js';
@@ -42,22 +41,15 @@ export default function WelcomePage() {
   }
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-10">
-      <div className="card overflow-hidden motion-safe:animate-fade-up">
-        <div className="flex flex-col items-center gap-5 bg-linear-to-b from-orange-50 to-surface px-6 pt-8 pb-2 text-center sm:flex-row sm:text-left">
-          <CampScene className="w-40 shrink-0 drop-shadow-lg" />
-          <div>
-            <h1 className="text-3xl font-extrabold text-ink">Welcome to TrailCast, @{user.username}!</h1>
-            <p className="mt-1 text-stone-600">
-              Pull up a log by the fire. A few quick questions so we can make TrailCast better for you.
-            </p>
-          </div>
-        </div>
+    <main className="mx-auto max-w-2xl px-4 py-12">
+      <div className="motion-safe:animate-rise">
+        <h1 className="text-title uppercase">Welcome to TrailCast{user.name ? `, ${user.name.split(' ')[0]}` : ''}</h1>
+        <p className="mt-3 text-lead text-ink-soft">Three quick questions, so TrailCast gets better for you. Only the first one is needed.</p>
 
-        <form onSubmit={submit} className="space-y-8 p-6 sm:p-8">
+        <form onSubmit={submit} className="mt-8 space-y-8 border-t-2 border-ink pt-8">
           <fieldset>
-            <legend className="font-display text-lg font-bold text-ink">What will you use TrailCast for?</legend>
-            <p className="text-sm text-stone-500">Pick as many as you like.</p>
+            <legend className="font-display text-[1.4rem] leading-tight font-semibold">What will you use TrailCast for?</legend>
+            <p className="text-ink-soft">Pick as many as you like.</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {Object.entries(INTERESTS).map(([value, label]) => (
                 <label key={value} className="cursor-pointer">
@@ -67,7 +59,7 @@ export default function WelcomePage() {
                     onChange={() => toggleInterest(value)}
                     className="peer sr-only"
                   />
-                  <span className="inline-flex items-center gap-2 rounded-full border-2 border-stone-200 bg-surface px-4 py-2 text-sm font-semibold text-stone-700 transition select-none hover:-translate-y-0.5 hover:border-orange-300 peer-checked:border-orange-600 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:shadow-md peer-checked:shadow-orange-600/30 peer-focus-visible:ring-4 peer-focus-visible:ring-orange-200">
+                  <span className="inline-flex items-center gap-2 rounded-[3px] bg-paper px-4 py-2 font-semibold text-ink-soft ring-[1.5px] ring-ink/20 transition-colors select-none hover:text-ink hover:ring-ink/50 peer-checked:bg-ink peer-checked:text-paper peer-checked:ring-ink peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-water">
                     <Icon name={INTEREST_ICON[value]} className="h-4 w-4" />
                     {label}
                   </span>
@@ -77,8 +69,8 @@ export default function WelcomePage() {
           </fieldset>
 
           <label className="block">
-            <span className="font-display text-lg font-bold text-ink">How did you hear about TrailCast?</span>{' '}
-            <span className="text-sm text-stone-500">(optional)</span>
+            <span className="font-display text-[1.4rem] leading-tight font-semibold">How did you hear about TrailCast?</span>{' '}
+            <span className="text-ink-soft">(optional)</span>
             <select value={referralSource} onChange={(e) => setReferralSource(e.target.value)} className="input mt-2">
               <option value="">Choose one</option>
               {Object.entries(REFERRAL_SOURCES).map(([value, label]) => (
@@ -90,10 +82,8 @@ export default function WelcomePage() {
           </label>
 
           <label className="block">
-            <span className="font-display text-lg font-bold text-ink">
-              What kind of videos or routes would you like to see here?
-            </span>{' '}
-            <span className="text-sm text-stone-500">(optional)</span>
+            <span className="font-display text-[1.4rem] leading-tight font-semibold">What rides or routes would you like to see here?</span>{' '}
+            <span className="text-ink-soft">(optional)</span>
             <textarea
               rows={3}
               maxLength={1000}
@@ -105,7 +95,7 @@ export default function WelcomePage() {
           </label>
 
           {error && <ErrorMessage>{error}</ErrorMessage>}
-          <button type="submit" disabled={saving} className="btn-primary px-6 py-3 text-base">
+          <button type="submit" disabled={saving} className="btn-primary">
             {saving ? 'Saving...' : 'Continue'} <Icon name="arrowRight" className="h-4 w-4" />
           </button>
         </form>

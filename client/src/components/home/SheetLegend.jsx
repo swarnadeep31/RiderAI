@@ -37,8 +37,8 @@ function Symbol({ kind }) {
           [52, 22, '3'],
         ].map(([x, y, n]) => (
           <g key={n}>
-            <circle cx={x} cy={y} r="9" className={n === '2' ? 'fill-road' : 'fill-ink'} stroke="#fff" strokeWidth="2" />
-            <text x={x} y={y + 4.5} textAnchor="middle" fill="#fff" className="font-sans text-[12px] font-bold">
+            <circle cx={x} cy={y} r="9" className={`stroke-paper ${n === '2' ? 'fill-road' : 'fill-ink'}`} strokeWidth="2" />
+            <text x={x} y={y + 4.5} textAnchor="middle" className="fill-paper font-sans text-[12px] font-bold">
               {n}
             </text>
           </g>

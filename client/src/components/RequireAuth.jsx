@@ -8,7 +8,7 @@ export default function RequireAuth({ children, onboarded = true }) {
   const { user, loading } = useAuth();
   const location = useLocation();
 
-  if (loading) return <p className="px-4 py-8 text-stone-500">Loading...</p>;
+  if (loading) return <p className="px-4 py-16 text-center font-medium text-ink-soft">Loading...</p>;
 
   const here = encodeURIComponent(location.pathname + location.search);
   if (!user) return <Navigate to={`/login?next=${here}`} replace />;

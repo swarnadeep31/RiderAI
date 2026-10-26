@@ -111,6 +111,16 @@ const PATHS = {
   check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
   trash: <path d="M4 7h16M10 11v6m4-6v6M9 7l1-3h4l1 3M6 7l1 13h10l1-13" />,
   edit: <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z" />,
+  // A warning: a long way without fuel.
+  warning: (
+    <>
+      <path d="M12 3.5 2.5 20h19z" />
+      <path d="M12 10v4.5M12 17.2v.1" />
+    </>
+  ),
+  close: <path d="M6 6l12 12M18 6 6 18" />,
+  play: <path d="M8 5.5v13l10.5-6.5z" />,
+  external: <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />,
   satellite: (
     <>
       <circle cx="12" cy="12" r="3" />

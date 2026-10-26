@@ -132,10 +132,10 @@ export default function ElevationChart({ profile, route, clock, approximate, hig
   const hoverText = hover === null ? '' : `km ${formatKm(d[hover])} · ${formatMetres(e[hover])} m${momentText(hoverMoment)}`;
 
   return (
-    <figure className="card px-3 pt-2.5 pb-1">
-      <figcaption className="flex flex-wrap items-baseline justify-between gap-x-3 px-1 text-sm">
-        <span className="font-display font-bold text-ink">Elevation</span>
-        {approximate && <span className="text-xs text-stone-500">Approximate: heights along the drawn route</span>}
+    <figure className="rounded-[3px] bg-paper px-3 pt-2 pb-1 ring-1 ring-ink/15">
+      <figcaption className="flex flex-wrap items-baseline justify-between gap-x-3 px-1">
+        <span className="margin-text text-ink">Cross-section · heights along the route</span>
+        {approximate && <span className="text-small text-ink-soft">Approximate: along the drawn route</span>}
       </figcaption>
       <div
         ref={wrapRef}
@@ -148,21 +148,21 @@ export default function ElevationChart({ profile, route, clock, approximate, hig
         onPointerDown={(event) => setHover(sampleAtPointer(event))}
         onPointerLeave={(event) => event.pointerType === 'mouse' && setHover(null)}
         onPointerUp={(event) => watch(sampleAtPointer(event))}
-        className={`relative touch-pan-y rounded-xl outline-none focus-visible:ring-4 focus-visible:ring-sky-200 ${playable ? 'cursor-pointer' : ''}`}
+        className={`relative touch-pan-y rounded-[3px] ${playable ? 'cursor-pointer' : ''}`}
         style={{ height: HEIGHT }}
       >
         {width > 0 && (
           <svg width={width} height={HEIGHT} aria-hidden="true" className="block overflow-visible">
             {axis.ticks.map((h) => (
               <g key={h}>
-                <line x1={MARGIN.left} x2={width - MARGIN.right} y1={y(h)} y2={y(h)} className="stroke-stone-200" strokeWidth="1" />
-                <text x={MARGIN.left - 6} y={y(h)} dy="0.32em" textAnchor="end" className="fill-stone-500 text-[11px] tabular-nums">
+                <line x1={MARGIN.left} x2={width - MARGIN.right} y1={y(h)} y2={y(h)} className="stroke-ink/10" strokeWidth="1" />
+                <text x={MARGIN.left - 6} y={y(h)} dy="0.32em" textAnchor="end" className="fill-ink-soft text-[12px] tabular-nums">
                   {formatMetres(h)}
                 </text>
               </g>
             ))}
             {ticks.map((km) => (
-              <text key={km} x={x(km * 1000)} y={HEIGHT - 6} textAnchor={km === 0 ? 'start' : 'middle'} className="fill-stone-500 text-[11px] tabular-nums">
+              <text key={km} x={x(km * 1000)} y={HEIGHT - 6} textAnchor={km === 0 ? 'start' : 'middle'} className="fill-ink-soft text-[12px] tabular-nums">
                 {km === 0 ? '0 km' : km}
               </text>
             ))}
@@ -172,8 +172,8 @@ export default function ElevationChart({ profile, route, clock, approximate, hig
 
             {overnights.map((night) => (
               <g key={night.alongM}>
-                <line x1={x(night.alongM)} x2={x(night.alongM)} y1={MARGIN.top} y2={HEIGHT - MARGIN.bottom} className="stroke-stone-400" strokeWidth="1" strokeDasharray="3 3" />
-                <text x={x(night.alongM) + 4} y={HEIGHT - MARGIN.bottom - 5} className="fill-stone-600 text-[11px]">
+                <line x1={x(night.alongM)} x2={x(night.alongM)} y1={MARGIN.top} y2={HEIGHT - MARGIN.bottom} className="stroke-water/60" strokeWidth="1" strokeDasharray="3 3" />
+                <text x={x(night.alongM) + 4} y={HEIGHT - MARGIN.bottom - 5} className="fill-water text-[12px] font-medium">
                   {night.label}
                 </text>
               </g>
@@ -186,7 +186,7 @@ export default function ElevationChart({ profile, route, clock, approximate, hig
                   x={highestX + (highestX > width / 2 ? -8 : 8)}
                   y={Math.max(y(summary.highestM), MARGIN.top) - 8}
                   textAnchor={highestX > width / 2 ? 'end' : 'start'}
-                  className="fill-ink text-[11px] font-semibold"
+                  className="fill-contour text-[12px] font-semibold"
                 >
                   {highestLabel}
                 </text>
@@ -199,7 +199,7 @@ export default function ElevationChart({ profile, route, clock, approximate, hig
 
             {hover !== null && (
               <g pointerEvents="none">
-                <line x1={x(d[hover])} x2={x(d[hover])} y1={MARGIN.top - 4} y2={HEIGHT - MARGIN.bottom} className="stroke-stone-400" strokeWidth="1" />
+                <line x1={x(d[hover])} x2={x(d[hover])} y1={MARGIN.top - 4} y2={HEIGHT - MARGIN.bottom} className="stroke-ink/40" strokeWidth="1" />
                 <circle cx={x(d[hover])} cy={y(e[hover])} r="4" strokeWidth="2" className="elevation-dot" />
               </g>
             )}
@@ -207,7 +207,7 @@ export default function ElevationChart({ profile, route, clock, approximate, hig
         )}
         {hover !== null && width > 0 && (
           <p
-            className="pointer-events-none absolute top-0 z-10 rounded-lg bg-pine-950/90 px-2.5 py-1 text-xs font-medium whitespace-nowrap text-white shadow-md"
+            className="pointer-events-none absolute top-0 z-10 rounded-[3px] bg-ink px-2.5 py-1 text-small font-medium whitespace-nowrap text-paper shadow-md"
             style={x(d[hover]) > width / 2 ? { right: width - x(d[hover]) + 8 } : { left: x(d[hover]) + 8 }}
           >
             {hoverText}

@@ -18,7 +18,7 @@ function FuelTable({ trail, services, warnKm }) {
   const warnings = longGaps(services.fuelGaps, warnKm);
   return (
     <section className="mt-8 break-inside-avoid">
-      <h2 className="text-lg font-bold">Fuel along the route</h2>
+      <h2 className="text-[1.5rem] leading-tight">Fuel along the route</h2>
       <p className="mt-1 font-semibold">{fuelGapSentence(services.fuelGaps[0], approximate)}</p>
       {warnings.map((gap) => (
         <p key={gap.fromM} className="font-semibold">
@@ -28,7 +28,7 @@ function FuelTable({ trail, services, warnKm }) {
       {stations.length > 0 && (
         <table className="mt-2 w-full border-collapse text-left text-sm">
           <thead>
-            <tr className="border-b-2 border-stone-800">
+            <tr className="border-b-2 border-ink">
               <th className="py-2 pr-3">Distance</th>
               <th className="py-2 pr-3">Fuel station</th>
               <th className="py-2">Location</th>
@@ -36,16 +36,16 @@ function FuelTable({ trail, services, warnKm }) {
           </thead>
           <tbody>
             {stations.map((station) => (
-              <tr key={station.osm} className="break-inside-avoid border-b border-stone-200 align-top">
-                <td className="py-2 pr-3 font-mono">{kmAlong(station.alongM, approximate)}</td>
+              <tr key={station.osm} className="break-inside-avoid border-b border-ink/15 align-top">
+                <td className="py-2 pr-3 tabular-nums">{kmAlong(station.alongM, approximate)}</td>
                 <td className="py-2 pr-3">
                   <div className="font-semibold">{serviceName(station)}</div>
-                  <div className="text-stone-600">{[station.brand && station.name ? station.brand : null, station.place, offRoute(station), station.hours && `Open: ${station.hours}`].filter(Boolean).join(' · ')}</div>
+                  <div className="text-ink-soft">{[station.brand && station.name ? station.brand : null, station.place, offRoute(station), station.hours && `Open: ${station.hours}`].filter(Boolean).join(' · ')}</div>
                 </td>
-                <td className="py-2 font-mono text-xs">
+                <td className="py-2 tabular-nums text-xs">
                   {station.lat.toFixed(5)}, {station.lng.toFixed(5)}
                   <br />
-                  <a href={googleMapsUrl(station.lat, station.lng)} className="font-sans text-orange-700 underline">
+                  <a href={googleMapsUrl(station.lat, station.lng)} className="font-sans text-road underline">
                     Open in Google Maps
                   </a>
                 </td>
@@ -54,7 +54,7 @@ function FuelTable({ trail, services, warnKm }) {
           </tbody>
         </table>
       )}
-      <p className="mt-2 text-xs text-stone-600">{FUEL_CAVEAT}</p>
+      <p className="mt-2 text-xs text-ink-soft">{FUEL_CAVEAT}</p>
     </section>
   );
 }
@@ -71,10 +71,10 @@ function Passes({ trail }) {
   const approximate = trail.routeSource === 'keypoints';
   return (
     <section className="mt-8 break-inside-avoid">
-      <h2 className="text-lg font-bold">High points on the way</h2>
+      <h2 className="text-[1.5rem] leading-tight">High points on the way</h2>
       <table className="mt-2 w-full border-collapse text-left text-sm">
         <thead>
-          <tr className="border-b-2 border-stone-800">
+          <tr className="border-b-2 border-ink">
             <th className="py-2 pr-3">Place</th>
             <th className="py-2 pr-3 text-right">Height</th>
             <th className="py-2 text-right">Distance from the start</th>
@@ -82,7 +82,7 @@ function Passes({ trail }) {
         </thead>
         <tbody>
           {passes.map((pass) => (
-            <tr key={pass.alongM} className="border-b border-stone-200">
+            <tr key={pass.alongM} className="border-b border-ink/15">
               <td className="py-2 pr-3 font-semibold">{pass.name ?? `At km ${formatKm(pass.alongM)}`}</td>
               <td className="py-2 pr-3 text-right tabular-nums">{formatMetres(pass.heightM)} m</td>
               <td className="py-2 text-right tabular-nums">
@@ -122,7 +122,7 @@ export default function PrintPage() {
   }, []);
 
   if (error) return <ErrorMessage>{error}</ErrorMessage>;
-  if (!trail) return <p className="p-8 text-stone-500">Loading...</p>;
+  if (!trail) return <p className="p-8 text-ink-soft">Loading...</p>;
 
   // "475 km · 2 days · Highest 5,328 m · Taglang La · 5,840 m climb"
   const statsLine = [distanceText, daysText, highestText, climbText]
@@ -131,24 +131,24 @@ export default function PrintPage() {
     .join(' · ');
 
   return (
-    <main className="mx-auto max-w-3xl bg-white p-8 text-stone-900">
-      <div className="no-print mb-8 flex flex-wrap items-center gap-3 rounded-lg bg-stone-100 p-3 text-sm">
+    <main className="mx-auto max-w-3xl bg-paper p-8 text-ink">
+      <div className="no-print mb-8 flex flex-wrap items-center gap-3 rounded-[3px] bg-surface p-3 text-sm">
         <button
           type="button"
           onClick={() => window.print()}
-          className="rounded-md bg-orange-600 px-3 py-1.5 font-semibold text-white hover:bg-orange-700"
+          className="btn-primary btn-small"
         >
           Save as PDF / Print
         </button>
-        <span className="text-stone-600">In the print window, choose "Save as PDF" as the printer.</span>
+        <span className="text-ink-soft">In the print window, choose "Save as PDF" as the printer.</span>
         <Link to={`/trails/${trail._id}`} className="ml-auto underline">
           Back to the video
         </Link>
       </div>
 
-      <h1 className="text-3xl font-bold">{trail.title}</h1>
-      <p className="mt-1 text-stone-600">
-        {ACTIVITIES[trail.activity]} · {trail.points.length} key points · Video:{' '}
+      <h1 className="text-title">{trail.title}</h1>
+      <p className="mt-1 text-ink-soft">
+        {ACTIVITIES[trail.activity]} · {trail.points.length} {trail.points.length === 1 ? 'place' : 'places'} · Video:{' '}
         <a href={youtubeUrlAt(trail.youtubeId, 0)} className="underline">
           youtu.be/{trail.youtubeId}
         </a>
@@ -159,7 +159,7 @@ export default function PrintPage() {
       {trail.points.length > 0 ? (
         <table className="mt-8 w-full border-collapse text-left text-sm">
           <thead>
-            <tr className="border-b-2 border-stone-800">
+            <tr className="border-b-2 border-ink">
               <th className="py-2 pr-3">#</th>
               <th className="py-2 pr-3">Video</th>
               <th className="py-2 pr-3">Place</th>
@@ -168,21 +168,21 @@ export default function PrintPage() {
           </thead>
           <tbody>
             {trail.points.map((point, i) => (
-              <tr key={point._id} className="break-inside-avoid border-b border-stone-200 align-top">
-                <td className="py-2 pr-3 font-bold">{i + 1}</td>
-                <td className="py-2 pr-3 font-mono">
+              <tr key={point._id} className="break-inside-avoid border-b border-ink/15 align-top">
+                <td className="py-2 pr-3 font-semibold">{i + 1}</td>
+                <td className="py-2 pr-3 tabular-nums">
                   <a href={youtubeUrlAt(trail.youtubeId, point.time)} className="underline">
                     {formatTime(point.time)}
                   </a>
                 </td>
                 <td className="py-2 pr-3">
                   <div className="font-semibold">{point.name}</div>
-                  {point.note && <div className="text-stone-600">{point.note}</div>}
+                  {point.note && <div className="text-ink-soft">{point.note}</div>}
                 </td>
-                <td className="py-2 font-mono text-xs">
+                <td className="py-2 tabular-nums text-xs">
                   {point.lat.toFixed(5)}, {point.lng.toFixed(5)}
                   <br />
-                  <a href={googleMapsUrl(point.lat, point.lng)} className="font-sans text-orange-700 underline">
+                  <a href={googleMapsUrl(point.lat, point.lng)} className="font-sans text-road underline">
                     Open in Google Maps
                   </a>
                 </td>
@@ -191,13 +191,13 @@ export default function PrintPage() {
           </tbody>
         </table>
       ) : (
-        <p className="mt-8 text-stone-500">No key points marked yet.</p>
+        <p className="mt-8 text-ink-soft">No places marked yet.</p>
       )}
 
       <Passes trail={trail} />
       <FuelTable trail={trail} services={services} warnKm={warnKm} />
 
-      <p className="mt-10 text-xs text-stone-400">Made with TrailCast. Map data © OpenStreetMap contributors.</p>
+      <p className="mt-10 text-small text-ink-soft">Made with TrailCast. Map data © OpenStreetMap contributors.</p>
     </main>
   );
 }

@@ -336,7 +336,7 @@
   border: 2px solid #ffffff;
   border-radius: 9999px;
   background: var(--color-ink);
-  color: #ffffff;
+  color: var(--color-paper);
   font: 600 13px/1 'Mukta', sans-serif;
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.4);
 }

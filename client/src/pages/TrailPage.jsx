@@ -7,7 +7,6 @@ import AddPointForm from '../components/AddPointForm.jsx';
 import AiRoutePanel, { HIDDEN_REASONS } from '../components/AiRoutePanel.jsx';
 import ElevationChart from '../components/ElevationChart.jsx';
 import Icon from '../components/art/Icon.jsx';
-import { CampScene } from '../components/art/Scenery.jsx';
 import ErrorMessage from '../components/ErrorMessage.jsx';
 import KeyPointList from '../components/KeyPointList.jsx';
 import RoutePanel from '../components/RoutePanel.jsx';
@@ -15,11 +14,11 @@ import SaveOptions from '../components/SaveOptions.jsx';
 import SectionHeading from '../components/SectionHeading.jsx';
 import ServicesPanel, { ServiceBadge } from '../components/ServicesPanel.jsx';
 import TrailMap from '../components/TrailMap.jsx';
-import TripStats from '../components/TripStats.jsx';
+import TripStats, { Readout } from '../components/TripStats.jsx';
 import { useRouteServices } from '../hooks/useRouteServices.js';
 import { useConfirm, useToast } from '../notices.jsx';
 import { useYouTubePlayer } from '../hooks/useYouTubePlayer.js';
-import { FUEL_CAVEAT, KIND_ORDER, fuelGapChip, fuelGapSentence } from '../lib/services.js';
+import { FUEL_CAVEAT, KIND_ORDER, afterWhat, fuelGapSentence, kmLength } from '../lib/services.js';
 import {
   cumulativeDistances,
   hiddenRangeAt,
@@ -47,9 +46,9 @@ function CreatorSetting({ trail, onSaved }) {
   }
 
   return (
-    <form onSubmit={save} className="space-y-2 text-sm">
-      <h3 className="font-semibold">Video creator</h3>
-      <p className="text-stone-600">
+    <form onSubmit={save} className="space-y-2">
+      <h3 className="text-[1.3rem] leading-tight">Video creator</h3>
+      <p className="text-small text-ink-soft">
         {trail.channel?.name
           ? `Leave it empty to show the YouTube channel's name (${trail.channel.name}).`
           : 'The name shown as "Video by ...".'}
@@ -63,7 +62,7 @@ function CreatorSetting({ trail, onSaved }) {
           aria-label="Video creator's name"
           className="field w-full max-w-xs"
         />
-        <button type="submit" className="btn-secondary px-3 py-1.5">
+        <button type="submit" className="btn-secondary btn-small">
           Save
         </button>
       </div>
@@ -90,14 +89,14 @@ function DaysSetting({ trail, onSaved }) {
   }
 
   return (
-    <form onSubmit={save} className="space-y-2 text-sm">
-      <h3 className="font-semibold">Riding days</h3>
-      <p className="text-stone-600">
+    <form onSubmit={save} className="space-y-2">
+      <h3 className="text-[1.3rem] leading-tight">Riding days</h3>
+      <p className="text-small text-ink-soft">
         {trail.daysOverride
           ? `You set ${trail.daysOverride}. Empty the box and save to work it out again.`
           : worked
             ? `Worked out from the ${trail.stats.daysSource === 'gps' ? 'GPS recording' : 'overnight stops'}: ${worked}. Change it if that's wrong.`
-            : 'Mark the places you stayed the night (the moon on a key point), or type the number of days.'}
+            : 'Mark the places you stayed the night (the moon beside a place), or type the number of days.'}
       </p>
       <div className="flex items-center gap-2">
         <input
@@ -110,7 +109,7 @@ function DaysSetting({ trail, onSaved }) {
           aria-label="Riding days"
           className="field w-24"
         />
-        <button type="submit" className="btn-secondary px-3 py-1.5">
+        <button type="submit" className="btn-secondary btn-small">
           Save
         </button>
       </div>
@@ -222,19 +221,19 @@ export default function TrailPage() {
 
   if (loadError) {
     return (
-      <main className="mx-auto max-w-xl space-y-6 px-4 py-12 text-center">
-        <CampScene className="mx-auto w-full max-w-sm drop-shadow-xl" />
+      <main className="mx-auto max-w-2xl space-y-6 px-4 py-16">
+        <h1 className="text-title uppercase">This ride couldn&apos;t be opened</h1>
         <ErrorMessage>{loadError}</ErrorMessage>
         <Link to="/" className="btn-primary">
-          Back to all trails
+          Back to the rides
         </Link>
       </main>
     );
   }
   if (!trail) {
     return (
-      <p className="flex items-center justify-center gap-2 px-4 py-16 font-semibold text-pine-700 dark:text-pine-300">
-        <Icon name="pin" className="h-6 w-6 text-orange-500 motion-safe:animate-bounce" /> Loading trail...
+      <p className="flex items-center justify-center gap-2 px-4 py-16 font-medium text-ink-soft">
+        <Icon name="compass" className="h-5 w-5 text-road motion-safe:animate-spin" /> Opening the ride...
       </p>
     );
   }
@@ -257,19 +256,15 @@ export default function TrailPage() {
   const creator = trail.creatorName || trail.channel?.name;
   const overnights = (stats?.nights ?? []).map((night, i) => ({ alongM: night.alongM, label: `Night ${i + 1}${night.name ? ` · ${night.name}` : ''}` }));
   // The longest stretch without fuel joins the stats once the services are in. Clicking it shows it on the map.
+  const noFuel = longestGap?.afterName === 'the start' && longestGap?.beforeName === 'the end';
   const fuelChip = longestGap && (
-    <li>
-      <button
-        type="button"
-        onClick={() => goAlong(longestGap.fromM)}
-        title={`${fuelGapSentence(longestGap, drawnRoute)} ${FUEL_CAVEAT}`}
-        className="inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1 text-sm font-semibold text-stone-800 shadow-sm ring-1 ring-stone-900/10 transition hover:-translate-y-0.5 hover:ring-orange-300"
-      >
-        <ServiceBadge kind="fuel" className="h-4 w-4 text-[9px] ring-0" />
-        {longestGap.lengthM >= fuelGapWarnKm * 1000 && <span aria-hidden="true">⚠</span>}
-        {fuelGapChip(longestGap, drawnRoute)}
-      </button>
-    </li>
+    <Readout
+      value={<span className={longestGap.lengthM >= fuelGapWarnKm * 1000 ? 'text-road' : ''}>{noFuel ? 'None mapped' : kmLength(longestGap.lengthM, drawnRoute)}</span>}
+      label={noFuel ? 'Fuel on the route' : `Without fuel · ${afterWhat(longestGap)}`}
+      title={`${fuelGapSentence(longestGap, drawnRoute)} ${FUEL_CAVEAT}`}
+      onClick={() => goAlong(longestGap.fromM)}
+      before={<ServiceBadge kind="fuel" className="h-5 w-5 text-[10px] ring-0" />}
+    />
   );
   const statsRow = (className) => (
     <TripStats
@@ -338,9 +333,9 @@ export default function TrailPage() {
 
   async function deletePoint(point) {
     const yes = await confirm({
-      title: 'Are you sure you want to delete this key point?',
+      title: 'Are you sure you want to delete this place?',
       message: `“${point.name}” will be removed from the trail and the map.`,
-      confirmLabel: 'Delete key point',
+      confirmLabel: 'Delete place',
     });
     if (!yes) return;
     try {
@@ -395,20 +390,81 @@ export default function TrailPage() {
         <div className="lg:col-start-1 lg:row-start-1">
           <div
             ref={video.containerRef}
-            className="aspect-video w-full overflow-hidden rounded-3xl bg-pine-950 shadow-xl ring-4 shadow-pine-900/25 ring-surface"
+            className="aspect-video w-full overflow-hidden rounded-[3px] bg-ink"
           />
           {video.error && (
             <div className="mt-2">
               <ErrorMessage>{video.error}</ErrorMessage>
             </div>
           )}
-          {/* Phones: the trip stats come straight after the video, before the map. */}
-          {statsRow('mt-4 lg:hidden')}
+          {/* The ride's name and numbers come straight after the video, on every screen. */}
+          <section className="mt-5 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <ActivityBadge activity={trail.activity} />
+                {recorded && (
+                  <span className="tag bg-surface text-ink" title="The route was recorded with GPS">
+                    <Icon name="satellite" className="h-3.5 w-3.5" />
+                    GPS route
+                  </span>
+                )}
+                {drawnRoute && (
+                  <span className={`tag ${aiRoute ? 'bg-water-tint text-water' : 'bg-surface text-contour'}`}>
+                    <Icon name={aiRoute ? 'sparkles' : 'route'} className="h-3.5 w-3.5 shrink-0" />
+                    {aiRoute ? 'AI-estimated route' : 'Approximate route'}
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {trail.supportUrl && (
+                  <a href={trail.supportUrl} target="_blank" rel="noopener noreferrer" className="btn-primary">
+                    <Icon name="heart" className="h-4 w-4" />
+                    Support the creator
+                  </a>
+                )}
+                {isOwner && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      stopMapMode();
+                      setNotice(null);
+                      setSearchParams(editing ? {} : { edit: '1' });
+                    }}
+                    className="btn-secondary"
+                  >
+                    <Icon name={editing ? 'check' : 'edit'} className="h-4 w-4" />
+                    {editing ? 'Done editing' : 'Edit'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <h1 className="text-title">{trail.title}</h1>
+              {/* The video's creator: the name given for the trail, or else the YouTube channel. */}
+              {creator && (
+                <p className="mt-2 flex items-center gap-2 text-ink-soft">
+                  <Icon name="video" className="h-5 w-5 shrink-0 text-road" />
+                  <span>
+                    Video by{' '}
+                    {trail.channel?.url ? (
+                      <a href={trail.channel.url} target="_blank" rel="noopener noreferrer" className="link">
+                        {creator}
+                      </a>
+                    ) : (
+                      <span className="font-semibold text-ink">{creator}</span>
+                    )}
+                  </span>
+                </p>
+              )}
+            </div>
+            {statsRow('')}
+          </section>
         </div>
 
         {/* The map, with the elevation chart under it in the same sticky column. */}
-        <div className="flex flex-col gap-3 lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-[calc(100vh-7rem)] lg:self-start">
-          <div className="isolate h-[55vh] overflow-hidden rounded-3xl shadow-xl ring-4 shadow-pine-900/20 ring-surface lg:h-auto lg:min-h-0 lg:flex-1">
+        <div className="flex flex-col gap-4 lg:sticky lg:top-18 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-[calc(100svh-6rem)] lg:self-start">
+          <div className="neatline isolate m-1 h-[55vh] overflow-hidden lg:h-auto lg:min-h-0 lg:flex-1">
             <TrailMap
               trailId={trail._id}
               track={trail.track}
@@ -454,92 +510,30 @@ export default function TrailPage() {
 
         <div className="space-y-8 lg:col-start-1 lg:row-start-2">
           <section className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <ActivityBadge activity={trail.activity} />
-                {recorded && (
-                  <span className="badge bg-pine-100 text-pine-800 dark:bg-pine-900/70 dark:text-pine-300" title="The route was recorded with GPS">
-                    <Icon name="satellite" className="h-3.5 w-3.5" />
-                    GPS route
-                  </span>
-                )}
-                {drawnRoute && (
-                  <span className={`badge ${aiRoute ? 'bg-violet-100 text-violet-800' : 'bg-amber-100 text-amber-900'}`}>
-                    <Icon name={aiRoute ? 'sparkles' : 'route'} className="h-3.5 w-3.5 shrink-0" />
-                    {aiRoute ? 'AI-estimated route' : 'Approximate route'}
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {trail.supportUrl && (
-                  <a href={trail.supportUrl} target="_blank" rel="noopener noreferrer" className="btn-primary">
-                    <Icon name="heart" className="h-4 w-4" />
-                    Support the creator
-                  </a>
-                )}
-                {isOwner && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      stopMapMode();
-                      setNotice(null);
-                      setSearchParams(editing ? {} : { edit: '1' });
-                    }}
-                    className="btn-secondary"
-                  >
-                    <Icon name={editing ? 'check' : 'edit'} className="h-4 w-4" />
-                    {editing ? 'Done editing' : 'Edit'}
-                  </button>
-                )}
-              </div>
-            </div>
 
-            <div>
-              <h1 className="text-3xl leading-tight font-extrabold text-ink sm:text-4xl">{trail.title}</h1>
-              {/* The video's creator: the name given for the trail, or else the YouTube channel. */}
-              {creator && (
-                <p className="mt-2 flex items-center gap-2 text-sm text-stone-600">
-                  <Icon name="video" className="h-5 w-5 shrink-0 text-red-600" />
-                  <span>
-                    Video by{' '}
-                    {trail.channel?.url ? (
-                      <a href={trail.channel.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-ink hover:underline">
-                        {creator}
-                      </a>
-                    ) : (
-                      <span className="font-semibold text-ink">{creator}</span>
-                    )}
-                  </span>
-                </p>
-              )}
-            </div>
-
-            {statsRow('hidden lg:flex')}
 
             {drawnRoute && (
-              <p className="text-sm text-stone-500">
+              <p className="text-small text-ink-soft">
                 {aiRoute
                   ? 'The AI worked out this route from the places in the video, so the roads may differ.'
-                  : 'This route is drawn between the key points, so the roads may differ.'}
+                  : 'This route is drawn between the places, so the roads may differ.'}
               </p>
             )}
-            {trail.description && <p className="text-lg whitespace-pre-line text-stone-700">{trail.description}</p>}
+            {trail.description && <p className="max-w-prose text-lead whitespace-pre-line">{trail.description}</p>}
           </section>
 
           {notice && (
-            <p className="flex items-start gap-2 rounded-2xl bg-pine-900 px-4 py-3 text-sm font-medium text-pine-50 shadow-lg motion-safe:animate-fade-up">
-              <Icon name="compass" className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+            <p role="status" className="flex items-start gap-2 rounded-[3px] bg-water-tint px-4 py-3 font-medium text-ink motion-safe:animate-rise">
+              <Icon name="compass" className="mt-1 h-4 w-4 shrink-0 text-water" />
               {notice}
             </p>
           )}
 
           {editing && (
-            <section className="card space-y-5 border-2 border-orange-200 bg-linear-to-b from-orange-50 to-surface p-5">
-              <h2 className="flex items-center gap-2 text-xl font-bold text-ink">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-600 text-white">
-                  <Icon name="edit" className="h-4 w-4" />
-                </span>
-                Creator tools
+            <section className="space-y-7 rounded-[3px] bg-surface p-5 ring-1 ring-ink/15 sm:p-6">
+              <h2 className="flex items-center gap-2 text-title">
+                <Icon name="edit" className="h-6 w-6 text-road" />
+                Edit this ride
               </h2>
 
               {mapMode === 'add' ? (
@@ -552,16 +546,17 @@ export default function TrailPage() {
                 />
               ) : (
                 <button type="button" onClick={startAddingPoint} className="btn-primary">
-                  + Add a key point at {formatTime(video.currentTime)}
+                  <Icon name="pin" className="h-4 w-4" />
+                  Add a place at {formatTime(video.currentTime)}
                 </button>
               )}
 
               {canSync && (
-                <div className="space-y-2 text-sm">
-                  <h3 className="font-semibold">Line up the map with the video</h3>
-                  <p className="text-stone-700">{describeSync(trail.videoStartsAt)}</p>
+                <div className="space-y-2">
+                  <h3 className="text-[1.3rem] leading-tight">Line up the map with the video</h3>
+                  <p>{describeSync(trail.videoStartsAt)}</p>
                   {mapMode === 'sync' ? (
-                    <p className="font-medium text-orange-800">
+                    <p className="font-medium text-road">
                       Now click the spot on the route where you were at {formatTime(video.currentTime)} in the video.{' '}
                       <button type="button" onClick={stopMapMode} className="underline">
                         Cancel
@@ -569,7 +564,7 @@ export default function TrailPage() {
                     </p>
                   ) : (
                     <>
-                      <p className="text-stone-600">
+                      <p className="text-small text-ink-soft">
                         If the blue dot is ahead of or behind the video: pause at a moment you can find on the map (a
                         bridge, a junction, the start), then press Sync and click that spot on the route.
                       </p>
@@ -589,7 +584,7 @@ export default function TrailPage() {
                 </div>
               )}
               {recorded && !canSync && (
-                <p className="text-sm text-stone-600">
+                <p className="text-small text-ink-soft">
                   This route has no times, so the map can't follow the video. Key points still work.
                 </p>
               )}
@@ -621,15 +616,15 @@ export default function TrailPage() {
 
               <CreatorSetting key={trail.creatorName ?? ''} trail={trail} onSaved={applyUpdate} />
 
-              <button type="button" onClick={deleteTrail} className="text-sm text-red-700 hover:underline">
+              <button type="button" onClick={deleteTrail} className="text-small font-semibold text-road underline-offset-4 hover:underline">
                 Delete this trail
               </button>
             </section>
           )}
 
           <section className="space-y-3">
-            <SectionHeading icon="pin" iconClass="bg-orange-100 text-orange-600" aside={trail.points.length > 0 && `${trail.points.length} ${trail.points.length === 1 ? 'place' : 'places'}`}>
-              Key points
+            <SectionHeading aside={trail.points.length > 0 && `${trail.points.length} ${trail.points.length === 1 ? 'place' : 'places'}`}>
+              Places on the way
             </SectionHeading>
             <KeyPointList
               points={trail.points}
@@ -655,9 +650,7 @@ export default function TrailPage() {
 
           {(trail.points.length > 0 || trail.track.length > 0) && (
             <section className="space-y-3">
-              <SectionHeading icon="map" iconClass="bg-sky-100 text-sky-700">
-                Take this trail with you
-              </SectionHeading>
+              <SectionHeading>Take this ride with you</SectionHeading>
               <SaveOptions trail={trail} services={ready?.items ?? []} />
             </section>
           )}

@@ -30,9 +30,9 @@ export default function AddPointForm({ currentTime, location, onSave, onCancel, 
   }
 
   return (
-    <form onSubmit={submit} className="card space-y-3 p-4">
-      <h3 className="text-lg font-bold text-ink">New key point</h3>
-      <p className="text-sm text-stone-600">
+    <form onSubmit={submit} className="space-y-3 rounded-[3px] bg-paper p-4 ring-1 ring-ink/15">
+      <h3 className="font-display text-[1.3rem] leading-tight font-semibold">New place</h3>
+      <p className="text-small text-ink-soft">
         {location
           ? `Location: ${location[0].toFixed(5)}, ${location[1].toFixed(5)}. Search or click the map to change it.`
           : 'Where is it? Search for the place, or click the map.'}
@@ -44,23 +44,23 @@ export default function AddPointForm({ currentTime, location, onSave, onCancel, 
         }}
       />
       <div className="flex items-end gap-2">
-        <label className="block text-sm font-semibold text-stone-800">
+        <label className="field-label">
           Video time
           <input
             value={timeText}
             onChange={(e) => setTimeText(e.target.value)}
-            className="field mt-1 block w-24 font-mono"
+            className="field mt-1 block w-24 tabular-nums"
           />
         </label>
         <button
           type="button"
           onClick={() => setTimeText(formatTime(currentTime))}
-          className="btn-secondary px-3 py-1.5"
+          className="btn-secondary btn-small"
         >
           Use current time ({formatTime(currentTime)})
         </button>
       </div>
-      <label className="block text-sm font-semibold text-stone-800">
+      <label className="field-label">
         Name
         <input
           required
@@ -71,8 +71,8 @@ export default function AddPointForm({ currentTime, location, onSave, onCancel, 
           className="field mt-1 block w-full"
         />
       </label>
-      <label className="block text-sm font-semibold text-stone-800">
-        Note <span className="font-normal text-stone-500">(optional)</span>
+      <label className="field-label">
+        Note <span className="font-normal text-ink-soft">(optional)</span>
         <textarea
           maxLength={1000}
           value={note}
@@ -82,11 +82,11 @@ export default function AddPointForm({ currentTime, location, onSave, onCancel, 
           className="field mt-1 block w-full"
         />
       </label>
-      <label className="flex items-center gap-2 text-sm font-semibold text-stone-800">
+      <label className="flex items-center gap-2 text-small font-semibold text-ink">
         <input type="checkbox" checked={overnight} onChange={(e) => setOvernight(e.target.checked)} />
-        <Icon name="moon" className="h-4 w-4 text-sky-600" />
+        <Icon name="moon" className="h-4 w-4 text-water" />
         Stayed the night here
-        <span className="font-normal text-stone-500">(counts towards the riding days)</span>
+        <span className="font-normal text-ink-soft">(counts towards the riding days)</span>
       </label>
       {error && <ErrorMessage>{error}</ErrorMessage>}
       <div className="flex gap-2">
@@ -95,7 +95,7 @@ export default function AddPointForm({ currentTime, location, onSave, onCancel, 
           disabled={saving}
           className="btn-primary"
         >
-          {saving ? 'Saving...' : 'Save key point'}
+          {saving ? 'Saving...' : 'Save the place'}
         </button>
         <button type="button" onClick={onCancel} className="btn-ghost">
           Cancel

@@ -8,7 +8,7 @@ import WayInField from '../components/WayInField.jsx';
 import { safeNext } from '../lib/redirect.js';
 import { useToast } from '../notices.jsx';
 
-const labelClass = 'block text-sm font-semibold text-stone-800';
+const labelClass = 'field-label';
 
 export default function SignupPage() {
   const { user, signup, loginWithGoogle } = useAuth();
@@ -65,19 +65,19 @@ export default function SignupPage() {
       footer={
         <>
           Already have an account?{' '}
-          <Link to={`/login?next=${encodeURIComponent(next)}`} className="font-semibold text-orange-700 underline">
+          <Link to={`/login?next=${encodeURIComponent(next)}`} className="link font-semibold">
             Log in
           </Link>
         </>
       }
     >
-      <div className="mt-6 space-y-4">
+      <div className="mt-8 space-y-5">
         <GoogleButton text="signup_with" onCredential={withGoogle} onError={(message) => setError(new Error(message))} />
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} className="space-y-5">
           <label className={labelClass}>
             Your name
             <input required maxLength={60} autoComplete="name" value={form.name} onChange={update('name')} placeholder="Your full name" className="input" />
-            <span className="mt-1 block text-sm font-normal text-stone-500">Shown on your profile.</span>
+            <span className="hint">Shown on your profile.</span>
           </label>
           <WayInField
             method={method}
@@ -93,7 +93,7 @@ export default function SignupPage() {
           <label className={labelClass}>
             Password
             <input type="password" required minLength={8} autoComplete="new-password" value={form.password} onChange={update('password')} className="input" />
-            <span className="mt-1 block text-sm font-normal text-stone-500">At least 8 characters.</span>
+            <span className="hint">At least 8 characters.</span>
           </label>
 
           {error && (
@@ -103,14 +103,14 @@ export default function SignupPage() {
                 <Link
                   to={`/login?next=${encodeURIComponent(next)}`}
                   state={{ method, value: form.identifier }}
-                  className="mt-2 block font-semibold underline"
+                  className="link mt-2 block font-semibold"
                 >
                   Log in instead →
                 </Link>
               )}
             </ErrorMessage>
           )}
-          <button type="submit" disabled={saving} className="btn-primary w-full py-3 text-base">
+          <button type="submit" disabled={saving} className="btn-primary w-full">
             {saving ? 'Creating your account...' : 'Sign up'}
           </button>
         </form>
