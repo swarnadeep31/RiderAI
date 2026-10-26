@@ -1,16 +1,10 @@
-import Icon from './art/Icon.jsx';
-
-// The heading of each part of the page, with an optional note on the right ("5 places").
-export default function SectionHeading({ icon, iconClass, aside, children }) {
+// The heading of each part of a ride's page, ruled off like a sheet's margin
+// note, with an optional figure on the right ("5 places").
+export default function SectionHeading({ aside, children }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <h2 className="flex items-center gap-2.5 text-xl font-extrabold text-ink">
-        <span className={`flex h-8 w-8 items-center justify-center rounded-full ${iconClass}`}>
-          <Icon name={icon} className="h-4 w-4" />
-        </span>
-        {children}
-      </h2>
-      {aside && <span className="text-sm font-medium text-stone-500">{aside}</span>}
+    <div className="flex items-baseline justify-between gap-3 border-b-2 border-ink pb-2">
+      <h2 className="text-[1.6rem] leading-tight uppercase">{children}</h2>
+      {aside && <span className="margin-text">{aside}</span>}
     </div>
   );
 }

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { api } from '../api.js';
-import { CampScene } from '../components/art/Scenery.jsx';
 import ErrorMessage from '../components/ErrorMessage.jsx';
 
 export default function FeedbackPage() {
@@ -25,28 +24,25 @@ export default function FeedbackPage() {
 
   if (sent) {
     return (
-      <main className="mx-auto max-w-xl px-4 py-12 text-center">
-        <CampScene className="mx-auto w-full max-w-sm drop-shadow-xl motion-safe:animate-fade-up" />
-        <h1 className="mt-8 text-4xl font-extrabold text-ink">Thank you!</h1>
-        <p className="mt-2 text-stone-600">
-          Your feedback helps decide what TrailCast does next. We read every message by the campfire.
-        </p>
-        <Link to="/" className="btn-primary mt-6">
-          Back to the trails
+      <main className="mx-auto max-w-2xl px-4 py-16 motion-safe:animate-rise">
+        <h1 className="text-display uppercase">Thank you</h1>
+        <p className="mt-4 text-lead text-ink-soft">Your feedback helps decide what TrailCast does next. Every message is read.</p>
+        <Link to="/" className="btn-primary mt-8">
+          Back to the rides
         </Link>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto max-w-xl px-4 py-10">
-      <div className="card p-6 motion-safe:animate-fade-up sm:p-8">
-        <h1 className="text-3xl font-extrabold text-ink">Tell us what you think</h1>
-        <p className="mt-1 text-stone-600">
+    <main className="mx-auto max-w-2xl px-4 py-12">
+      <div className="motion-safe:animate-rise">
+        <h1 className="text-title uppercase">Tell us what you think</h1>
+        <p className="mt-3 text-lead text-ink-soft">
           What works, what's confusing, what videos or features you'd like to see next.
         </p>
-        <form onSubmit={submit} className="mt-6 space-y-4">
-          <label className="block text-sm font-semibold text-stone-800">
+        <form onSubmit={submit} className="mt-8 space-y-5 border-t-2 border-ink pt-8">
+          <label className="field-label">
             Your feedback
             <textarea
               required
@@ -59,7 +55,7 @@ export default function FeedbackPage() {
             />
           </label>
           {error && <ErrorMessage>{error}</ErrorMessage>}
-          <button type="submit" disabled={saving} className="btn-primary px-6 py-3 text-base">
+          <button type="submit" disabled={saving} className="btn-primary">
             {saving ? 'Sending...' : 'Send feedback'}
           </button>
         </form>

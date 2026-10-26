@@ -58,7 +58,7 @@ export default function GoogleButton({ text = 'continue_with', onCredential, onE
         google.accounts.id.renderButton(ref.current, {
           type: 'standard',
           text,
-          shape: 'pill',
+          shape: 'rectangular',
           size: 'large',
           logo_alignment: 'center',
           theme: document.documentElement.classList.contains('dark') ? 'filled_black' : 'outline',
@@ -87,16 +87,16 @@ export default function GoogleButton({ text = 'continue_with', onCredential, onE
           type="button"
           onClick={explain}
           disabled={clientId === null}
-          className="mx-auto flex min-h-11 w-full max-w-[400px] items-center justify-center gap-3 rounded-full border border-[#dadce0] bg-white px-4 text-sm font-semibold text-[#1f1f1f] transition hover:bg-[#f8faff] disabled:opacity-60 dark:border-[#8e918f] dark:bg-[#131314] dark:text-[#e3e3e3] dark:hover:bg-[#1f1f20]"
+          className="mx-auto flex min-h-11 w-full max-w-[400px] items-center justify-center gap-3 rounded-[3px] border border-[#dadce0] bg-white px-4 font-semibold text-[#1f1f1f] transition hover:bg-[#f8faff] disabled:opacity-60 dark:border-[#8e918f] dark:bg-[#131314] dark:text-[#e3e3e3] dark:hover:bg-[#1f1f20]"
         >
           <GoogleLogo className="h-5 w-5" />
           {LABELS[text] ?? LABELS.continue_with}
         </button>
       )}
-      <p className="flex items-center gap-3 text-xs font-semibold tracking-wide text-stone-400 uppercase">
-        <span className="h-px flex-1 bg-stone-200" />
+      <p className="flex items-center gap-3 text-small text-ink-soft">
+        <span className="h-px flex-1 bg-ink/15" />
         or
-        <span className="h-px flex-1 bg-stone-200" />
+        <span className="h-px flex-1 bg-ink/15" />
       </p>
     </div>
   );

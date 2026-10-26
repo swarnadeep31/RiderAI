@@ -2,15 +2,14 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { api } from '../api.js';
 import Icon, { ACTIVITY_STYLE } from '../components/art/Icon.jsx';
-import { HeroScene } from '../components/art/Scenery.jsx';
 import ErrorMessage from '../components/ErrorMessage.jsx';
 import { ACTIVITIES } from '../lib/activities.js';
 import { parseGpx } from '../lib/gpx.js';
 import { formatDuration } from '../lib/time.js';
 
 const inputClass = 'input';
-const labelClass = 'block text-sm font-semibold text-stone-800';
-const hintClass = 'mt-1.5 block text-sm font-normal text-stone-500';
+const labelClass = 'field-label';
+const hintClass = 'hint';
 
 export default function NewTrailPage() {
   const navigate = useNavigate();
@@ -56,20 +55,31 @@ export default function NewTrailPage() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8">
-      <div className="card overflow-hidden motion-safe:animate-fade-up">
-        <div className="relative" style={{ background: 'var(--sky-hero)' }}>
-          <div className="sky-night absolute inset-0" style={{ background: 'var(--sky-night)' }} aria-hidden="true" />
-          <HeroScene className="relative h-48 w-full sm:h-60" />
-          <div className="pointer-events-none absolute inset-x-0 top-0 p-6 sm:p-8">
-            <h1 className="text-3xl font-extrabold text-ink sm:text-4xl">Add a trail</h1>
-            <p className="mt-1 max-w-md font-medium text-ink/80">
-              Your video stays on YouTube. TrailCast adds the map: the route, and the places you mark.
-            </p>
-          </div>
+    <main className="mx-auto grid max-w-6xl gap-x-14 gap-y-8 px-4 py-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] lg:py-14">
+      <div className="lg:sticky lg:top-20 lg:self-start">
+        <h1 className="text-title uppercase">Put a ride on the map</h1>
+        <p className="mt-3 text-lead text-ink-soft">Your video stays on YouTube. TrailCast adds the map beside it.</p>
+        <div className="mt-8 border-t border-ink/15 pt-5">
+          <h2 className="margin-text text-ink">After this</h2>
+          <ul className="mt-3 space-y-3 text-ink-soft">
+            <li className="flex gap-3">
+              <Icon name="satellite" className="mt-0.5 h-5 w-5 shrink-0 text-ink" />
+              <span>With a GPS file, the route is on the map at once.</span>
+            </li>
+            <li className="flex gap-3">
+              <Icon name="sparkles" className="mt-0.5 h-5 w-5 shrink-0 text-water" />
+              <span>Without one, let AI find the places in the video, then check them.</span>
+            </li>
+            <li className="flex gap-3">
+              <Icon name="pin" className="mt-0.5 h-5 w-5 shrink-0 text-road" />
+              <span>Or add each place yourself, and TrailCast draws the route between them.</span>
+            </li>
+          </ul>
         </div>
+      </div>
 
-        <form onSubmit={submit} className="space-y-6 p-6 sm:p-8">
+      <div className="motion-safe:animate-rise">
+        <form onSubmit={submit} className="space-y-7 rounded-[3px] bg-paper p-5 ring-1 ring-ink/15 sm:p-8">
           <label className={labelClass}>
             YouTube link
             <input
@@ -90,7 +100,7 @@ export default function NewTrailPage() {
           </label>
 
           <label className={labelClass}>
-            Video creator's name <span className="font-normal text-stone-500">(optional)</span>
+            Video creator's name <span className="font-normal text-ink-soft">(optional)</span>
             <input maxLength={100} value={form.creatorName} onChange={update('creatorName')} placeholder="The rider's or channel's name" className={inputClass} />
             <span className={hintClass}>Shown as "Video by ...". Leave it empty to use the YouTube channel's name.</span>
           </label>
@@ -108,7 +118,7 @@ export default function NewTrailPage() {
                     onChange={update('activity')}
                     className="peer sr-only"
                   />
-                  <span className="flex h-full flex-col items-center gap-1.5 rounded-2xl border-2 border-stone-200 bg-surface px-2 py-3 text-center text-sm font-semibold text-stone-700 transition hover:-translate-y-0.5 hover:border-orange-300 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-800 peer-focus-visible:ring-4 peer-focus-visible:ring-orange-200">
+                  <span className="flex h-full flex-col items-center gap-1.5 rounded-[3px] bg-paper px-2 py-3 text-center text-small font-semibold text-ink-soft ring-[1.5px] ring-ink/20 transition-colors hover:text-ink hover:ring-ink/50 peer-checked:bg-ink peer-checked:text-paper peer-checked:ring-ink peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-water">
                     <Icon name={ACTIVITY_STYLE[value].icon} className="h-7 w-7" />
                     {label}
                   </span>
@@ -118,7 +128,7 @@ export default function NewTrailPage() {
           </fieldset>
 
           <label className={labelClass}>
-            Description <span className="font-normal text-stone-500">(optional)</span>
+            Description <span className="font-normal text-ink-soft">(optional)</span>
             <textarea
               maxLength={5000}
               rows={3}
@@ -129,22 +139,22 @@ export default function NewTrailPage() {
             />
           </label>
 
-          <div className="rounded-2xl border-2 border-dashed border-pine-200 bg-pine-50/60 dark:border-pine-700 dark:bg-pine-900/30 p-4">
+          <div className="rounded-[3px] bg-surface p-4 ring-1 ring-ink/15">
             <label htmlFor="gpx" className={`${labelClass} flex items-center gap-2`}>
-              <Icon name="satellite" className="h-5 w-5 text-pine-600" />
-              GPS route <span className="font-normal text-stone-500">(optional, a .gpx file)</span>
+              <Icon name="satellite" className="h-5 w-5" />
+              GPS route <span className="font-normal text-ink-soft">(optional, a .gpx file)</span>
             </label>
             <input
               id="gpx"
               type="file"
               accept=".gpx,application/gpx+xml"
               onChange={readGpxFile}
-              className={`${inputClass} file:mr-3 file:rounded-full file:border-0 file:bg-pine-700 file:px-4 file:py-1.5 file:text-sm file:font-semibold file:text-white hover:file:bg-pine-600`}
+              className={`${inputClass} file:mr-3 file:rounded-[3px] file:border-0 file:bg-ink file:px-4 file:py-1.5 file:font-semibold file:text-paper hover:file:bg-road`}
             />
             <span className={hintClass}>
               Export it from Strava, Garmin, Komoot or any GPS tracking app used during the trip. No GPS file? Leave
-              this empty: after creating the trail, let AI find the places the video passes (public videos), or add a
-              key point for each place yourself, and TrailCast draws the route between them.
+              this empty: after creating the trail, let AI find the places the video passes (public videos), or add
+              each place yourself, and TrailCast draws the route between them.
             </span>
             {routeError && (
               <div className="mt-2">
@@ -152,7 +162,7 @@ export default function NewTrailPage() {
               </div>
             )}
             {route && (
-              <p className="mt-2 rounded-xl bg-surface px-3 py-2 text-sm font-medium text-pine-800 shadow-sm dark:text-pine-300">
+              <p className="mt-3 rounded-[3px] bg-paper px-3 py-2 font-medium text-forest ring-1 ring-forest/30">
                 {route.track.length.toLocaleString()} GPS points
                 {route.trackTimes.length > 0
                   ? `, recorded over ${formatDuration(route.trackTimes.at(-1))}. The map will be able to follow the video.`
@@ -162,7 +172,7 @@ export default function NewTrailPage() {
           </div>
 
           <label className={labelClass}>
-            Support link <span className="font-normal text-stone-500">(optional)</span>
+            Support link <span className="font-normal text-ink-soft">(optional)</span>
             <input
               type="url"
               value={form.supportUrl}
@@ -176,8 +186,8 @@ export default function NewTrailPage() {
           </label>
 
           {error && <ErrorMessage>{error}</ErrorMessage>}
-          <button type="submit" disabled={saving} className="btn-primary px-6 py-3 text-base">
-            {saving ? 'Saving...' : 'Create trail'} <Icon name="arrowRight" className="h-4 w-4" />
+          <button type="submit" disabled={saving} className="btn-primary">
+            {saving ? 'Saving...' : 'Create the trail'} <Icon name="arrowRight" className="h-4 w-4" />
           </button>
         </form>
       </div>

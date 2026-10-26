@@ -2,11 +2,17 @@ import L from 'leaflet';
 import { useEffect, useMemo, useRef } from 'react';
 import { CircleMarker, MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import { SERVICE_KINDS, serviceName } from '../lib/services.js';
+import { useTheme } from '../lib/theme.js';
 import { formatTime } from '../lib/time.js';
 import { boundsOf, cumulativeDistances, indexAtOrBefore, positionAt, travelledAt, videoTimeAtLocation } from '../lib/track.js';
 
-const ORANGE = '#ea580c';
-const VIOLET = '#7c3aed';
+// The sheet's inks for the map: the route in road red, the rider and the AI's
+// places in water blue. Read from the page's colours, which change at night.
+function readInks() {
+  const css = getComputedStyle(document.documentElement);
+  const ink = (name, fallback) => css.getPropertyValue(`--color-${name}`).trim() || fallback;
+  return { road: ink('road', '#c8261c'), ink: ink('ink', '#1b1d19'), water: ink('water', '#1d5c9c'), soft: ink('ink-soft', '#4a5047') };
+}
 
 // While dragging the marker, look for the road only this many route points
 // either side of where it was, so it follows the road under the finger when a
@@ -121,14 +127,13 @@ const iconCache = new Map();
 function numberIcon(number, active) {
   const key = `${number}:${active}`;
   if (!iconCache.has(key)) {
-    const colour = active ? 'bg-orange-600 ring-4 ring-orange-300' : 'bg-pine-800';
     iconCache.set(
       key,
       L.divIcon({
         className: '',
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
-        html: `<div class="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white shadow ${colour}">${number}</div>`,
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
+        html: `<div class="map-point" data-active="${active}">${number}</div>`,
       }),
     );
   }
@@ -178,7 +183,7 @@ function PanTo({ focus }) {
 // the video pauses and shows the frame under the marker, then carries on from
 // there (playing again only if it was playing). With the marker focused, the
 // arrow keys move 10 s, or 60 s with Shift.
-function RiderLayer({ route, clock, follow, approximate, scrub }) {
+function RiderLayer({ route, clock, follow, approximate, scrub, inks }) {
   const { track, trackTimes, videoStartsAt, hiddenRanges } = route;
   const map = useMap();
   const followRef = useRef(follow);
@@ -192,7 +197,7 @@ function RiderLayer({ route, clock, follow, approximate, scrub }) {
     // Its own layer, so the marker is drawn above the key point pins (600) and below tooltips (650).
     if (!map.getPane('rider')) map.createPane('rider').style.zIndex = '640';
     const travelled = L.polyline([], {
-      color: ORANGE,
+      color: inks.road,
       weight: 6,
       opacity: 1,
       dashArray: approximate ? '10 8' : undefined,
@@ -307,22 +312,22 @@ function RiderLayer({ route, clock, follow, approximate, scrub }) {
       travelled.remove();
       marker.remove();
     };
-  }, [map, route, track, trackTimes, videoStartsAt, hiddenRanges, clock, approximate, canScrub]);
+  }, [map, route, track, trackTimes, videoStartsAt, hiddenRanges, clock, approximate, canScrub, inks.road]);
   return null;
 }
 
-// The AI's places while they're being reviewed: violet dots joined in order
+// The AI's places while they're being reviewed: blue dots joined in order
 // (unticked ones grey, suspicious ones red). Drawn in the browser, at no cost.
-function AiPreview({ places }) {
+function AiPreview({ places, inks }) {
   const located = places.filter((p) => p.lat !== null && p.lat !== undefined);
   const ticked = located.filter((p) => p.checked);
   return (
     <>
       {ticked.length > 1 && (
-        <Polyline positions={ticked.map((p) => [p.lat, p.lng])} pathOptions={{ color: VIOLET, weight: 3, dashArray: '2 8', opacity: 0.9 }} />
+        <Polyline positions={ticked.map((p) => [p.lat, p.lng])} pathOptions={{ color: inks.water, weight: 3, dashArray: '2 8', opacity: 0.9 }} />
       )}
       {located.map((p) => {
-        const colour = !p.checked ? '#a8a29e' : p.flags?.includes('detour') ? '#dc2626' : VIOLET;
+        const colour = !p.checked ? inks.soft : p.flags?.includes('detour') ? inks.road : inks.water;
         return (
           <CircleMarker key={p.id} center={[p.lat, p.lng]} radius={6} pathOptions={{ color: '#ffffff', weight: 2, fillColor: colour, fillOpacity: 1 }}>
             <Tooltip direction="top" offset={[0, -6]}>
@@ -371,6 +376,8 @@ export default function TrailMap({
   fuelGapLine,
 }) {
   const playable = trackTimes?.length > 0 && trackTimes.length === track.length;
+  const theme = useTheme();
+  const inks = useMemo(readInks, [theme]);
   // Everything the route maths needs, worked out once per route.
   const route = useMemo(
     () => ({ track, trackTimes, videoStartsAt, hiddenRanges: hiddenRanges ?? [], cum: cumulativeDistances(track) }),
@@ -389,12 +396,16 @@ export default function TrailMap({
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         {track.length > 1 && (
-          <Polyline
-            positions={track}
-            // Faded when the video can play along it (the covered part is drawn bold on top).
-            // Dashed for routes drawn between key points: they're approximate.
-            pathOptions={{ color: ORANGE, weight: 5, opacity: playable ? 0.35 : 0.85, dashArray: approximate ? '10 8' : undefined, interactive: false }}
-          />
+          <>
+            {/* A road on a sheet: red, edged in ink. */}
+            <Polyline positions={track} pathOptions={{ color: inks.ink, weight: 8, opacity: playable ? 0.3 : 0.5, interactive: false }} />
+            <Polyline
+              positions={track}
+              // Faded when the video can play along it (the covered part is drawn bold on top).
+              // Dashed for routes drawn between key points: they're approximate.
+              pathOptions={{ color: inks.road, weight: 5, opacity: playable ? 0.6 : 0.95, dashArray: approximate ? '10 8' : undefined, interactive: false }}
+            />
+          </>
         )}
         {track.length > 1 && scrub && <ScrubLine route={route} scrub={scrub} />}
         {points.map((point, i) => (
@@ -413,16 +424,16 @@ export default function TrailMap({
           </Marker>
         ))}
         {pendingLocation && (
-          <CircleMarker center={pendingLocation} radius={9} pathOptions={{ color: ORANGE, weight: 3, dashArray: '4 4', fillOpacity: 0.2 }} />
+          <CircleMarker center={pendingLocation} radius={9} pathOptions={{ color: inks.road, weight: 3, dashArray: '4 4', fillOpacity: 0.2 }} />
         )}
-        {/* While the AI's places are reviewed, the service icons step aside (ATM violet is close to the AI's). */}
+        {/* While the AI's places are reviewed, the service icons step aside, so the two don't mix. */}
         {preview.length === 0 && (services.length > 0 || fuelGapLine) && <ServicesLayer items={services} visibleKinds={serviceKinds} gapLine={fuelGapLine} />}
-        <AiPreview places={preview} />
+        <AiPreview places={preview} inks={inks} />
         {/* The spot under the pointer on the elevation chart. */}
         {ghost && (
-          <CircleMarker center={ghost} radius={8} interactive={false} pathOptions={{ color: '#2563eb', weight: 3, fill: false, dashArray: '3 3' }} />
+          <CircleMarker center={ghost} radius={8} interactive={false} pathOptions={{ color: inks.water, weight: 3, fill: false, dashArray: '3 3' }} />
         )}
-        {playable && clock && <RiderLayer route={route} clock={clock} follow={follow} approximate={approximate} scrub={scrub} />}
+        {playable && clock && <RiderLayer route={route} clock={clock} follow={follow} approximate={approximate} scrub={scrub} inks={inks} />}
         <FitToTrail trailId={trailId} locations={locations} />
         <FitToPreview places={preview} />
         <PanTo focus={focus} />
@@ -430,13 +441,13 @@ export default function TrailMap({
       </MapContainer>
 
       {hiddenNote && (
-        <p className="absolute top-3 left-14 z-[1000] rounded-lg bg-surface/95 px-3 py-1.5 text-sm shadow-md">{hiddenNote}</p>
+        <p className="absolute top-3 left-14 z-[1000] rounded-[3px] bg-paper/95 px-3 py-1.5 text-small font-medium ring-1 ring-ink/20">{hiddenNote}</p>
       )}
       {playable && !follow && (
         <button
           type="button"
           onClick={() => onFollowChange?.(true)}
-          className="absolute right-3 bottom-6 z-[1000] rounded-lg bg-surface px-3 py-1.5 text-sm font-semibold shadow-md hover:bg-stone-100"
+          className="btn-secondary btn-small absolute right-3 bottom-6 z-[1000]"
         >
           Follow the video
         </button>

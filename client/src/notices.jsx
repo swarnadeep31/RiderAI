@@ -36,19 +36,19 @@ function ConfirmDialog({ request, onAnswer }) {
       // A click on the dim backdrop (the dialog itself, outside its panel) cancels.
       onClick={(event) => event.target === ref.current && onAnswer(false)}
       // overflow-visible: the browser gives dialogs scroll bars, which would flash while the panel animates in.
-      className="m-auto max-w-[calc(100%-2rem)] overflow-visible bg-transparent p-0 backdrop:bg-pine-950/60 backdrop:backdrop-blur-sm"
+      className="m-auto max-w-[calc(100%-2rem)] overflow-visible bg-transparent p-0 backdrop:bg-black/55"
     >
       {request && (
-        <div className="card w-96 max-w-full p-6 motion-safe:animate-dialog-in">
+        <div className="w-[28rem] max-w-full rounded-[3px] bg-paper p-6 text-ink shadow-[0_18px_50px_-12px_rgb(0_0_0/0.45)] ring-1 ring-ink/20 motion-safe:animate-dialog-in">
           <div className="flex items-start gap-4">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[3px] bg-road/10 text-road">
               <Icon name={request.icon ?? 'trash'} className="h-5 w-5" />
             </span>
             <div className="min-w-0">
-              <h2 id={titleId} className="text-lg font-extrabold text-ink">
+              <h2 id={titleId} className="text-[1.5rem] leading-tight">
                 {request.title}
               </h2>
-              <p id={messageId} className="mt-1 text-sm text-stone-600">
+              <p id={messageId} className="mt-1 text-ink-soft">
                 {request.message}
               </p>
             </div>
@@ -69,8 +69,8 @@ function ConfirmDialog({ request, onAnswer }) {
 
 // The opposite of the page (dark by day, light at night), so it always stands out.
 const TONES = {
-  success: { icon: 'check', className: 'bg-ink text-surface', iconClass: 'bg-pine-600 text-white' },
-  error: { icon: 'compass', className: 'bg-red-600 text-white', iconClass: 'bg-white/20 text-white' },
+  success: { icon: 'check', className: 'bg-ink text-paper', iconClass: 'bg-forest text-paper' },
+  error: { icon: 'warning', className: 'bg-road text-road-ink', iconClass: 'bg-paper/20' },
 };
 
 function Toasts({ toasts, onDismiss }) {
@@ -81,14 +81,14 @@ function Toasts({ toasts, onDismiss }) {
         return (
           <div
             key={toast.id}
-            className={`pointer-events-auto flex max-w-md items-center gap-3 rounded-2xl py-2.5 pr-2 pl-3 text-sm font-semibold shadow-xl motion-safe:animate-fade-up ${tone.className}`}
+            className={`pointer-events-auto flex max-w-md items-center gap-3 rounded-[3px] py-2.5 pr-2 pl-3 font-medium shadow-[0_12px_30px_-10px_rgb(0_0_0/0.45)] motion-safe:animate-rise ${tone.className}`}
           >
-            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${tone.iconClass}`}>
+            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-[2px] ${tone.iconClass}`}>
               <Icon name={tone.icon} className="h-4 w-4" strokeWidth={2.4} />
             </span>
             <span className="min-w-0">{toast.message}</span>
-            <button type="button" onClick={() => onDismiss(toast.id)} aria-label="Dismiss" className="ml-1 rounded-full px-2 py-1 opacity-70 hover:opacity-100">
-              ✕
+            <button type="button" onClick={() => onDismiss(toast.id)} aria-label="Dismiss" className="ml-1 rounded-[2px] p-1.5 opacity-70 hover:opacity-100">
+              <Icon name="close" className="h-4 w-4" />
             </button>
           </div>
         );

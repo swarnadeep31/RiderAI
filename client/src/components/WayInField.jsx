@@ -10,7 +10,7 @@ const METHODS = [
 export default function WayInField({ method, onMethod, value, onChange, newAccount = false }) {
   return (
     <div className="space-y-2">
-      <div role="radiogroup" aria-label="Use your email or phone number" className="grid grid-cols-2 gap-1 rounded-full bg-stone-100 p-1">
+      <div role="radiogroup" aria-label="Use your email or phone number" className="grid grid-cols-2 gap-1 rounded-[3px] bg-surface p-1 ring-1 ring-ink/15">
         {METHODS.map((option) => (
           <button
             key={option.value}
@@ -18,8 +18,8 @@ export default function WayInField({ method, onMethod, value, onChange, newAccou
             role="radio"
             aria-checked={method === option.value}
             onClick={() => onMethod(option.value)}
-            className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
-              method === option.value ? 'bg-surface text-ink shadow-sm' : 'text-stone-500 hover:text-stone-800'
+            className={`rounded-[2px] px-3 py-1.5 font-semibold transition-colors ${
+              method === option.value ? 'bg-ink text-paper' : 'text-ink-soft hover:text-ink'
             }`}
           >
             {option.label}
@@ -27,12 +27,12 @@ export default function WayInField({ method, onMethod, value, onChange, newAccou
         ))}
       </div>
       {method === 'email' ? (
-        <label className="block text-sm font-semibold text-stone-800">
+        <label className="field-label">
           Email
           <input type="email" required autoComplete="email" value={value} onChange={(e) => onChange(e.target.value)} className="input" />
         </label>
       ) : (
-        <label className="block text-sm font-semibold text-stone-800">
+        <label className="field-label">
           Phone number
           <input
             type="tel"
@@ -45,7 +45,7 @@ export default function WayInField({ method, onMethod, value, onChange, newAccou
             className="input"
           />
           {newAccount && (
-            <span className="mt-1 flex items-center gap-1 text-sm font-normal text-stone-500">
+            <span className="hint flex items-center gap-1">
               <Icon name="check" className="h-3.5 w-3.5" /> With the country code. Indian numbers can skip the +91.
             </span>
           )}

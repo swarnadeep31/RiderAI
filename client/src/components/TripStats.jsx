@@ -1,41 +1,55 @@
-import { climbText, daysText, distanceText, explain, highestText } from '../lib/stats.js';
-import Icon from './art/Icon.jsx';
+import { formatMetres } from '../lib/elevation.js';
+import { daysText, distanceText, explain } from '../lib/stats.js';
 
-const chipClass =
-  'inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1 text-sm font-semibold text-stone-800 shadow-sm ring-1 ring-stone-900/10';
+// One figure in the sheet's margin: big value, small label under it.
+// onClick: the value is a button (e.g. watch the moment at the highest point).
+export function Readout({ value, label, title, onClick, before = null }) {
+  return (
+    <div title={title} className="flex flex-col-reverse">
+      <dt className="margin-text mt-1">{label}</dt>
+      <dd className="font-display text-[1.75rem] leading-none font-semibold tabular-nums">
+        {onClick ? (
+          <button type="button" onClick={onClick} className="inline-flex items-center gap-1.5 decoration-road decoration-2 underline-offset-4 hover:underline">
+            {before}
+            {value}
+          </button>
+        ) : (
+          <span className="inline-flex items-center gap-1.5">
+            {before}
+            {value}
+          </span>
+        )}
+      </dd>
+    </div>
+  );
+}
 
-// One row of chips under a trail's title: distance, riding days, highest
-// point, total climb, plus `extra` chips (the longest stretch without fuel).
-// A number that isn't known has no chip. Hovering a chip says how it was
-// worked out; the highest point can be clicked to watch that moment.
+// The ride's numbers, set like the margin of a map sheet. A number that isn't
+// known isn't shown. Hovering one says how it was worked out; the highest
+// point can be clicked to watch that moment. extra: more readouts (the longest
+// stretch without fuel).
 export default function TripStats({ stats, onHighest, extra = null, className = '' }) {
   const why = explain(stats);
-  const chips = [
-    { key: 'distance', text: distanceText(stats), icon: 'route', title: why.distance },
-    { key: 'days', text: daysText(stats), icon: 'tent', title: why.days },
-    { key: 'highest', text: highestText(stats), icon: 'summit', title: why.highest, onClick: onHighest },
-    { key: 'climb', text: climbText(stats), icon: 'ascent', title: why.climb },
-  ].filter((chip) => chip.text);
-  if (chips.length === 0 && !extra) return null;
+  const readouts = [
+    { key: 'distance', value: distanceText(stats), label: 'Distance', title: why.distance },
+    { key: 'days', value: daysText(stats), label: 'Riding', title: why.days },
+    Number.isFinite(stats?.highestM) && {
+      key: 'highest',
+      value: `${formatMetres(stats.highestM)} m`,
+      label: stats.highestName ? `Highest · ${stats.highestName}` : 'Highest point',
+      title: why.highest,
+      onClick: onHighest,
+    },
+    Number.isFinite(stats?.ascentM) && { key: 'climb', value: `${formatMetres(stats.ascentM)} m`, label: 'Total climb', title: why.climb },
+  ].filter((r) => r && r.value);
+  if (readouts.length === 0 && !extra) return null;
 
   return (
-    <ul className={`flex flex-wrap gap-2 ${className}`} aria-label="Trip stats">
-      {chips.map((chip) => (
-        <li key={chip.key}>
-          {chip.onClick ? (
-            <button type="button" onClick={chip.onClick} title={chip.title} className={`${chipClass} transition hover:-translate-y-0.5 hover:ring-orange-300`}>
-              <Icon name={chip.icon} className="h-4 w-4 text-orange-600" />
-              {chip.text}
-            </button>
-          ) : (
-            <span title={chip.title} className={chipClass}>
-              <Icon name={chip.icon} className="h-4 w-4 text-pine-600 dark:text-pine-300" />
-              {chip.text}
-            </span>
-          )}
-        </li>
+    <dl className={`flex flex-wrap gap-x-8 gap-y-4 border-y border-ink/15 py-4 ${className}`} aria-label="Trip stats">
+      {readouts.map(({ key, ...r }) => (
+        <Readout key={key} {...r} />
       ))}
       {extra}
-    </ul>
+    </dl>
   );
 }

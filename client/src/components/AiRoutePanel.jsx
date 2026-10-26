@@ -45,10 +45,10 @@ function UploadOption({ busy, onUpload, maxMb }) {
   }
 
   return (
-    <details className="rounded-2xl border border-stone-200 p-3">
-      <summary className="cursor-pointer font-semibold text-violet-900">Or use the video file from your computer</summary>
+    <details className="rounded-[3px] bg-paper p-3 ring-1 ring-ink/15">
+      <summary className="cursor-pointer font-semibold text-water">Or use the video file from your computer</summary>
       <div className="mt-3 space-y-3">
-        <p className="text-stone-600">
+        <p className="text-ink-soft">
           Use the same video you put on YouTube, so the places line up with it. This also works for private and unlisted
           videos. The file goes to Google's Gemini, and is deleted from TrailCast and Gemini when the analysis ends.
           {maxMb && ` Files up to ${maxMb} MB: for a bigger one, export a smaller copy (720p is plenty).`}
@@ -57,7 +57,7 @@ function UploadOption({ busy, onUpload, maxMb }) {
           type="file"
           accept="video/*,.mkv,.mov,.mp4"
           onChange={(e) => setFile(e.target.files[0] ?? null)}
-          className="block w-full text-sm file:mr-3 file:rounded-full file:border-0 file:bg-violet-100 file:px-3 file:py-1.5 file:font-semibold file:text-violet-800"
+          className="block w-full text-small file:mr-3 file:rounded-[3px] file:border-0 file:bg-ink file:px-3 file:py-1.5 file:font-semibold file:text-paper"
         />
         <fieldset className="space-y-1.5">
           <legend className="font-medium">What should the AI use?</legend>
@@ -66,17 +66,17 @@ function UploadOption({ busy, onUpload, maxMb }) {
               <input type="radio" name="media-mode" value={option.value} checked={mode === option.value} onChange={() => setMode(option.value)} className="mt-1" />
               <span>
                 <span className="font-semibold">{option.label}</span>
-                <span className="block text-xs text-stone-600">{option.hint}</span>
+                <span className="block text-small text-ink-soft">{option.hint}</span>
               </span>
             </label>
           ))}
         </fieldset>
         {progress !== null ? (
           <div className="space-y-1" role="status">
-            <div className="h-2 overflow-hidden rounded-full bg-stone-200">
-              <div className="h-full rounded-full bg-violet-600 transition-all" style={{ width: `${Math.round(progress * 100)}%` }} />
+            <div className="h-2 overflow-hidden rounded-full bg-surface-2">
+              <div className="h-full rounded-full bg-water transition-[width]" style={{ width: `${Math.round(progress * 100)}%` }} />
             </div>
-            <p className="text-xs text-stone-600">{progress < 1 ? `Uploading... ${Math.round(progress * 100)}%` : 'Checking the file...'}</p>
+            <p className="text-small text-ink-soft">{progress < 1 ? `Uploading... ${Math.round(progress * 100)}%` : 'Checking the file...'}</p>
           </div>
         ) : (
           <>
@@ -113,9 +113,9 @@ const FLAGS = {
 };
 
 function confidenceColour(confidence) {
-  if (confidence >= 0.75) return 'bg-green-500';
-  if (confidence >= 0.5) return 'bg-amber-400';
-  return 'bg-red-400';
+  if (confidence >= 0.75) return 'bg-forest';
+  if (confidence >= 0.5) return 'bg-contour';
+  return 'bg-road';
 }
 
 const isRunning = (job) => job && ['queued', 'running'].includes(job.state);
@@ -143,7 +143,7 @@ function CandidateRow({ place, onChange, onSeek }) {
           aria-label={`Use ${place.name}`}
           className="mt-1"
         />
-        <button type="button" onClick={() => onSeek(place.time)} className="font-mono text-xs text-orange-700 hover:underline" title="Jump to this moment">
+        <button type="button" onClick={() => onSeek(place.time)} className="text-small font-semibold text-water tabular-nums hover:underline" title="Jump to this moment">
           {formatTime(place.time)}
           {place.stayUntil ? `–${formatTime(place.stayUntil)}` : ''}
         </button>
@@ -154,35 +154,35 @@ function CandidateRow({ place, onChange, onSeek }) {
               title={`AI confidence ${Math.round(place.confidence * 100)}%`}
             />
             <span className="font-semibold">{place.name}</span>
-            {place.presence === 'mentioned' && <span className="ml-1 text-xs text-stone-500">(only mentioned)</span>}
+            {place.presence === 'mentioned' && <span className="ml-1 text-small text-ink-soft">(only mentioned)</span>}
           </p>
           {located ? (
-            <p className="truncate text-xs text-stone-500">{place.label}</p>
+            <p className="truncate text-small text-ink-soft">{place.label}</p>
           ) : (
-            <p className="text-xs text-stone-500">Not on the map yet</p>
+            <p className="text-small text-ink-soft">Not on the map yet</p>
           )}
-          <p className="text-xs text-stone-600">
+          <p className="text-small text-ink-soft">
             {EVIDENCE[place.evidence]}
             {place.quote && <span className="italic"> · “{place.quote}”</span>}
           </p>
-          <label className="mt-0.5 flex w-fit items-center gap-1.5 text-xs text-stone-700">
+          <label className="mt-0.5 flex w-fit items-center gap-1.5 text-small text-ink">
             <input
               type="checkbox"
               checked={place.stopKind === 'overnight'}
               onChange={(e) => onChange({ stopKind: e.target.checked ? 'overnight' : null })}
             />
-            <Icon name="moon" className="h-3.5 w-3.5 text-sky-600" />
+            <Icon name="moon" className="h-3.5 w-3.5 text-water" />
             Stayed the night here
           </label>
           {place.flags
             ?.filter((flag) => FLAGS[flag])
             .map((flag) => (
-              <p key={flag} className={`text-xs ${flag === 'low_confidence' ? 'text-stone-600' : 'text-red-700'}`}>
+              <p key={flag} className={`text-small ${flag === 'low_confidence' ? 'text-ink-soft' : 'text-road'}`}>
                 {FLAGS[flag]}
               </p>
             ))}
         </div>
-        <button type="button" onClick={() => setChanging(!changing)} className="shrink-0 text-xs font-medium text-orange-700 hover:underline">
+        <button type="button" onClick={() => setChanging(!changing)} className="shrink-0 text-small font-medium text-road hover:underline">
           {changing ? 'Close' : 'Change'}
         </button>
       </div>
@@ -190,8 +190,8 @@ function CandidateRow({ place, onChange, onSeek }) {
         <div className="space-y-2 pl-6">
           {place.alternatives?.length > 0 && (
             <div>
-              <p className="text-xs font-medium text-stone-600">Other places with this name:</p>
-              <ul className="text-xs">
+              <p className="text-small font-medium text-ink-soft">Other places with this name:</p>
+              <ul className="text-small">
                 {place.alternatives.map((alt) => (
                   <li key={`${alt.lat},${alt.lng}`}>
                     <button type="button" onClick={() => moveTo(alt)} className="text-left hover:underline">
@@ -238,10 +238,10 @@ function HiddenRangeRow({ range, onChange, onRemove }) {
           </option>
         ))}
       </select>
-      <input value={start} onChange={(e) => setStart(e.target.value)} onBlur={commit} aria-label="Skip from" className="field w-20 px-2 py-1 font-mono" />
+      <input value={start} onChange={(e) => setStart(e.target.value)} onBlur={commit} aria-label="Skip from" className="field w-20 px-2 py-1 tabular-nums" />
       to
-      <input value={end} onChange={(e) => setEnd(e.target.value)} onBlur={commit} aria-label="Skip until" className="field w-20 px-2 py-1 font-mono" />
-      <button type="button" onClick={onRemove} aria-label="Stop skipping this part" className="px-1 text-stone-400 hover:text-red-600">
+      <input value={end} onChange={(e) => setEnd(e.target.value)} onBlur={commit} aria-label="Skip until" className="field w-20 px-2 py-1 tabular-nums" />
+      <button type="button" onClick={onRemove} aria-label="Stop skipping this part" className="px-1 text-ink-soft hover:text-road">
         ✕
       </button>
     </li>
@@ -366,36 +366,36 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
   if (available === null) return null;
 
   return (
-    <div className="space-y-2 text-sm">
-      <h3 className="flex items-center gap-1.5 font-display text-base font-bold text-violet-900">
+    <div className="space-y-3">
+      <h3 className="flex items-center gap-1.5 font-display text-[1.3rem] leading-tight font-semibold text-water">
         <Icon name="sparkles" className="h-4 w-4" /> Let AI find the places in the video
       </h3>
       {!available && (
-        <p className="text-stone-600">
+        <p className="text-ink-soft">
           This server has no Gemini key yet (GEMINI_API_KEY in server/.env), so the AI route builder is off.
         </p>
       )}
 
       {available && !running && !reviewing && (
         <>
-          <p className="text-stone-600">
+          <p className="text-ink-soft">
             Google's Gemini watches the video and lists the towns and landmarks it passes, with the moment each one
             appears. You check the list, then TrailCast draws the route through them. Works with public videos only.
           </p>
           {job?.state === 'failed' && <ErrorMessage>{job.error || 'The analysis failed.'}</ErrorMessage>}
-          {job?.state === 'cancelled' && <p className="text-stone-600">The last analysis was cancelled.</p>}
+          {job?.state === 'cancelled' && <p className="text-ink-soft">The last analysis was cancelled.</p>}
           {job?.state === 'needs_review' && (
-            <p className="text-stone-600">
+            <p className="text-ink-soft">
               The AI's places are waiting for your check.{' '}
-              <button type="button" onClick={() => setReviewing(true)} className="font-medium text-orange-700 underline">
+              <button type="button" onClick={() => setReviewing(true)} className="font-medium text-road underline">
                 Check them now
               </button>
             </p>
           )}
           {job?.state === 'accepted' && (
-            <p className="text-stone-600">
-              The AI's places are on the map as key points.{' '}
-              <button type="button" onClick={() => setReviewing(true)} className="font-medium text-orange-700 underline">
+            <p className="text-ink-soft">
+              The AI's places are on the map.{' '}
+              <button type="button" onClick={() => setReviewing(true)} className="font-medium text-road underline">
                 Review them again
               </button>
             </p>
@@ -421,32 +421,32 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
       )}
 
       {running && (
-        <div className="card space-y-2 p-4">
+        <div className="space-y-2 rounded-[3px] bg-paper p-4 ring-1 ring-ink/15">
           <p className="font-medium">
             {job.state === 'running' ? `${stageText(job)}...` : job.retryAt ? `Trying again at ${clockTime(job.retryAt)}...` : 'Waiting to start...'}
             {job.state === 'running' && job.progress?.total > 1 && (
-              <span className="ml-1 text-stone-500">
+              <span className="ml-1 text-ink-soft">
                 ({job.progress.done} of {job.progress.total})
               </span>
             )}
           </p>
           {/* Gemini was busy or at its limit: the analysis waits its turn again, nothing is lost. */}
-          {job.retryAt && job.retryReason && <p className="text-stone-600">{job.retryReason}</p>}
-          <p className="text-stone-600">This takes a minute or two for a short video. You can leave this page and come back.</p>
-          <button type="button" onClick={cancel} className="text-red-700 hover:underline">
+          {job.retryAt && job.retryReason && <p className="text-ink-soft">{job.retryReason}</p>}
+          <p className="text-ink-soft">This takes a minute or two for a short video. You can leave this page and come back.</p>
+          <button type="button" onClick={cancel} className="text-road hover:underline">
             Cancel
           </button>
         </div>
       )}
 
       {reviewing && (
-        <div className="card space-y-3 p-4">
+        <div className="space-y-3 rounded-[3px] bg-paper p-4 ring-1 ring-ink/15">
           <div>
             <p className="font-medium">
               Check the places the AI found{job.videoTitle && <> in “{job.videoTitle}”</>}
             </p>
-            <p className="text-stone-600">
-              Ticked places become key points and the route goes through them in order (violet on the map). Untick
+            <p className="text-ink-soft">
+              Ticked places are added to the ride, and the route goes through them in order (blue on the map). Untick
               anything wrong, and use Change if a place landed in the wrong spot.
               {job.reused
                 ? ' This video was analysed before, so this cost nothing.'
@@ -457,9 +457,9 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
           </div>
 
           {places.length === 0 ? (
-            <p className="text-stone-600">The AI found no places in this video. Add key points by hand instead.</p>
+            <p className="text-ink-soft">The AI found no places in this video. Add the places by hand instead.</p>
           ) : (
-            <ol className="max-h-[28rem] divide-y divide-stone-100 overflow-y-auto rounded-xl border border-stone-200">
+            <ol className="max-h-[28rem] divide-y divide-ink/10 overflow-y-auto rounded-[3px] bg-paper ring-1 ring-ink/15">
               {places.map((place) => (
                 <CandidateRow key={place.id} place={place} onChange={(changes) => updatePlace(place.id, changes)} onSeek={onSeek} />
               ))}
@@ -469,7 +469,7 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
           <div className="space-y-1">
             <p className="font-medium">Parts of the video the map skips</p>
             {hidden.length === 0 ? (
-              <p className="text-stone-600">None. The map follows the whole video.</p>
+              <p className="text-ink-soft">None. The map follows the whole video.</p>
             ) : (
               <ul className="space-y-1">
                 {hidden.map((range, i) => (
@@ -493,11 +493,11 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
             >
               {busy ? 'Drawing the route...' : `Use ${tickedCount} places and draw the route`}
             </button>
-            <button type="button" onClick={() => setReviewing(false)} className="text-stone-600 hover:underline">
+            <button type="button" onClick={() => setReviewing(false)} className="text-ink-soft hover:underline">
               Not now
             </button>
           </div>
-          {tickedCount < 2 && <p className="text-stone-600">Tick at least two places to draw a route.</p>}
+          {tickedCount < 2 && <p className="text-ink-soft">Tick at least two places to draw a route.</p>}
         </div>
       )}
 

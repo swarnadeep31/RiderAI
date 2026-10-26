@@ -50,22 +50,22 @@ export default function PlaceSearch({ onPick }) {
           type="button"
           onClick={search}
           disabled={searching || query.trim().length < 2}
-          className="btn-secondary py-1.5"
+          className="btn-secondary btn-small"
         >
           {searching ? 'Searching...' : 'Search'}
         </button>
       </div>
       {error && <ErrorMessage>{error}</ErrorMessage>}
       {results?.length === 0 && (
-        <p className="text-sm text-stone-600">No places found. Try another spelling, or click the map instead.</p>
+        <p className="text-small text-ink-soft">No places found. Try another spelling, or click the map instead.</p>
       )}
       {results?.length > 0 && (
-        <ul className="divide-y divide-stone-100 overflow-hidden rounded-xl border border-stone-200 bg-surface">
+        <ul className="divide-y divide-ink/10 overflow-hidden rounded-[3px] bg-paper ring-1 ring-ink/15">
           {results.map((place) => (
             <li key={`${place.lat},${place.lng}`}>
-              <button type="button" onClick={() => pick(place)} className="block w-full px-2 py-1.5 text-left hover:bg-orange-50">
+              <button type="button" onClick={() => pick(place)} className="block w-full px-2 py-1.5 text-left hover:bg-surface">
                 <span className="font-medium">{place.name}</span>
-                <span className="block truncate text-xs text-stone-500">{place.description}</span>
+                <span className="block truncate text-small text-ink-soft">{place.description}</span>
               </button>
             </li>
           ))}
