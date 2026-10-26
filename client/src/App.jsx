@@ -3,7 +3,7 @@ import { BrowserRouter, Link, Outlet, Route, Routes, useLocation } from 'react-r
 import { AuthProvider, useAuth } from './auth.jsx';
 import RequireAuth from './components/RequireAuth.jsx';
 import Icon from './components/art/Icon.jsx';
-import { CampScene, FooterCamp, FooterRidge, LogoMark } from './components/art/Scenery.jsx';
+import { LogoMark } from './components/art/Sheet.jsx';
 import { toggleTheme, useTheme } from './lib/theme.js';
 import AccountPage from './pages/AccountPage.jsx';
 import FeedbackPage from './pages/FeedbackPage.jsx';
@@ -20,7 +20,7 @@ const TrailPage = lazy(() => import('./pages/TrailPage.jsx'));
 const PrintPage = lazy(() => import('./pages/PrintPage.jsx'));
 
 function PageLoading() {
-  return <p className="px-4 py-16 text-center font-semibold text-pine-700 dark:text-pine-300">Loading...</p>;
+  return <p className="px-4 py-16 text-center font-medium text-ink-soft">Loading...</p>;
 }
 
 function HeaderLinks() {
@@ -32,94 +32,121 @@ function HeaderLinks() {
     const onAuthPage = ['/login', '/signup'].includes(location.pathname);
     const next = onAuthPage ? location.search : `?next=${encodeURIComponent(location.pathname + location.search)}`;
     return (
-      <div className="flex items-center gap-1.5 sm:gap-2">
-        <Link to={`/login${next}`} className="btn-ghost">
+      <>
+        <Link to={`/login${next}`} className="btn-ghost btn-small">
           Log in
         </Link>
-        <Link to={`/signup${next}`} className="btn-primary">
+        <Link to={`/signup${next}`} className="btn-primary btn-small">
           Sign up
         </Link>
-      </div>
+      </>
     );
   }
+  const name = user.name || `@${user.username}`;
   return (
-    <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
-      <Link to="/new" className="btn-primary">
-        + New trail
-      </Link>
-      <Link to="/account" className="btn-ghost min-w-0 gap-2 px-1.5 sm:max-w-52 sm:pr-4">
-        <span
-          aria-hidden="true"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-pine-700 font-display text-sm text-white uppercase"
-        >
-          {(user.name || user.username)[0]}
+    <>
+      <Link to="/new" className="btn-primary btn-small">
+        <Icon name="edit" className="h-4 w-4" />
+        <span>
+          New<span className="hidden sm:inline"> trail</span>
         </span>
-        {/* Phones show just the round letter; screen readers still hear the name. */}
-        <span className="sr-only sm:not-sr-only sm:truncate">{user.name || `@${user.username}`}</span>
       </Link>
-    </div>
+      <Link to="/account" className="btn-ghost btn-small min-w-0 gap-2 px-1.5" title="Your account">
+        <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink font-display text-base font-semibold text-paper uppercase">
+          {name.replace('@', '')[0]}
+        </span>
+        {/* Phones show just the initial; screen readers still hear the name. */}
+        <span className="sr-only lg:not-sr-only lg:max-w-40 lg:truncate">{name}</span>
+      </Link>
+    </>
   );
 }
 
-// The small day/night switch tucked into the footer (the big one is the sun on the home page).
-function DayNightSwitch() {
+// Day and night: a small switch in the header, and a worded one in the footer.
+// The site follows the device's setting until the visitor picks one.
+function DayNightSwitch({ worded = false }) {
   const night = useTheme() === 'dark';
   const label = night ? 'Switch to day mode' : 'Switch to night mode';
+  if (worded) {
+    return (
+      <button type="button" onClick={toggleTheme} className="link inline-flex items-center gap-1.5">
+        <Icon name={night ? 'sun' : 'moon'} className="h-4 w-4" />
+        {night ? 'Day mode' : 'Night mode'}
+      </button>
+    );
+  }
   return (
     <button
       type="button"
       onClick={toggleTheme}
       aria-label={label}
-      title={night ? 'Bring back the morning' : 'Watch the sunset'}
-      className="flex h-8 w-8 items-center justify-center rounded-full text-pine-300 transition hover:rotate-12 hover:bg-white/10 hover:text-amber-300 focus-visible:ring-4 focus-visible:ring-amber-300/40 focus-visible:outline-none"
+      title={label}
+      className="flex h-9 w-9 items-center justify-center rounded-[3px] text-ink transition-colors hover:bg-ink/6"
     >
-      <Icon name={night ? 'sun' : 'moon'} className="h-4 w-4" />
+      <Icon name={night ? 'sun' : 'moon'} className="h-5 w-5" />
     </button>
   );
 }
 
 function Layout() {
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-[1100] border-b border-stone-900/5 bg-sand-100/85 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2.5">
-          <Link to="/" className="group flex items-center gap-2.5">
-            <LogoMark className="h-9 w-9 transition group-hover:-rotate-6" />
-            <span className="font-display text-xl font-extrabold tracking-tight text-ink">
-              Trail<span className="text-orange-600">Cast</span>
-            </span>
+    <div className="flex min-h-svh flex-col">
+      <header className="sticky top-0 z-[1100] border-b border-ink/12 bg-paper">
+        <div className="mx-auto flex h-14 max-w-7xl items-center gap-2 px-4 sm:gap-6">
+          <Link to="/" className="flex shrink-0 items-center gap-2">
+            <LogoMark className="h-8 w-8" />
+            <span className="font-display text-[1.6rem] leading-none font-semibold tracking-tight">TrailCast</span>
           </Link>
-          <HeaderLinks />
+          <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
+            <Link to="/#rides" className="btn-ghost btn-small text-ink-soft hover:text-ink">
+              Rides
+            </Link>
+            <Link to="/#how" className="btn-ghost btn-small text-ink-soft hover:text-ink">
+              How it works
+            </Link>
+            <Link to="/tour" className="btn-ghost btn-small text-ink-soft hover:text-ink">
+              Tour
+            </Link>
+          </nav>
+          <div className="ml-auto flex min-w-0 items-center gap-1 sm:gap-2">
+            <DayNightSwitch />
+            <HeaderLinks />
+          </div>
         </div>
       </header>
       <div className="flex-1">
         <Outlet />
       </div>
-      <footer className="relative mt-24 bg-pine-900 text-pine-100">
-        <FooterRidge className="absolute bottom-full left-0 h-16 w-full sm:h-24" />
-        <FooterCamp className="absolute right-[6%] bottom-full h-14 sm:h-20" />
-        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-10 sm:flex-row sm:items-end sm:justify-between">
+      <footer className="mt-24 bg-field">
+        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:grid-cols-[1.4fr_1fr_1fr]">
           <div>
-            <Link to="/" className="flex items-center gap-2.5">
+            <Link to="/" className="flex items-center gap-2">
               <LogoMark className="h-8 w-8" />
-              <span className="font-display text-lg font-extrabold text-white">TrailCast</span>
+              <span className="font-display text-2xl leading-none font-semibold">TrailCast</span>
             </Link>
-            <p className="mt-2 max-w-sm text-sm text-pine-200">
-              Made for people who&apos;d rather be outside. Videos stay on YouTube; maps by OpenStreetMap contributors.
+            <p className="mt-3 max-w-sm text-ink-soft">
+              Ride videos with the map beside them. Videos stay on YouTube; map data from OpenStreetMap contributors.
             </p>
           </div>
-          <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-semibold">
-            <Link to="/" className="hover:text-white">
-              Explore trails
+          <nav aria-label="Rides" className="flex flex-col items-start gap-2">
+            <p className="margin-text">Rides</p>
+            <Link to="/#rides" className="link">
+              Explore the rides
             </Link>
-            <Link to="/new" className="hover:text-white">
-              Share a trip
+            <Link to="/new" className="link">
+              Share your ride
             </Link>
-            <Link to="/feedback" className="text-amber-300 hover:text-amber-200">
+            <Link to="/tour" className="link">
+              Take the tour
+            </Link>
+          </nav>
+          <div className="flex flex-col items-start gap-2">
+            <p className="margin-text">TrailCast</p>
+            <Link to="/feedback" className="link">
               Send feedback
             </Link>
-            <DayNightSwitch />
-          </nav>
+            <DayNightSwitch worded />
+          </div>
         </div>
       </footer>
     </div>
@@ -128,12 +155,11 @@ function Layout() {
 
 function NotFound() {
   return (
-    <main className="mx-auto max-w-xl px-4 py-16 text-center">
-      <CampScene className="mx-auto w-full max-w-sm drop-shadow-xl" />
-      <h1 className="mt-8 text-3xl font-extrabold text-ink">This trail doesn&apos;t exist (yet)</h1>
-      <p className="mt-2 text-stone-600">Looks like we wandered off the map. Let&apos;s head back to camp.</p>
-      <Link to="/" className="btn-primary mt-6">
-        Back to all trails
+    <main className="mx-auto max-w-3xl px-4 py-16">
+      <h1 className="text-display uppercase">This page is off the map</h1>
+      <p className="mt-4 max-w-xl text-lead text-ink-soft">The link may be missing a part, or the trail was deleted.</p>
+      <Link to="/" className="btn-primary mt-8">
+        Back to the rides
       </Link>
     </main>
   );

@@ -1,69 +1,59 @@
 @import 'tailwindcss';
+@import '@fontsource/mukta/400.css';
+@import '@fontsource/mukta/500.css';
+@import '@fontsource/mukta/600.css';
+@import '@fontsource/mukta/700.css';
+@import '@fontsource/khand/500.css';
+@import '@fontsource/khand/600.css';
 
 /* Night mode: the `dark` class on <html> (set by lib/theme.js). */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* TrailCast's look: warm sand paper, pine forests, sunset orange and a morning sky. */
+/* TrailCast prints every ride like a Survey of India map sheet: white sheet,
+   black ink, the route in road red, heights in contour brown, the rider's
+   moment in water blue, and forest green for whole fields of the page. At
+   night the sheet is read by headlamp: dark slate, the same inks made bright.
+   Type: Khand (Indian Type Foundry) for sheet titles, Mukta (Ek Type) for text. */
 @theme {
-  --font-sans: 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, sans-serif;
-  --font-display: 'Bricolage Grotesque Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Mukta', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Khand', 'Mukta', ui-sans-serif, system-ui, sans-serif;
 
-  --color-pine-50: #eff8f3;
-  --color-pine-100: #d8eee2;
-  --color-pine-200: #b3dcc7;
-  --color-pine-300: #84c3a5;
-  --color-pine-400: #52a37f;
-  --color-pine-500: #318764;
-  --color-pine-600: #236c50;
-  --color-pine-700: #1d5642;
-  --color-pine-800: #194536;
-  --color-pine-900: #15392e;
-  --color-pine-950: #0b201a;
+  --color-paper: #fbfcf9;
+  --color-surface: #f1f4ec;
+  --color-surface-2: #e4e9dc;
+  --color-field: #dbe8cd;
+  --color-ink: #1b1d19;
+  --color-ink-soft: #4a5047;
+  --color-road: #c8261c;
+  --color-road-deep: #a11b13;
+  --color-road-ink: #ffffff;
+  --color-contour: #93491f;
+  --color-water: #1d5c9c;
+  --color-water-tint: #d7e6f4;
+  --color-forest: #2f6b3a;
 
-  --color-sand-50: #fdfbf7;
-  --color-sand-100: #fbf6ec;
-  --color-sand-200: #f4e8d2;
-  --color-sand-300: #e9d4ae;
+  /* The few sizes the site uses, with their line heights. */
+  --text-small: 0.875rem;
+  --text-small--line-height: 1.45;
+  --text-body: 1.0625rem;
+  --text-body--line-height: 1.6;
+  --text-lead: 1.3125rem;
+  --text-lead--line-height: 1.5;
+  --text-title: clamp(1.75rem, 1.35rem + 1.6vw, 2.6rem);
+  --text-title--line-height: 1.05;
+  --text-display: clamp(2.5rem, 1.2rem + 3.6vw, 4.6rem);
+  --text-display--line-height: 0.92;
 
-  /* Cards and headings, which change at night. */
-  --color-surface: #ffffff;
-  --color-ink: #0b201a;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 
-  --animate-float: float 6s ease-in-out infinite;
-  --animate-glow: glow 7s ease-in-out infinite;
-  --animate-fade-up: fade-up 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  --animate-pop: pop 0.6s cubic-bezier(0.3, 1.5, 0.5, 1) both;
-  /* Dialogs: a quick, gentle fade in that never grows past full size. */
-  --animate-dialog-in: dialog-in 0.18s ease-out both;
-  --animate-flutter: flutter 1.6s ease-in-out infinite;
-  --animate-flicker: flicker 0.9s ease-in-out infinite alternate;
-  --animate-shimmer: shimmer 1.6s linear infinite;
-  --animate-wiggle: wiggle 2.4s ease-in-out infinite;
+  --animate-rise: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-dialog-in: dialog-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-fade-in: fade-in 0.4s ease-out both;
 
-  @keyframes float {
-    0%,
-    100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-8px);
-    }
-  }
-  @keyframes glow {
-    0%,
-    100% {
-      opacity: 0.5;
-      transform: scale(1);
-    }
-    50% {
-      opacity: 0.9;
-      transform: scale(1.08);
-    }
-  }
-  @keyframes fade-up {
+  @keyframes rise {
     from {
       opacity: 0;
-      transform: translateY(18px);
+      transform: translateY(14px);
     }
     to {
       opacity: 1;
@@ -73,321 +63,248 @@
   @keyframes dialog-in {
     from {
       opacity: 0;
-      transform: translateY(8px) scale(0.97);
+      transform: translateY(8px);
     }
     to {
       opacity: 1;
       transform: none;
     }
   }
-  @keyframes pop {
-    0% {
+  @keyframes fade-in {
+    from {
       opacity: 0;
-      transform: translateY(12px) scale(0.4);
-    }
-    100% {
-      opacity: 1;
-      transform: none;
-    }
-  }
-  @keyframes flutter {
-    0%,
-    100% {
-      transform: skewY(0deg) scaleX(1);
-    }
-    50% {
-      transform: skewY(-10deg) scaleX(0.85);
-    }
-  }
-  @keyframes flicker {
-    from {
-      transform: scaleY(0.85) scaleX(1.05);
-      opacity: 0.85;
     }
     to {
-      transform: scaleY(1.12) scaleX(0.95);
       opacity: 1;
-    }
-  }
-  @keyframes shimmer {
-    from {
-      background-position: -400px 0;
-    }
-    to {
-      background-position: 400px 0;
-    }
-  }
-  @keyframes wiggle {
-    0%,
-    100% {
-      transform: rotate(-6deg);
-    }
-    50% {
-      transform: rotate(6deg);
     }
   }
 }
 
+:root.dark {
+  color-scheme: dark;
+  --color-paper: #12171b;
+  --color-surface: #192025;
+  --color-surface-2: #232c32;
+  --color-field: #1b2a21;
+  --color-ink: #edf0e8;
+  --color-ink-soft: #aab3a6;
+  --color-road: #f0584a;
+  --color-road-deep: #ff7a6d;
+  --color-road-ink: #12171b;
+  --color-contour: #e59c6c;
+  --color-water: #72adf0;
+  --color-water-tint: #1a3046;
+  --color-forest: #8fd19e;
+}
+
 @layer base {
+  html {
+    background: var(--color-paper);
+    scrollbar-color: color-mix(in oklab, var(--color-contour) 55%, transparent) var(--color-surface);
+  }
   body {
-    @apply bg-sand-100 font-sans text-stone-900 antialiased;
+    @apply bg-paper font-sans text-body text-ink antialiased;
+    caret-color: var(--color-road);
   }
   h1,
   h2,
   h3 {
-    @apply font-display tracking-tight;
+    @apply font-display font-semibold;
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  a {
+    text-underline-offset: 0.2em;
   }
   ::selection {
-    @apply bg-orange-200 text-stone-900;
+    background: var(--color-water-tint);
+    color: var(--color-ink);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-water);
+    outline-offset: 2px;
+  }
+  input,
+  textarea,
+  select {
+    accent-color: var(--color-road);
   }
 }
 
+/* Buttons: printed, square-cornered, one ink each. Red is the road: the way on. */
 @utility btn {
-  @apply inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold whitespace-nowrap transition duration-200 focus-visible:ring-4 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50;
+  @apply inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-[3px] px-5 text-body font-semibold whitespace-nowrap select-none focus-visible:outline-offset-3 disabled:pointer-events-none disabled:opacity-50;
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.12s var(--ease-out);
+  &:active {
+    transform: translateY(1px);
+  }
 }
 @utility btn-primary {
-  @apply btn bg-orange-600 text-white shadow-md shadow-orange-600/25 hover:-translate-y-0.5 hover:bg-orange-500 hover:shadow-lg hover:shadow-orange-600/30 focus-visible:ring-orange-300;
+  @apply btn bg-road text-road-ink hover:bg-road-deep;
 }
 @utility btn-secondary {
-  @apply btn border border-stone-300 bg-surface text-stone-800 hover:-translate-y-0.5 hover:border-stone-400 hover:shadow-md focus-visible:ring-stone-300;
+  @apply btn bg-paper text-ink ring-[1.5px] ring-ink/75 ring-inset hover:bg-surface;
 }
 @utility btn-ghost {
-  @apply btn text-stone-700 hover:bg-stone-900/5 focus-visible:ring-stone-300;
+  @apply btn px-3 text-ink hover:bg-ink/6;
 }
 /* For actions that can't be undone, like deleting. */
 @utility btn-danger {
-  @apply btn bg-red-600 text-white shadow-md shadow-red-600/25 hover:bg-red-500 focus-visible:ring-red-300;
+  @apply btn bg-road text-road-ink hover:bg-road-deep;
 }
+/* Starting the AI: water blue, the colour of "found in the video". */
 @utility btn-ai {
-  @apply btn bg-violet-700 text-white shadow-md shadow-violet-700/25 hover:-translate-y-0.5 hover:bg-violet-600 focus-visible:ring-violet-300;
+  @apply btn bg-water text-paper hover:bg-ink;
 }
-@utility card {
-  @apply rounded-3xl border border-stone-900/5 bg-surface shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_24px_-12px_rgb(21_57_46/0.18)];
+@utility btn-small {
+  @apply min-h-9 px-3.5 text-small;
+}
+@utility link {
+  @apply font-medium text-ink underline decoration-ink/40 underline-offset-[0.2em] hover:decoration-road;
+}
+
+/* A sheet: a piece of the page with a fine edge, no shadow. */
+@utility sheet {
+  @apply rounded-[3px] bg-paper ring-1 ring-ink/15;
+}
+/* The neatline: the double frame round a map, as on a printed sheet. */
+@utility neatline {
+  @apply border-2 border-ink;
+  outline: 1px solid var(--color-ink);
+  outline-offset: 3px;
 }
 @utility input {
-  @apply mt-1.5 block w-full rounded-xl border border-stone-300 bg-surface px-3.5 py-2.5 font-normal text-stone-900 transition placeholder:text-stone-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-200 focus:outline-none;
+  @apply mt-1.5 block w-full rounded-[3px] bg-paper px-3.5 py-2.5 text-body text-ink ring-[1.5px] ring-ink/30 ring-inset placeholder:text-ink-soft/70 focus:ring-2 focus:ring-water focus:outline-none;
+  transition: box-shadow 0.15s ease;
 }
 /* A compact text box, for forms inside panels. */
 @utility field {
-  @apply rounded-xl border border-stone-300 bg-surface px-3 py-1.5 text-stone-900 transition placeholder:text-stone-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-200 focus:outline-none;
+  @apply rounded-[3px] bg-paper px-3 py-1.5 text-ink ring-[1.5px] ring-ink/30 ring-inset placeholder:text-ink-soft/70 focus:ring-2 focus:ring-water focus:outline-none;
 }
-@utility eyebrow {
-  @apply inline-flex items-center gap-2 rounded-full bg-surface/80 px-3 py-1 text-xs font-bold tracking-wide text-pine-700 uppercase dark:text-pine-300 shadow-sm ring-1 ring-pine-900/10 backdrop-blur;
+@utility field-label {
+  @apply block text-small font-semibold text-ink;
 }
-@utility badge {
-  @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+@utility hint {
+  @apply mt-1 block text-small font-normal text-ink-soft;
+}
+/* Small printed tags: what kind of ride, where the route came from. */
+@utility tag {
+  @apply inline-flex items-center gap-1.5 rounded-[2px] px-2 py-0.5 font-display text-[0.95rem] leading-tight font-medium tracking-wide uppercase;
+}
+/* The sheet's margin lettering: sheet name, scale, what's on it. */
+@utility margin-text {
+  @apply font-display text-small font-medium tracking-[0.06em] text-ink-soft uppercase;
 }
 @utility skeleton {
-  @apply motion-safe:animate-shimmer;
-  background: linear-gradient(90deg, var(--color-sand-200) 0px, var(--color-sand-100) 160px, var(--color-sand-200) 320px);
-  background-size: 800px 100%;
+  @apply bg-surface-2;
+  animation: fade-in 1.2s ease-in-out infinite alternate;
 }
-/* SVG parts that scale or turn around their own middle (sun, flames, flags). */
+/* SVG parts that scale or turn around their own middle. */
 @utility svg-center {
   transform-box: fill-box;
   transform-origin: center;
 }
-@utility svg-bottom {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-}
-@utility svg-left {
-  transform-box: fill-box;
-  transform-origin: 0% 50%;
-}
-
-/* The illustrations' colours, by day and by night (see components/art/Scenery.jsx). */
-:root {
-  --sky-hero: linear-gradient(180deg, #bfe3f5 0%, #dcf0f7 38%, #fdebd3 78%, #fbdcb6 100%);
-  --sky-night: linear-gradient(180deg, #0a1230 0%, #18224b 42%, #352f62 76%, #533b62 100%);
-  --scene-far: #bcd3e4;
-  --scene-snow: #ffffff;
-  --scene-mid: #86b99a;
-  --scene-near: #4f9a74;
-  --scene-tree: #2f7356;
-  --scene-front: #2d6a50;
-  --scene-front-tree: #1d4f3c;
-  --scene-road-edge: #e7d2ad;
-  --scene-road: #f6e8cc;
-  --scene-page: #fbf6ec;
-  --scene-cloud: #ffffff;
-  --scene-figure: #15392e;
-  --scene-sky-top: #7dd3fc;
-  --scene-sky-middle: #e0f2fe;
-  --scene-sky-bottom: #fde7c7;
-}
-:root.dark {
-  color-scheme: dark;
-
-  /* Neutrals turn around: light paper becomes a night forest, dark text becomes moonlight. */
-  --color-stone-50: #131f1b;
-  --color-stone-100: #1d2c27;
-  --color-stone-200: #2a3b35;
-  --color-stone-300: #3a4d45;
-  --color-stone-400: #6f7a72;
-  --color-stone-500: #8f978e;
-  --color-stone-600: #b3b6ab;
-  --color-stone-700: #cfcfc4;
-  --color-stone-800: #e2e0d6;
-  --color-stone-900: #f1efe7;
-  --color-stone-950: #faf8f2;
-  --color-sand-50: #1c2b26;
-  --color-sand-100: #0f1a17;
-  --color-sand-200: #1d2c27;
-  --color-sand-300: #2a3b35;
-  --color-surface: #16231f;
-  --color-ink: #f4efe4;
-
-  /* Pale tints become deep ones; dark text shades become light (deep shades used as backgrounds stay). */
-  --color-orange-50: #2a1a10;
-  --color-orange-100: #3d2414;
-  --color-orange-200: #5c3518;
-  --color-orange-700: #fb923c;
-  --color-orange-800: #fdba74;
-  --color-orange-900: #fed7aa;
-  --color-amber-50: #2a2110;
-  --color-amber-100: #3a2c10;
-  --color-amber-200: #574114;
-  --color-amber-800: #fcd34d;
-  --color-amber-900: #fde68a;
-  --color-sky-50: #0f2230;
-  --color-sky-100: #12293a;
-  --color-sky-200: #1b3a52;
-  --color-sky-800: #7dd3fc;
-  --color-sky-900: #bae6fd;
-  --color-violet-50: #1f1736;
-  --color-violet-100: #2a1f4a;
-  --color-violet-200: #3b2d66;
-  --color-violet-800: #c4b5fd;
-  --color-violet-900: #ddd6fe;
-  --color-red-50: #2d1414;
-  --color-red-100: #3d1a1a;
-  --color-red-200: #5c2323;
-  --color-red-700: #fca5a5;
-  --color-red-800: #fecaca;
-  --color-green-50: #102a1c;
-  --color-green-100: #133520;
-  --color-green-800: #86efac;
-
-  --scene-far: #34416a;
-  --scene-snow: #c7d2fe;
-  --scene-mid: #2a4a45;
-  --scene-near: #1f3a33;
-  --scene-tree: #142a24;
-  --scene-front: #12241e;
-  --scene-front-tree: #0b1814;
-  --scene-road-edge: #4b4436;
-  --scene-road: #7d715c;
-  --scene-page: #0f1a17;
-  --scene-cloud: #8a96bb;
-  --scene-figure: #0a1410;
-  --scene-sky-top: #0a1230;
-  --scene-sky-middle: #26305e;
-  --scene-sky-bottom: #4a3a66;
-}
-
-/* Things that only show by day (the sun, birds) or by night (the moon, stars, campfire glow).
-   When the theme changes, the sun sets and the moon rises. */
-.day-only,
-.night-only {
-  transition:
-    opacity 0.9s ease,
-    transform 0.9s ease;
-}
-.night-only,
-.dark .day-only {
-  opacity: 0;
-  pointer-events: none;
-}
-.dark .night-only {
-  opacity: 1;
-  pointer-events: auto;
-}
-.dark .day-only {
-  transform: translateY(60px);
-}
-.night-only {
-  transform: translateY(-30px);
-}
-.dark .night-only {
-  transform: none;
-}
-.sky-night {
-  opacity: 0;
-  transition: opacity 0.9s ease;
-}
-.dark .sky-night {
-  opacity: 1;
-}
-@keyframes twinkle {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.3;
-  }
-}
-@media (prefers-reduced-motion: no-preference) {
-  .star {
-    animation: twinkle var(--duration, 3s) ease-in-out infinite;
-    animation-delay: var(--delay, 0s);
-  }
-}
-
-/* The hidden switch: the sun (or moon) in the home page sky glows when pointed at. */
-.sun-switch {
-  transition: filter 0.3s ease;
-}
-.sun-switch:hover {
-  filter: drop-shadow(0 0 22px rgb(251 191 36 / 0.85));
-}
-.dark .sun-switch:hover {
-  filter: drop-shadow(0 0 22px rgb(199 210 254 / 0.9));
-}
-.sun-ring {
-  opacity: 0;
-}
-.sun-switch:focus-visible .sun-ring {
-  opacity: 1;
-}
 
 /* While switching day and night, everything fades instead of jumping. */
-/* (Not transforms: the map moves with them. The sun and moon have their own transition above.) */
+/* (Not transforms: the map moves with them.) */
 .theme-fade,
-.theme-fade *:not(.day-only, .night-only, .sky-night) {
+.theme-fade * {
   transition:
-    background-color 0.8s ease,
-    border-color 0.8s ease,
-    color 0.8s ease,
-    fill 0.8s ease,
-    stop-color 0.8s ease !important;
+    background-color 0.6s ease,
+    border-color 0.6s ease,
+    color 0.6s ease,
+    fill 0.6s ease,
+    stroke 0.6s ease,
+    outline-color 0.6s ease !important;
 }
 
-/* The elevation chart: one green line over a light wash, and a blue line at the
-   video's current moment (the same blue as the marker on the map). The greens
-   were checked for contrast and colourfulness on the light and dark cards. */
-:root {
-  --chart-line: #1a8a5a;
-  --chart-cursor: #2563eb;
+/* The home page's sketch map: pins drop onto the road as the rider passes. */
+.sheet-pin {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  opacity: 0;
+  transform: translateY(-22px);
+  transition:
+    opacity 0.25s ease-out,
+    transform 0.45s var(--ease-out);
 }
-:root.dark {
-  --chart-line: #26a46c;
-  --chart-cursor: #3b82f6;
+.sheet-pin[data-shown='true'] {
+  opacity: 1;
+  transform: none;
 }
+@media (prefers-reduced-motion: reduce) {
+  .sheet-pin {
+    transition: none;
+  }
+}
+
+/* The scale bar under a sheet doubles as a timeline: a range input drawn as
+   black and white segments, with the moment marked in water blue. */
+.scale-range {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 2.25rem;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  touch-action: pan-y;
+}
+.scale-range::-webkit-slider-runnable-track {
+  height: 0.6rem;
+  border: 1.5px solid var(--color-ink);
+  background: repeating-linear-gradient(90deg, var(--color-ink) 0 10%, var(--color-paper) 10% 20%);
+}
+.scale-range::-moz-range-track {
+  height: 0.6rem;
+  border: 1.5px solid var(--color-ink);
+  background: repeating-linear-gradient(90deg, var(--color-ink) 0 10%, var(--color-paper) 10% 20%);
+}
+.scale-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 1.1rem;
+  height: 1.75rem;
+  margin-top: -0.65rem;
+  border: 2px solid var(--color-paper);
+  border-radius: 2px;
+  background: var(--color-water);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
+}
+.scale-range::-moz-range-thumb {
+  width: 1rem;
+  height: 1.6rem;
+  border: 2px solid var(--color-paper);
+  border-radius: 2px;
+  background: var(--color-water);
+}
+.scale-range:focus-visible {
+  outline: none;
+}
+.scale-range:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--color-water);
+  outline-offset: 2px;
+}
+
+/* The elevation chart: a cross-section in contour brown, the video's moment in water blue. */
 .elevation-line {
-  stroke: var(--chart-line);
+  stroke: var(--color-contour);
 }
 .elevation-wash {
-  fill: var(--chart-line);
-  fill-opacity: 0.1;
+  fill: var(--color-contour);
+  fill-opacity: 0.12;
 }
 .elevation-dot {
-  fill: var(--chart-line);
-  stroke: var(--color-surface);
+  fill: var(--color-contour);
+  stroke: var(--color-paper);
 }
 .elevation-cursor {
-  stroke: var(--chart-cursor);
+  stroke: var(--color-water);
 }
 
 /* Services along the route on the map: a coloured circle with its own symbol and a white ring. */
@@ -400,7 +317,7 @@
   border: 2px solid #ffffff;
   border-radius: 9999px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1;
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
 }
@@ -409,14 +326,35 @@
   stroke: var(--color-ink);
 }
 
+/* Key points on the map: numbered red circles, as places are marked on a sheet. */
+.map-point {
+  display: flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #ffffff;
+  border-radius: 9999px;
+  background: var(--color-ink);
+  color: #ffffff;
+  font: 600 13px/1 'Mukta', sans-serif;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+}
+.map-point[data-active='true'] {
+  background: var(--color-road);
+  box-shadow:
+    0 0 0 4px color-mix(in oklab, var(--color-road) 35%, transparent),
+    0 1px 3px rgb(0 0 0 / 0.4);
+}
+
 /* The rider's marker on the map: a blue dot that can be dragged along the route. */
 .rider-dot {
   width: 22px;
   height: 22px;
   border-radius: 9999px;
-  background: #2563eb;
+  background: var(--color-water);
   border: 3px solid #ffffff;
-  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.4);
 }
 .leaflet-marker-draggable .rider-dot {
   cursor: grab;
@@ -433,75 +371,50 @@
   outline: none;
 }
 .rider-marker:focus-visible .rider-dot {
-  box-shadow: 0 0 0 5px rgb(37 99 235 / 0.45);
+  box-shadow: 0 0 0 5px color-mix(in oklab, var(--color-water) 45%, transparent);
 }
 
-/* The map at night: the tiles are turned dark; routes and pins keep their colours. */
+/* The map in the sheet's own inks: the tiles a little quieter, so the red
+   route and the symbols lead. At night the tiles are turned dark. */
+.leaflet-container {
+  font-family: var(--font-sans);
+  background: var(--color-surface);
+}
+.leaflet-tile-pane {
+  filter: saturate(0.6) contrast(0.96) brightness(1.02);
+}
 .dark .leaflet-tile-pane {
-  filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9) saturate(0.5);
+  filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) saturate(0.45);
 }
-.dark .leaflet-container {
-  background: #1a2321;
+.leaflet-bar,
+.leaflet-touch .leaflet-bar {
+  border: 1.5px solid var(--color-ink) !important;
+  border-radius: 3px !important;
+  box-shadow: none !important;
 }
-.dark .leaflet-bar a,
-.dark .leaflet-bar a:hover {
-  background-color: var(--color-surface);
-  border-color: var(--color-stone-200);
-  color: var(--color-stone-800);
+.leaflet-bar a,
+.leaflet-bar a:hover {
+  background-color: var(--color-paper);
+  border-color: color-mix(in oklab, var(--color-ink) 25%, transparent);
+  color: var(--color-ink);
 }
-.dark .leaflet-control-attribution {
-  background: rgb(22 35 31 / 0.85);
-  color: var(--color-stone-600);
+.leaflet-tooltip {
+  border: 0;
+  border-radius: 3px;
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font: 500 13px/1.35 var(--font-sans);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
 }
-.dark .leaflet-control-attribution a {
-  color: var(--color-sky-800);
+.leaflet-tooltip-top::before {
+  border-top-color: var(--color-ink);
 }
-
-/* Clouds are thin at night, so the stars show. */
-.dark .cloud {
-  opacity: 0.35;
+.leaflet-control-attribution {
+  background: color-mix(in oklab, var(--color-paper) 88%, transparent) !important;
+  color: var(--color-ink-soft) !important;
 }
-
-/* Clouds sail across the hero sky. */
-@keyframes cloud-drift {
-  from {
-    transform: translateX(-360px);
-  }
-  to {
-    transform: translateX(1800px);
-  }
-}
-@keyframes route-draw {
-  from {
-    stroke-dashoffset: 1;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-@keyframes bird-flap {
-  0%,
-  100% {
-    transform: scaleY(1);
-  }
-  50% {
-    transform: scaleY(0.4);
-  }
-}
-@media (prefers-reduced-motion: no-preference) {
-  .cloud {
-    animation: cloud-drift var(--duration, 90s) linear infinite;
-    animation-delay: var(--delay, 0s);
-  }
-  .route-draw {
-    stroke-dasharray: 1;
-    animation: route-draw 3.2s 0.4s cubic-bezier(0.5, 0, 0.3, 1) both;
-  }
-  .bird {
-    animation: bird-flap 0.9s ease-in-out infinite;
-    transform-box: fill-box;
-    transform-origin: center;
-  }
+.leaflet-control-attribution a {
+  color: var(--color-ink) !important;
 }
 
 @media print {
@@ -539,17 +452,7 @@
 @keyframes tour-pop {
   from {
     opacity: 0;
-    transform: scale(0.3);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-@keyframes tour-rise {
-  from {
-    opacity: 0;
-    transform: translateY(24px);
+    transform: translateY(-10px);
   }
   to {
     opacity: 1;
@@ -563,25 +466,21 @@
 .tour-draw {
   stroke-dasharray: 1;
 }
-.tour-pop,
-.tour-rise {
+.tour-pop {
   transform-box: fill-box;
   transform-origin: center;
 }
 @media (prefers-reduced-motion: no-preference) {
   .tour-progress {
-    animation: tour-progress 6s ease-in-out infinite;
+    animation: tour-progress 6s linear infinite;
   }
   .tour-draw {
     animation: tour-draw 1.6s var(--delay, 0s) cubic-bezier(0.5, 0, 0.3, 1) both;
   }
   .tour-sweep {
-    animation: tour-sweep 4s ease-in-out infinite alternate;
+    animation: tour-sweep 4s cubic-bezier(0.65, 0, 0.35, 1) infinite alternate;
   }
   .tour-pop {
-    animation: tour-pop 0.45s var(--delay, 0s) cubic-bezier(0.2, 0.9, 0.3, 1) both;
-  }
-  .tour-rise {
-    animation: tour-rise 0.6s var(--delay, 0s) ease-out both;
+    animation: tour-pop 0.45s var(--delay, 0s) cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 }

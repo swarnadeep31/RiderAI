@@ -143,13 +143,13 @@ export default function Icon({ name, className = 'h-5 w-5', strokeWidth = 1.8 })
   );
 }
 
-// Each activity's icon and colours, used on cards, badges and choices.
+// Each activity's icon, used on tags and choices.
 export const ACTIVITY_STYLE = {
-  ride: { icon: 'ride', badge: 'bg-orange-100 text-orange-800', solid: 'bg-orange-500' },
-  hike: { icon: 'hike', badge: 'bg-pine-100 text-pine-800 dark:bg-pine-900/80 dark:text-pine-300', solid: 'bg-pine-500' },
-  climb: { icon: 'climb', badge: 'bg-sky-100 text-sky-800', solid: 'bg-sky-500' },
-  cycle: { icon: 'cycle', badge: 'bg-amber-100 text-amber-800', solid: 'bg-amber-500' },
-  other: { icon: 'compass', badge: 'bg-stone-200 text-stone-700', solid: 'bg-stone-500' },
+  ride: { icon: 'ride' },
+  hike: { icon: 'hike' },
+  climb: { icon: 'climb' },
+  cycle: { icon: 'cycle' },
+  other: { icon: 'compass' },
 };
 
 export const INTEREST_ICON = {
