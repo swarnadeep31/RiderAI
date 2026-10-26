@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { api } from '../api.js';
 import Icon, { ACTIVITY_STYLE } from '../components/art/Icon.jsx';
 import ErrorMessage from '../components/ErrorMessage.jsx';
+import TripEnds from '../components/TripEnds.jsx';
 import { ACTIVITIES } from '../lib/activities.js';
 import { parseGpx } from '../lib/gpx.js';
 import { formatDuration } from '../lib/time.js';
@@ -11,15 +12,56 @@ const inputClass = 'input';
 const labelClass = 'field-label';
 const hintClass = 'hint';
 
+// Something worth asking YouTube about: a link to it, or a bare video ID.
+const looksLikeVideo = (text) => /youtu\.?be|^[\w-]{11}$/.test(text.trim());
+
+const TITLE_HINTS = {
+  idle: 'As it is on YouTube. It usually says where the ride starts and ends, like “Kolkata to Ladakh”.',
+  loading: 'Getting the title from YouTube…',
+  found: "From YouTube. Check it's the whole title: it usually says where the ride starts and ends.",
+  missing: "YouTube didn't say what this video is called. Type or paste its whole title.",
+};
+
 export default function NewTrailPage() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ youtubeUrl: '', title: '', creatorName: '', activity: 'ride', description: '', supportUrl: '' });
+  const [form, setForm] = useState({ youtubeUrl: '', videoTitle: '', title: '', creatorName: '', activity: 'ride', description: '', supportUrl: '' });
+  // Where the ride starts and ends, as picked on the map.
+  const [trip, setTrip] = useState({ start: null, end: null });
+  const [titleState, setTitleState] = useState('idle');
+  // Once the owner types the video's title, YouTube's doesn't replace it.
+  const titleTyped = useRef(false);
   const [route, setRoute] = useState(null);
   const [routeError, setRouteError] = useState(null);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
 
   const update = (field) => (event) => setForm({ ...form, [field]: event.target.value });
+
+  // A pasted link: ask YouTube what the video is called (after a pause in typing).
+  useEffect(() => {
+    const url = form.youtubeUrl;
+    if (!looksLikeVideo(url)) return undefined;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setTitleState('loading');
+      try {
+        const info = await api.videoInfo(url);
+        if (cancelled) return;
+        setTitleState(info.title ? 'found' : 'missing');
+        setForm((f) => ({
+          ...f,
+          videoTitle: titleTyped.current || !info.title ? f.videoTitle : info.title,
+          title: f.title || info.title.slice(0, 120),
+        }));
+      } catch {
+        if (!cancelled) setTitleState(titleTyped.current ? 'idle' : 'missing');
+      }
+    }, 500);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [form.youtubeUrl]);
 
   async function readGpxFile(event) {
     const file = event.target.files[0];
@@ -42,6 +84,8 @@ export default function NewTrailPage() {
     try {
       const trail = await api.createTrail({
         ...form,
+        startPlace: trip.start ?? undefined,
+        endPlace: trip.end ?? undefined,
         track: route?.track ?? [],
         trackTimes: route?.trackTimes ?? [],
         trackElevations: route?.trackElevations ?? undefined,
@@ -95,7 +139,28 @@ export default function NewTrailPage() {
           </label>
 
           <label className={labelClass}>
-            Title
+            The video&apos;s full title
+            <input
+              maxLength={200}
+              value={form.videoTitle}
+              onChange={(event) => {
+                titleTyped.current = true;
+                update('videoTitle')(event);
+              }}
+              placeholder="Kolkata to Ladakh | EP1 Kolkata to Dehri"
+              className={inputClass}
+            />
+            <span className={hintClass} aria-live="polite">
+              {TITLE_HINTS[titleState]}
+            </span>
+          </label>
+
+          <div className="rounded-[3px] bg-surface p-4 ring-1 ring-ink/15">
+            <TripEnds title={form.videoTitle} value={trip} onChange={setTrip} optional />
+          </div>
+
+          <label className={labelClass}>
+            Title on TrailCast
             <input required maxLength={120} value={form.title} onChange={update('title')} className={inputClass} />
           </label>
 

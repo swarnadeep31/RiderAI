@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, Navigate, useLocation } from 'react-router';
 import { api } from '../api.js';
 import { useAuth } from '../auth.jsx';
+import Icon from '../components/art/Icon.jsx';
 import ErrorMessage from '../components/ErrorMessage.jsx';
 import SheetHero from '../components/home/SheetHero.jsx';
 import SheetLegend from '../components/home/SheetLegend.jsx';
@@ -11,6 +12,28 @@ import { tourSeen } from './TourPage.jsx';
 
 // How many trails the server sends at a time (see listTrails on the server).
 const PAGE_SIZE = 24;
+
+// The rides from the last visit, shown at once while the newest load: the
+// free server sleeps when nobody has used it for a while, and takes up to a
+// minute to wake. Only a convenience, so a browser without storage just waits.
+const RIDES_KEY = 'trailcast.rides';
+function savedRides() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(RIDES_KEY));
+    return Array.isArray(saved) && saved.length > 0 ? saved : null;
+  } catch {
+    return null;
+  }
+}
+function saveRides(trails) {
+  try {
+    localStorage.setItem(RIDES_KEY, JSON.stringify(trails.slice(0, PAGE_SIZE)));
+  } catch {
+    // Not remembered: the next visit waits for the server.
+  }
+}
+// After this long, say why it's slow.
+const WAKING_MS = 3000;
 
 function LoadingCards() {
   return (
@@ -31,21 +54,38 @@ export default function HomePage() {
   const confirm = useConfirm();
   const toast = useToast();
   const { hash } = useLocation();
-  const [trails, setTrails] = useState(null);
+  const [trails, setTrails] = useState(savedRides);
+  // Whether the list is the newest from the server (not the last visit's).
+  const [fresh, setFresh] = useState(false);
+  const [waking, setWaking] = useState(false);
   const [error, setError] = useState(null);
   // Whether the server may have older trails, and whether they're loading.
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
-    api.listTrails().then(
-      (page) => {
-        setTrails(page);
-        setHasMore(page.length === PAGE_SIZE);
-      },
-      (err) => setError(err.message),
-    );
+    const timer = setTimeout(() => setWaking(true), WAKING_MS);
+    api
+      .listTrails()
+      .then(
+        (page) => {
+          setTrails(page);
+          setFresh(true);
+          setHasMore(page.length === PAGE_SIZE);
+        },
+        (err) => setError(err.message),
+      )
+      .finally(() => {
+        clearTimeout(timer);
+        setWaking(false);
+      });
+    return () => clearTimeout(timer);
   }, []);
+
+  // Remembered for next time, as the server last sent it.
+  useEffect(() => {
+    if (fresh && trails) saveRides(trails);
+  }, [fresh, trails]);
 
   // "Rides" and "How it works" in the header link here from other pages.
   useEffect(() => {
@@ -105,7 +145,15 @@ export default function HomePage() {
         </div>
 
         <div className="mt-8">
-          {error && <ErrorMessage>{error}</ErrorMessage>}
+          {waking && (
+            <p role="status" className="mb-6 flex items-center gap-2 text-ink-soft">
+              <Icon name="compass" className="h-4 w-4 shrink-0 text-road motion-safe:animate-spin" />
+              {trails
+                ? 'These are the rides from your last visit. The server is waking up to check for newer ones…'
+                : 'Waking up the server. After a quiet spell this takes up to a minute…'}
+            </p>
+          )}
+          {error && (trails ? <p className="mb-6 text-ink-soft">Couldn&apos;t check for newer rides just now. These are from your last visit.</p> : <ErrorMessage>{error}</ErrorMessage>)}
           {!trails && !error && (
             <>
               <p className="sr-only">Loading the rides...</p>
@@ -124,11 +172,11 @@ export default function HomePage() {
           {trails?.length > 0 && (
             <ul className="grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
               {trails.map((trail) => (
-                <TrailCard key={trail._id} trail={trail} onDelete={user && trail.owner?._id === user._id ? deleteTrail : null} />
+                <TrailCard key={trail._id} trail={trail} onDelete={fresh && user && trail.owner?._id === user._id ? deleteTrail : null} />
               ))}
             </ul>
           )}
-          {hasMore && (
+          {hasMore && fresh && (
             <div className="mt-10 flex justify-center">
               <button type="button" onClick={showMore} disabled={loadingMore} className="btn-secondary">
                 {loadingMore ? 'Loading...' : 'Show more rides'}

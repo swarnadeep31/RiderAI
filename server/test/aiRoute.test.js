@@ -109,6 +109,60 @@ describe('AI route jobs', () => {
     assert.equal((await alice.get(`/api/jobs/${job.body._id}`)).body.state, 'accepted');
   });
 
+  test("with the trip's start and end from the title: they're pinned on, Gemini is told, and places are looked for between them", async () => {
+    const kolkata = { name: 'Kolkata', label: 'Kolkata, West Bengal, India', lat: 22.5726, lng: 88.3639 };
+    const dhanbad = { name: 'Dhanbad', label: 'Dhanbad, Jharkhand, India', lat: 23.7957, lng: 86.4304 };
+    const set = await alice.patch(`/api/trails/${trailId}`).send({ videoTitle: 'Kolkata to Dhanbad | EP1', startPlace: kolkata, endPlace: dhanbad });
+    assert.equal(set.status, 200, JSON.stringify(set.body));
+    const started = await start();
+
+    const told = [];
+    const lookedUp = [];
+    const { services } = fakeServices({
+      extract: async (options) => {
+        told.push(options.trip);
+        const data = { ...geminiAnswer, start_time: '2:00' };
+        return { data, raw: JSON.stringify(data), usage: {}, model: 'gemini-3.5-flash-lite' };
+      },
+    });
+    const geocode = services.geocode;
+    services.geocode = async (candidates, options) => {
+      lookedUp.push(options);
+      return geocode(candidates.filter((c) => !c.anchor));
+    };
+    await processNextJob(services);
+
+    assert.deepEqual(told, [{ title: 'Kolkata to Dhanbad | EP1', start: kolkata, end: dhanbad }]);
+    assert.deepEqual(lookedUp[0].start, kolkata);
+    assert.ok(lookedUp[0].area.west < 86.4304 && lookedUp[0].area.east > 88.3639);
+
+    const { body: job } = await alice.get(`/api/jobs/${started.body._id}`);
+    assert.deepEqual(job.trip, { start: kolkata, end: dhanbad });
+    assert.deepEqual(job.result.candidates.map((c) => [c.name, c.time, c.checked, c.anchor ?? null]), [
+      // Howrah came before the ride set off at 2:00.
+      ['Howrah', 90, false, null],
+      ['Kolkata', 120, true, 'start'],
+      ['Durgapur', 540, true, null],
+      ['Leh', 720, false, null],
+      ['Asansol', 960, true, null],
+      ['Dhanbad', 1800, true, 'end'],
+    ]);
+    assert.deepEqual(job.result.hiddenRanges, [{ start: 0, end: 120, reason: 'intro' }]);
+
+    const accepted = await alice.post(`/api/trails/${trailId}/ai-route/accept`).send({
+      jobId: job._id,
+      places: job.result.candidates.filter((c) => c.checked),
+      hiddenRanges: job.result.hiddenRanges,
+    });
+    assert.equal(accepted.status, 200, JSON.stringify(accepted.body));
+    assert.deepEqual(accepted.body.points.map((p) => [p.name, p.time]), [['Kolkata', 120], ['Durgapur', 540], ['Asansol', 960], ['Dhanbad', 1800]]);
+    assert.deepEqual([accepted.body.trackTimes[0], accepted.body.trackTimes.at(-1)], [120, 1800]);
+
+    // Other ends are another analysis, not a reuse of this one.
+    await alice.patch(`/api/trails/${trailId}`).send({ endPlace: { ...dhanbad, name: 'Asansol', lat: 23.68, lng: 86.98 } });
+    assert.equal((await start()).status, 202);
+  });
+
   test('accepting again replaces the AI places but keeps hand-made ones', async () => {
     await alice.post(`/api/trails/${trailId}/points`).send({ time: 30, name: 'My note', lat: 22.5, lng: 88.3 });
     const { body: job } = await start();

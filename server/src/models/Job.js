@@ -51,6 +51,11 @@ const jobSchema = new mongoose.Schema(
     promptVersion: String,
     highDetail: { type: Boolean, default: false },
     videoTitle: String,
+    // What the trail's owner said about the trip before it was watched: the
+    // video's title, and where it starts and ends ({ name, label, lat, lng }).
+    // tripKey: the same, as text, so an analysis is only reused for the same trip.
+    trip: { title: String, start: mongoose.Schema.Types.Mixed, end: mongoose.Schema.Types.Mixed },
+    tripKey: { type: String, default: '' },
     source: { type: String, enum: AI_SOURCES, default: 'youtube' },
     mediaMode: { type: String, enum: MEDIA_MODES, default: 'full' },
     // upload: where the file waits on the server (deleted when the analysis

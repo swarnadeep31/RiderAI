@@ -27,11 +27,14 @@ export function hiddenRangeAt(hiddenRanges, t) {
 
 // Where the rider was `videoTime` seconds into the video, or null if the
 // video is outside the GPS recording, in a hidden part, or the route has no times.
-export function positionAt(track, trackTimes, videoStartsAt, videoTime, hiddenRanges = []) {
+// hold: before the route starts the rider waits at its start, and after it
+// ends at its end (a drawn route: they were there, just not yet moving).
+export function positionAt(track, trackTimes, videoStartsAt, videoTime, hiddenRanges = [], { hold = false } = {}) {
   if (!trackTimes?.length || trackTimes.length !== track.length) return null;
   if (hiddenRangeAt(hiddenRanges, videoTime)) return null;
   const t = videoTime + videoStartsAt;
-  if (t < trackTimes[0] || t > trackTimes.at(-1)) return null;
+  if (t < trackTimes[0]) return hold ? track[0] : null;
+  if (t > trackTimes.at(-1)) return hold ? track.at(-1) : null;
 
   const lo = indexAtOrBefore(trackTimes, t);
   if (lo === track.length - 1) return track[lo];

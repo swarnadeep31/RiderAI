@@ -4,7 +4,7 @@ import { CircleMarker, MapContainer, Marker, Polyline, TileLayer, Tooltip, useMa
 import { SERVICE_KINDS, serviceName } from '../lib/services.js';
 import { useTheme } from '../lib/theme.js';
 import { formatTime } from '../lib/time.js';
-import { boundsOf, cumulativeDistances, indexAtOrBefore, positionAt, travelledAt, videoTimeAtLocation } from '../lib/track.js';
+import { boundsOf, cumulativeDistances, indexAtOrBefore, positionAt, videoTimeAtLocation } from '../lib/track.js';
 
 // The sheet's inks for the map: the route in road red, the rider and the AI's
 // places in water blue. Read from the page's colours, which change at night.
@@ -22,6 +22,10 @@ const DRAG_WINDOW = 300;
 const FULL_SEARCH_M = 200;
 // Show the video frame under the marker at most this often while dragging.
 const PREVIEW_MS = 250;
+// The bold line's long part is redrawn at most this often, or when the tip
+// to the marker would be longer than this many route points.
+const LINE_MS = 500;
+const TIP_MAX_POINTS = 200;
 
 // Fuel always shows; mechanics, medical help and ATMs only from this zoom, so towns don't drown in ATMs.
 const SERVICES_MIN_ZOOM = 11;
@@ -183,6 +187,12 @@ function PanTo({ focus }) {
 // the video pauses and shows the frame under the marker, then carries on from
 // there (playing again only if it was playing). With the marker focused, the
 // arrow keys move 10 s, or 60 s with Shift.
+// On a drawn route (approximate), the marker waits at the start before the
+// ride sets off and at the end after it arrives.
+// The bold line is two lines: the long part up to a recent route point,
+// redrawn at most twice a second, and the short tip from there to the
+// marker, redrawn every frame. Redrawing thousands of points 60 times a
+// second is what made the marker stutter on long routes.
 function RiderLayer({ route, clock, follow, approximate, scrub, inks }) {
   const { track, trackTimes, videoStartsAt, hiddenRanges } = route;
   const map = useMap();
@@ -196,13 +206,27 @@ function RiderLayer({ route, clock, follow, approximate, scrub, inks }) {
     if (!trackTimes?.length || trackTimes.length !== track.length) return undefined;
     // Its own layer, so the marker is drawn above the key point pins (600) and below tooltips (650).
     if (!map.getPane('rider')) map.createPane('rider').style.zIndex = '640';
-    const travelled = L.polyline([], {
-      color: inks.road,
-      weight: 6,
-      opacity: 1,
-      dashArray: approximate ? '10 8' : undefined,
-      interactive: false,
-    }).addTo(map);
+    const lineStyle = { color: inks.road, weight: 6, opacity: 1, dashArray: approximate ? '10 8' : undefined, interactive: false };
+    const travelled = L.polyline([], lineStyle).addTo(map);
+    const tip = L.polyline([], lineStyle).addTo(map);
+    // The route point the long part ends at, and when it was last redrawn.
+    let shownIndex = -1;
+    let lineAt = 0;
+    const drawTravelled = (index, point, now) => {
+      if (index < 0) {
+        if (shownIndex !== -1) travelled.setLatLngs([]);
+        shownIndex = -1;
+        tip.setLatLngs([]);
+        return;
+      }
+      if (shownIndex < 0 || index < shownIndex || index - shownIndex > TIP_MAX_POINTS || now - lineAt > LINE_MS) {
+        travelled.setLatLngs(track.slice(0, index + 1));
+        shownIndex = index;
+        lineAt = now;
+      }
+      const piece = track.slice(shownIndex, index + 1);
+      tip.setLatLngs(point ? [...piece, point] : piece);
+    };
     const restingTooltip = canScrub ? 'Here now in the video. Drag me along the route to scrub.' : 'Here now in the video';
     const marker = L.marker([0, 0], { pane: 'rider', icon: riderIcon, draggable: canScrub, keyboard: canScrub, autoPan: false })
       .bindTooltip(restingTooltip, { direction: 'top', offset: [0, -12] });
@@ -232,7 +256,7 @@ function RiderLayer({ route, clock, follow, approximate, scrub, inks }) {
       lastHit = hit;
       // Keep the marker on the road, and the bold line up to it.
       marker.setLatLng(hit.point);
-      travelled.setLatLngs([...track.slice(0, hit.index + 1), hit.point]);
+      drawTravelled(hit.index, hit.point, performance.now());
       marker.setTooltipContent(bubbleText(hit));
       if (performance.now() - lastPreviewAt > PREVIEW_MS) {
         lastPreviewAt = performance.now();
@@ -259,8 +283,6 @@ function RiderLayer({ route, clock, follow, approximate, scrub, inks }) {
     let frame;
     let lastTime = null;
     let lastFollow = followRef.current;
-    let lastIndex = null;
-    let lastLineAt = 0;
     let lastPanAt = 0;
     // After a zoom, look again even while paused (the marker may now be off screen).
     const recheck = () => {
@@ -271,7 +293,7 @@ function RiderLayer({ route, clock, follow, approximate, scrub, inks }) {
       const t = clock.now();
       if (!scrubbing && (t !== lastTime || followRef.current !== lastFollow)) {
         lastFollow = followRef.current;
-        const position = positionAt(track, trackTimes, videoStartsAt, t, hiddenRanges);
+        const position = positionAt(track, trackTimes, videoStartsAt, t, hiddenRanges, { hold: approximate });
         let panLater = false;
         if (position) {
           if (!map.hasLayer(marker)) {
@@ -293,13 +315,8 @@ function RiderLayer({ route, clock, follow, approximate, scrub, inks }) {
         } else if (map.hasLayer(marker)) {
           marker.remove();
         }
-        // Redraw the bold part when a new route point is reached, and a few times a second in between.
-        const index = indexAtOrBefore(trackTimes, t + videoStartsAt);
-        if (index !== lastIndex || now - lastLineAt > 150) {
-          travelled.setLatLngs(travelledAt(track, trackTimes, videoStartsAt, t));
-          lastIndex = index;
-          lastLineAt = now;
-        }
+        // The bold part up to the marker (all of it once the route is done).
+        drawTravelled(indexAtOrBefore(trackTimes, t + videoStartsAt), position, now);
         lastTime = panLater ? null : t;
       }
       frame = requestAnimationFrame(draw);
@@ -310,6 +327,7 @@ function RiderLayer({ route, clock, follow, approximate, scrub, inks }) {
       map.off('zoomend', recheck);
       marker.getElement()?.removeEventListener('keydown', onKey);
       travelled.remove();
+      tip.remove();
       marker.remove();
     };
   }, [map, route, track, trackTimes, videoStartsAt, hiddenRanges, clock, approximate, canScrub, inks.road]);

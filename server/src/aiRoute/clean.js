@@ -11,7 +11,7 @@ const SAME_PLACE_WINDOW = 120; // seconds: the same name this close in two clips
 export const MAX_CANDIDATES = 150;
 
 const text = (value, max) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
-const sameName = (a, b) => a.toLowerCase().replace(/[^a-z0-9]/g, '') === b.toLowerCase().replace(/[^a-z0-9]/g, '');
+export const sameName = (a, b) => a.toLowerCase().replace(/[^a-z0-9]/g, '') === b.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 // Gemini may count times from the start of the clip or of the whole video.
 // If every time fits inside the clip's length, treat them as clip times.
@@ -20,12 +20,16 @@ function clipOffset(times, clip) {
   return times.every((t) => t <= clip.end - clip.start + 5) ? clip.start : 0;
 }
 
-// One clip's answer -> { places, hiddenRanges } in whole-video seconds.
+// One clip's answer -> { places, hiddenRanges, startTime, endTime } in
+// whole-video seconds (startTime/endTime: when the trip sets off and arrives,
+// or null when this clip doesn't show it).
 // relative: the clip was sent as its own file, so its times surely count from the clip's start.
 export function cleanClip(answer, clip, duration, { relative = false } = {}) {
   const rawPlaces = Array.isArray(answer?.places) ? answer.places : [];
   const rawHidden = Array.isArray(answer?.hidden_ranges) ? answer.hidden_ranges : [];
   const allTimes = [
+    parseClock(answer?.start_time),
+    parseClock(answer?.end_time),
     ...rawPlaces.map((p) => parseClock(p?.time)),
     ...rawHidden.flatMap((r) => [parseClock(r?.start), parseClock(r?.end)]),
   ].filter((t) => t !== null);
@@ -64,7 +68,7 @@ export function cleanClip(answer, clip, duration, { relative = false } = {}) {
     if (start === null || end === null || end <= start) continue;
     hiddenRanges.push({ start, end, reason: HIDDEN_REASONS.includes(r?.reason) ? r.reason : 'off_route' });
   }
-  return { places, hiddenRanges };
+  return { places, hiddenRanges, startTime: toVideoTime(answer?.start_time), endTime: toVideoTime(answer?.end_time) };
 }
 
 export function mergeHiddenRanges(ranges) {
@@ -78,7 +82,8 @@ export function mergeHiddenRanges(ranges) {
   return merged;
 }
 
-// All clips -> the candidate list the reviewer sees.
+// All clips -> the candidate list the reviewer sees, the parts to skip, and
+// when the trip sets off (the earliest any clip saw) and arrives (the latest).
 export function mergeClips(cleanedClips, { minConfidence }) {
   const all = cleanedClips
     .flatMap((c, clip) => c.places.map((place) => ({ ...place, clip })))
@@ -122,7 +127,14 @@ export function mergeClips(cleanedClips, { minConfidence }) {
     checked: place.presence === 'here' && place.confidence >= minConfidence,
   }));
 
-  return { candidates, hiddenRanges: mergeHiddenRanges(cleanedClips.flatMap((c) => c.hiddenRanges)) };
+  const starts = cleanedClips.map((c) => c.startTime).filter((t) => Number.isFinite(t));
+  const ends = cleanedClips.map((c) => c.endTime).filter((t) => Number.isFinite(t));
+  return {
+    candidates,
+    hiddenRanges: mergeHiddenRanges(cleanedClips.flatMap((c) => c.hiddenRanges)),
+    startTime: starts.length ? Math.min(...starts) : null,
+    endTime: ends.length ? Math.max(...ends) : null,
+  };
 }
 
 // Splits a long video into clips with a little overlap, so a place at a boundary isn't lost.

@@ -5,19 +5,25 @@
 const oembedUrl = () => process.env.YOUTUBE_OEMBED_URL || 'https://www.youtube.com/oembed';
 const isWebLink = (value) => /^https?:\/\//.test(value ?? '');
 
-// The YouTube channel the video is on: { name, url }, or null if YouTube
-// doesn't say (a private video, or YouTube can't be reached).
-export async function fetchChannel(youtubeId, { timeoutMs = 5000 } = {}) {
+// The video's title and channel: { title, channel: { name, url } | null }, or
+// null if YouTube doesn't say (a private video, or YouTube can't be reached).
+export async function fetchVideoInfo(youtubeId, { timeoutMs = 5000 } = {}) {
   const url = `${oembedUrl()}?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${youtubeId}`)}`;
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
     if (!res.ok) return null;
     const info = await res.json();
+    const title = typeof info.title === 'string' ? info.title.trim().slice(0, 200) : '';
     const name = typeof info.author_name === 'string' ? info.author_name.trim().slice(0, 100) : '';
-    return name ? { name, url: isWebLink(info.author_url) ? info.author_url : undefined } : null;
+    return { title, channel: name ? { name, url: isWebLink(info.author_url) ? info.author_url : undefined } : null };
   } catch {
     return null;
   }
+}
+
+// The YouTube channel the video is on: { name, url }, or null.
+export async function fetchChannel(youtubeId, options) {
+  return (await fetchVideoInfo(youtubeId, options))?.channel ?? null;
 }
 
 export async function checkVideo(youtubeId) {

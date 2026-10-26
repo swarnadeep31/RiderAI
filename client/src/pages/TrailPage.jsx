@@ -242,10 +242,10 @@ export default function TrailPage() {
   const isOwner = Boolean(user && trail.owner?._id === user._id);
   const editing = isOwner && searchParams.has('edit');
   // Where the rider is now (the map draws its own smoothly moving marker; this is for new key points).
-  const position = positionAt(trail.track, trail.trackTimes, trail.videoStartsAt, video.currentTime, trail.hiddenRanges);
-  const activePoint = trail.points.findLast((p) => p.time <= video.currentTime + 0.5);
   const recorded = isGpxRoute(trail);
   const drawnRoute = trail.routeSource === 'keypoints' && trail.track.length > 1;
+  const position = positionAt(trail.track, trail.trackTimes, trail.videoStartsAt, video.currentTime, trail.hiddenRanges, { hold: drawnRoute });
+  const activePoint = trail.points.findLast((p) => p.time <= video.currentTime + 0.5);
   const aiRoute = drawnRoute && trail.points.some((p) => p.origin === 'ai');
   const hidden = drawnRoute ? hiddenRangeAt(trail.hiddenRanges, video.currentTime) : null;
   // Recorded routes may need lining up with the video; drawn routes use video times already.
@@ -594,6 +594,7 @@ export default function TrailPage() {
                   getDuration={video.getDuration}
                   onSeek={video.seekTo}
                   onPreview={setPreview}
+                  onTrailChange={applyUpdate}
                   onAccepted={(updated) => {
                     applyUpdate(updated);
                     if (!updated.routeNotice) setNotice('Route drawn. Play the video to watch the blue dot follow it.');

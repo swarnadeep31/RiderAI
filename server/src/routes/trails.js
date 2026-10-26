@@ -10,6 +10,7 @@ import {
   listTrails,
   updatePoint,
   updateTrail,
+  videoInfo,
 } from '../controllers/trailsController.js';
 import { enrichNow, getServices } from '../controllers/servicesController.js';
 import { requireUser } from '../middleware/auth.js';
@@ -22,6 +23,8 @@ trailsRouter.param('pointId', checkObjectId);
 
 // Anyone can watch...
 trailsRouter.get('/', listTrails);
+// What a YouTube video is called (logged in, while adding a trail).
+trailsRouter.get('/video-info', requireUser, videoInfo);
 trailsRouter.get('/:id', getTrail);
 trailsRouter.get('/:id/services', getServices);
 

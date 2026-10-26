@@ -48,6 +48,19 @@ const keyPointSchema = new mongoose.Schema({
   quote: { type: String, trim: true, maxlength: 200 },
 });
 
+// Where the trip in the video starts or ends, as the owner confirmed it
+// (usually read from the video's title, "Kolkata to Ladakh"). label: the
+// place's full name from the map search, to tell same-named places apart.
+const tripEndSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: [true, 'Give the place a name.'], trim: true, maxlength: 100 },
+    label: { type: String, trim: true, maxlength: 200, default: '' },
+    lat: { type: Number, required: true, validate: { validator: isLatitude, message: 'Latitude must be between -90 and 90.' } },
+    lng: { type: Number, required: true, validate: { validator: isLongitude, message: 'Longitude must be between -180 and 180.' } },
+  },
+  { _id: false },
+);
+
 // Parts of the video that don't show the journey (intro, recap, drone montage):
 // no marker is shown then.
 export const HIDDEN_REASONS = ['intro', 'recap', 'montage', 'flashback', 'off_route'];
@@ -124,6 +137,13 @@ const trailSchema = new mongoose.Schema(
       name: { type: String, trim: true, maxlength: 100 },
       url: { type: String, validate: { validator: isWebLink, message: "The channel's link must start with http:// or https://." } },
     },
+    // The video's full title as on YouTube. It usually names where the trip
+    // starts and ends ("Kolkata to Ladakh | EP1"), and the AI is told it.
+    videoTitle: { type: String, trim: true, maxlength: 200, default: '' },
+    // Where the trip starts and ends: the AI's places are pinned between
+    // these two, which are known before the video is watched.
+    startPlace: { type: tripEndSchema, default: undefined },
+    endPlace: { type: tripEndSchema, default: undefined },
     supportUrl: {
       type: String,
       trim: true,

@@ -42,6 +42,13 @@ describe('positionAt', () => {
     expect(positionAt(track, [], 0, 50)).toBeNull();
   });
 
+  test('a drawn route holds the rider at its start before it sets off and at its end after, but not in a hidden part', () => {
+    const hold = { hold: true };
+    expect(positionAt(track, [30, 100, 200], 0, 10, [], hold)).toEqual([10, 20]);
+    expect(positionAt(track, times, 0, 500, [], hold)).toEqual([11, 21]);
+    expect(positionAt(track, [30, 100, 200], 0, 10, [{ start: 0, end: 30 }], hold)).toBeNull();
+  });
+
   test('copes with two points recorded at the same second', () => {
     expect(positionAt(track, [0, 0, 10], 0, 0)).toEqual([10, 21]);
   });
