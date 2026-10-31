@@ -61,8 +61,10 @@ async function fetchPlaces(query, near, within) {
   }
 }
 
-// Nominatim's place_rank: 4 a country, 8 a state, 10 to 12 a region or division.
-const NOMINATIM_COARSE_RANK = 12;
+// Nominatim's place_rank: 4 a country, 8 a state. A district (10 to 12) still
+// places a town on a trip's route well enough: "Aurangabad, Bihar" is often
+// only found as its district.
+const NOMINATIM_COARSE_RANK = 8;
 
 async function fetchFromNominatim(query, near, within) {
   const params = new URLSearchParams({ q: query, format: 'jsonv2', limit: '5', 'accept-language': 'en' });

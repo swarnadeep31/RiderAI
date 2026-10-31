@@ -87,4 +87,7 @@ export function applyRateLimits(app) {
   const aiStarts = limit({ minutes: 60, max: 10, by: 'user', message: wait('Too many AI analyses started.') });
   app.post('/api/trails/:id/ai-route', aiStarts);
   app.post('/api/trails/:id/ai-route/upload', aiStarts);
+  app.post('/api/trails/:id/ai-route/transcript', aiStarts);
+  // Looking up a video's title asks YouTube.
+  app.get('/api/trails/video-info', limit({ minutes: 1, max: 20, by: 'user', message: wait('Too many video look-ups.') }));
 }

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { acceptAiRoute, latestAiRoute, startAiRoute, uploadAiVideo } from '../controllers/aiRouteController.js';
+import { acceptAiRoute, latestAiRoute, startAiFromTranscript, startAiRoute, uploadAiVideo } from '../controllers/aiRouteController.js';
 import {
   addPoint,
   createTrail,
@@ -41,6 +41,8 @@ trailsRouter.get('/:id/ai-route', requireUser, latestAiRoute);
 trailsRouter.post('/:id/ai-route', requireUser, startAiRoute);
 // ...or from a video file the owner uploads (the request body is the file).
 trailsRouter.post('/:id/ai-route/upload', requireUser, uploadAiVideo);
+// ...or from the video's transcript, which the owner pastes (the cheapest).
+trailsRouter.post('/:id/ai-route/transcript', requireUser, startAiFromTranscript);
 trailsRouter.post('/:id/ai-route/accept', requireUser, acceptAiRoute);
 
 trailsRouter.post('/:id/points', requireUser, addPoint);

@@ -8,10 +8,11 @@ import { pipeline } from 'node:stream/promises';
 import { tripKey, tripOf } from '../aiRoute/trip.js';
 import { aiConfig } from '../config.js';
 import { Job, MEDIA_MODES } from '../models/Job.js';
-import { PROMPT_VERSION } from '../services/gemini.js';
+import { PROMPT_VERSION, TRANSCRIPT_PROMPT_VERSION } from '../services/gemini.js';
 import { probeVideo } from '../services/videoFile.js';
 import { httpError } from '../utils/httpError.js';
 import { formatClock } from '../utils/time.js';
+import { parseTranscript, timedTranscript } from '../utils/transcript.js';
 import { drawRouteFromPoints, findOwnTrail, saveTrail, sendTrail } from './trailsController.js';
 
 // What the browser sees of a job (not the raw Gemini answers).
@@ -135,6 +136,63 @@ export async function startAiRoute(req, res) {
 
   await checkLimits(req.user, config);
   const job = await Job.create({ ...settings, trip, trail: trail._id, user: req.user._id, durationSec });
+  res.status(202).json(jobView(job));
+}
+
+// About 4 hours of talking, or a caption file with all its timings. The text
+// the AI reads is much shorter than this.
+const MAX_TRANSCRIPT_CHARS = 1_000_000;
+
+// Starts an analysis from the video's transcript, which the owner gives:
+// copied from YouTube's "Show transcript" panel, or a caption file (.srt,
+// .vtt, .sbv). Gemini reads only the words, with the moment each is said:
+// much cheaper than watching, and the times are exact. A video without a
+// transcript is watched instead (startAiRoute). Body: { text, durationSec }.
+export async function startAiFromTranscript(req, res) {
+  const config = aiConfig();
+  const trail = await trailReadyForAi(req, config);
+  const durationSec = checkDuration(req.body?.durationSec, config);
+  const text = req.body?.text;
+  if (typeof text !== 'string' || !text.trim()) throw httpError(400, 'Paste the transcript, or choose a caption file.');
+  if (text.length > MAX_TRANSCRIPT_CHARS) throw httpError(413, 'That transcript is too long. Paste the transcript of this one video.');
+
+  const lines = parseTranscript(text);
+  if (lines.length === 0) {
+    throw httpError(
+      400,
+      "There are no times in that text, so the places can't be lined up with the video. Copy the transcript with its times, or use a .srt or .vtt caption file.",
+    );
+  }
+  // The places' times must line up with the video, so it has to be this video's transcript.
+  const lastSaid = lines.at(-1).start;
+  if (lastSaid > durationSec + 60) {
+    throw httpError(
+      400,
+      `This transcript runs to ${formatClock(lastSaid)}, but the video is ${formatClock(durationSec)} long. Use the transcript of this video.`,
+    );
+  }
+
+  const transcript = timedTranscript(lines);
+  const trip = tripOf(trail);
+  const settings = {
+    type: 'ai-route',
+    source: 'transcript',
+    youtubeId: trail.youtubeId,
+    fileHash: createHash('sha256').update(transcript).digest('hex'),
+    model: config.transcriptModel,
+    promptVersion: TRANSCRIPT_PROMPT_VERSION,
+    highDetail: false,
+    tripKey: tripKey(trip),
+  };
+
+  // The same transcript was read the same way before: reuse it, free.
+  const previous = await Job.findOne({ ...settings, state: READY }).sort({ createdAt: -1 });
+  const reused = await reuse(previous, { trail, user: req.user, durationSec });
+  if (reused) return res.status(201).json(jobView(reused));
+
+  await checkLimits(req.user, config);
+  const videoTitle = trail.videoTitle || trail.title;
+  const job = await Job.create({ ...settings, trip, transcript, videoTitle, trail: trail._id, user: req.user._id, durationSec });
   res.status(202).json(jobView(job));
 }
 

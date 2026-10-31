@@ -74,6 +74,8 @@ async function stopIfCancelled(job) {
 async function extractClip(job, clip, services) {
   try {
     if (job.source === 'upload') return await services.extractFromUpload({ job, clip });
+    // A transcript is read whole: it's text, a small part of a video's tokens.
+    if (job.source === 'transcript') return await services.extract({ transcript: job.transcript, model: job.model, trip: tripFor(job) });
     return await services.extract({
       youtubeId: job.youtubeId,
       // One clip covering the whole video is sent without offsets.
@@ -127,7 +129,9 @@ async function runStages(job, services) {
   const config = aiConfig();
 
   if (job.stage === 'check') {
-    if (job.source === 'upload') {
+    if (job.source === 'transcript') {
+      if (!job.transcript) throw new Error('The transcript is missing. Please paste it again.');
+    } else if (job.source === 'upload') {
       await access(job.uploadPath).catch(() => {
         throw new Error('The uploaded video is no longer on the server (it was restarted). Please upload it again.');
       });
@@ -138,7 +142,8 @@ async function runStages(job, services) {
       // The owner didn't give the title: YouTube's tells Gemini where the trip goes.
       if (!job.trip?.title && video.title) job.set('trip.title', video.title);
     }
-    job.clips = planClips(job.durationSec, config.clipMinutes).map((c) => ({ ...c, status: 'pending' }));
+    const clips = job.source === 'transcript' ? [{ start: 0, end: job.durationSec }] : planClips(job.durationSec, config.clipMinutes);
+    job.clips = clips.map((c) => ({ ...c, status: 'pending' }));
     job.stage = 'extract';
     job.progress = { done: 0, total: job.clips.length };
     await job.save();
@@ -178,6 +183,7 @@ async function runStages(job, services) {
     const trip = tripFor(job);
     await services.geocode(candidates, {
       start: trip.start,
+      end: trip.end,
       area: tripArea(trip),
       onProgress: async (done, total) => {
         job.progress = { done, total };
