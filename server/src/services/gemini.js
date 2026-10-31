@@ -13,6 +13,11 @@ import { formatClock } from '../utils/time.js';
 // (start_time) and arrives (end_time).
 export const PROMPT_VERSION = 'videoPlaces.v3';
 const PROMPT = readFileSync(new URL(`../prompts/${PROMPT_VERSION}.md`, import.meta.url), 'utf8');
+// For a transcript the owner gives instead: the words said, with their times.
+// v2 asks for times exactly as the transcript writes them (v1 answers came
+// back as "24:29:00", read as 24 hours).
+export const TRANSCRIPT_PROMPT_VERSION = 'transcriptPlaces.v2';
+const TRANSCRIPT_PROMPT = readFileSync(new URL(`../prompts/${TRANSCRIPT_PROMPT_VERSION}.md`, import.meta.url), 'utf8');
 
 // The answer Gemini must give (JSON Schema). The server checks it again before use.
 export const PLACES_SCHEMA = {
@@ -84,6 +89,10 @@ export function buildPrompt({ clipStart, clipEnd, wholeVideo, noAudio = false, s
       ' You only have the SOUND of this video, no picture: use what is said. Evidence is "speech" unless a sign or milestone is read out.';
   }
   return PROMPT.replace('{{part}}', part).replace('{{trip}}', tripNote(trip)).replace('{{timeNote}}', timeNote).replace('{{soundNote}}', soundNote);
+}
+
+export function buildTranscriptPrompt({ trip = null } = {}) {
+  return TRANSCRIPT_PROMPT.replace('{{trip}}', tripNote(trip));
 }
 
 function client() {
@@ -162,32 +171,40 @@ function explain(err) {
 // has no sound, so the prompt says to rely on what is seen. soundOnly: the
 // file is only the sound, so the prompt says to rely on what is said.
 // trip: what the owner said about the trip (see tripNote).
-export async function extractPlaces({ youtubeId, file, clipStart = 0, clipEnd = null, model, highDetail, thinkingLevel, fps, noAudio = false, soundOnly = false, trip = null }) {
+// transcript: instead of a video, the words said in it as timed lines
+// ("[5:18] I'm in Kolkata"): only text is sent, a small part of a video's tokens.
+export async function extractPlaces({ youtubeId, file, transcript, clipStart = 0, clipEnd = null, model, highDetail, thinkingLevel, fps, noAudio = false, soundOnly = false, trip = null }) {
   const config = aiConfig();
   model ??= config.model;
   highDetail ??= config.highDetail;
-  thinkingLevel ??= config.thinkingLevel;
+  thinkingLevel ??= transcript ? config.transcriptThinkingLevel : config.thinkingLevel;
   const wholeVideo = clipStart === 0 && clipEnd === null;
 
-  const videoPart = {
-    fileData: file ? { fileUri: file.uri, mimeType: file.mimeType } : { fileUri: `https://www.youtube.com/watch?v=${youtubeId}` },
-  };
-  const videoMetadata = {
-    ...(!wholeVideo && { startOffset: `${Math.floor(clipStart)}s` }),
-    ...(!wholeVideo && clipEnd !== null && { endOffset: `${Math.ceil(clipEnd)}s` }),
-    ...(fps && fps !== 1 && { fps }),
-  };
-  if (Object.keys(videoMetadata).length) videoPart.videoMetadata = videoMetadata;
+  let parts;
+  if (transcript) {
+    parts = [{ text: buildTranscriptPrompt({ trip }) }, { text: `TRANSCRIPT\n${transcript}` }];
+  } else {
+    const videoPart = {
+      fileData: file ? { fileUri: file.uri, mimeType: file.mimeType } : { fileUri: `https://www.youtube.com/watch?v=${youtubeId}` },
+    };
+    const videoMetadata = {
+      ...(!wholeVideo && { startOffset: `${Math.floor(clipStart)}s` }),
+      ...(!wholeVideo && clipEnd !== null && { endOffset: `${Math.ceil(clipEnd)}s` }),
+      ...(fps && fps !== 1 && { fps }),
+    };
+    if (Object.keys(videoMetadata).length) videoPart.videoMetadata = videoMetadata;
+    parts = [videoPart, { text: buildPrompt({ clipStart, clipEnd, wholeVideo, noAudio, soundOnly, trip }) }];
+  }
 
   let response;
   try {
     response = await client().models.generateContent({
       model,
-      contents: [{ role: 'user', parts: [videoPart, { text: buildPrompt({ clipStart, clipEnd, wholeVideo, noAudio, soundOnly, trip }) }] }],
+      contents: [{ role: 'user', parts }],
       config: {
         responseMimeType: 'application/json',
         responseJsonSchema: PLACES_SCHEMA,
-        mediaResolution: highDetail ? MediaResolution.MEDIA_RESOLUTION_HIGH : MediaResolution.MEDIA_RESOLUTION_LOW,
+        ...(!transcript && { mediaResolution: highDetail ? MediaResolution.MEDIA_RESOLUTION_HIGH : MediaResolution.MEDIA_RESOLUTION_LOW }),
         ...(thinkingLevel && { thinkingConfig: { thinkingLevel: thinkingLevel.toUpperCase() } }),
       },
     });

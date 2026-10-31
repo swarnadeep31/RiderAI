@@ -13,6 +13,18 @@ export const MAX_CANDIDATES = 150;
 const text = (value, max) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
 export const sameName = (a, b) => a.toLowerCase().replace(/[^a-z0-9]/g, '') === b.toLowerCase().replace(/[^a-z0-9]/g, '');
 
+// A time Gemini wrote, in seconds. Gemini sometimes adds ":00" to a minutes
+// and seconds time ("24:29:00" for 24:29), which reads as 24 hours: a time
+// that would be past the end of the video, but fits as minutes and seconds,
+// is read that way.
+function readTime(value, duration) {
+  const t = parseClock(value);
+  const parts = typeof value === 'string' ? value.trim().split(':') : [];
+  if (t === null || t <= duration + 5 || parts.length !== 3) return t;
+  const asMinutes = Number(parts[0]) * 60 + Number(parts[1]);
+  return asMinutes <= duration + 5 ? asMinutes : t;
+}
+
 // Gemini may count times from the start of the clip or of the whole video.
 // If every time fits inside the clip's length, treat them as clip times.
 function clipOffset(times, clip) {
@@ -28,14 +40,16 @@ export function cleanClip(answer, clip, duration, { relative = false } = {}) {
   const rawPlaces = Array.isArray(answer?.places) ? answer.places : [];
   const rawHidden = Array.isArray(answer?.hidden_ranges) ? answer.hidden_ranges : [];
   const allTimes = [
-    parseClock(answer?.start_time),
-    parseClock(answer?.end_time),
-    ...rawPlaces.map((p) => parseClock(p?.time)),
-    ...rawHidden.flatMap((r) => [parseClock(r?.start), parseClock(r?.end)]),
-  ].filter((t) => t !== null);
+    answer?.start_time,
+    answer?.end_time,
+    ...rawPlaces.map((p) => p?.time),
+    ...rawHidden.flatMap((r) => [r?.start, r?.end]),
+  ]
+    .map((value) => readTime(value, duration))
+    .filter((t) => t !== null);
   const offset = relative ? clip.start : clipOffset(allTimes, clip);
   const toVideoTime = (value) => {
-    const t = parseClock(value);
+    const t = readTime(value, duration);
     return t === null ? null : Math.min(Math.max(t + offset, 0), duration);
   };
 

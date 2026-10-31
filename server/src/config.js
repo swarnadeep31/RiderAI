@@ -21,6 +21,11 @@ export function aiConfig() {
       .filter(Boolean),
     // "minimal" keeps thinking (charged as output) cheap. Empty: let the model decide.
     thinkingLevel: process.env.GEMINI_THINKING_LEVEL ?? 'MINIMAL',
+    // A transcript is a small part of a video's tokens, so a stronger model can
+    // read it, and think a little (when the ride sets off, what's only talked
+    // about), for well under a cent. Flash Lite mixed up places in tests.
+    transcriptModel: process.env.GEMINI_TRANSCRIPT_MODEL || 'gemini-3.5-flash',
+    transcriptThinkingLevel: process.env.GEMINI_TRANSCRIPT_THINKING_LEVEL ?? 'LOW',
     // High detail reads boards and milestones better, but costs about 3-4x as much.
     highDetail: process.env.AI_HIGH_DETAIL === 'true',
     clipMinutes: number('AI_CLIP_MINUTES', 60),

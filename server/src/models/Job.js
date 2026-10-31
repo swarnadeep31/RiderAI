@@ -11,8 +11,9 @@ export const JOB_STATES = ['queued', 'running', 'needs_review', 'accepted', 'don
 export const JOB_STAGES = ['check', 'extract', 'clean', 'geocode', 'review', 'elevation', 'services', 'stats'];
 // What an AI analysis watches: the YouTube video (Gemini fetches it itself),
 // or a video file the owner uploaded, sent as picture and sound ('full'),
-// picture only, or sound only (what's said: the cheapest).
-export const AI_SOURCES = ['youtube', 'upload'];
+// picture only, or sound only (what's said). Or what it reads: the video's
+// transcript, which the owner gives ('transcript': the cheapest by far).
+export const AI_SOURCES = ['youtube', 'upload', 'transcript'];
 export const MEDIA_MODES = ['full', 'picture', 'sound'];
 
 const clipSchema = new mongoose.Schema(
@@ -59,9 +60,11 @@ const jobSchema = new mongoose.Schema(
     source: { type: String, enum: AI_SOURCES, default: 'youtube' },
     mediaMode: { type: String, enum: MEDIA_MODES, default: 'full' },
     // upload: where the file waits on the server (deleted when the analysis
-    // ends), and a fingerprint so the same file is never paid for twice.
+    // ends), and a fingerprint so the same file (or transcript) is never paid for twice.
     uploadPath: String,
     fileHash: String,
+    // transcript: the words said in the video, as the timed lines the AI reads.
+    transcript: String,
 
     state: { type: String, enum: JOB_STATES, default: 'queued' },
     stage: { type: String, enum: JOB_STAGES, default: 'check' },

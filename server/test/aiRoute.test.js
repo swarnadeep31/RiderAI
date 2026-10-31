@@ -163,6 +163,48 @@ describe('AI route jobs', () => {
     assert.equal((await start()).status, 202);
   });
 
+  test("from the video's transcript: Gemini reads only the words, with their times, and nothing is watched", async () => {
+    const pasted = ['0:00', 'welcome to the channel', '1:30', 'we are at Howrah station', '9:00', 'night in Durgapur', '16:00', 'Asansol now'].join('\n');
+    const started = await alice.post(`/api/trails/${trailId}/ai-route/transcript`).send({ text: pasted, durationSec: 1800 });
+    assert.equal(started.status, 202, JSON.stringify(started.body));
+    assert.equal(started.body.source, 'transcript');
+
+    const read = [];
+    const { services } = fakeServices({
+      extract: async (options) => {
+        read.push(options);
+        return { data: geminiAnswer, raw: JSON.stringify(geminiAnswer), usage: { promptTokenCount: 900, candidatesTokenCount: 300 }, model: 'gemini-3.5-flash-lite' };
+      },
+    });
+    services.checkVideo = async () => assert.fail("a transcript doesn't need the video");
+    await processNextJob(services);
+
+    assert.equal(read.length, 1);
+    assert.equal(read[0].transcript, '[0:00] welcome to the channel\n[1:30] we are at Howrah station\n[9:00] night in Durgapur\n[16:00] Asansol now');
+    assert.equal(read[0].youtubeId, undefined);
+    const { body: job } = await alice.get(`/api/jobs/${started.body._id}`);
+    assert.equal(job.state, 'needs_review');
+    assert.deepEqual(job.result.candidates.map((c) => c.name), ['Howrah', 'Durgapur', 'Leh', 'Asansol']);
+    assert.equal(job.transcript, undefined, "the browser doesn't get the transcript back");
+
+    // The same transcript again (copied a little differently) is free.
+    const again = await alice.post(`/api/trails/${trailId}/ai-route/transcript`).send({ text: `${pasted}\n`, durationSec: 1800 });
+    assert.equal(again.status, 201);
+    assert.equal(again.body.reused, true);
+  });
+
+  test('a transcript needs its times, and must be of this video', async () => {
+    const send = (text, durationSec = 1800) => alice.post(`/api/trails/${trailId}/ai-route/transcript`).send({ text, durationSec });
+    const noTimes = await send('we rode from Kolkata to Dhanbad');
+    assert.equal(noTimes.status, 400);
+    assert.match(noTimes.body.error, /no times/);
+    const longer = await send('0:00\nhello\n45:00\nthe end');
+    assert.equal(longer.status, 400);
+    assert.match(longer.body.error, /runs to 45:00, but the video is 30:00 long/);
+    assert.equal((await send('')).status, 400);
+    assert.equal((await send('x'.repeat(1_000_001))).status, 413);
+  });
+
   test('accepting again replaces the AI places but keeps hand-made ones', async () => {
     await alice.post(`/api/trails/${trailId}/points`).send({ time: 30, name: 'My note', lat: 22.5, lng: 88.3 });
     const { body: job } = await start();

@@ -17,9 +17,71 @@ const STAGES = {
 };
 
 function stageText(job) {
+  if (job.source === 'transcript' && ['check', 'extract'].includes(job.stage)) return 'Reading the transcript';
   if (job.source === 'upload' && job.stage === 'check') return 'Getting your file ready';
   if (job.mediaMode === 'sound' && job.stage === 'extract') return 'Listening to the video';
   return STAGES[job.stage];
+}
+
+// The biggest caption file read in the browser (the server takes about 1 MB of text).
+const MAX_CAPTION_FILE_BYTES = 1048576;
+
+// The cheapest way, and the best timed: the video's transcript, pasted from
+// YouTube's "Show transcript" panel or read from a caption file. The AI reads
+// only the words, with the moment each is said.
+function TranscriptOption({ busy, onStart }) {
+  const [text, setText] = useState('');
+  const [fileNote, setFileNote] = useState(null);
+
+  async function readFile(event) {
+    const file = event.target.files[0];
+    event.target.value = '';
+    if (!file) return;
+    if (file.size > MAX_CAPTION_FILE_BYTES) {
+      setFileNote(`${file.name} is too big for a caption file. Choose the .srt, .vtt or .sbv file of this video.`);
+      return;
+    }
+    setText(await file.text());
+    setFileNote(`Read from ${file.name}.`);
+  }
+
+  return (
+    <section className="space-y-3 rounded-[3px] bg-paper p-4 ring-1 ring-ink/15">
+      <h4 className="flex flex-wrap items-center gap-2 font-semibold">
+        From the video&apos;s transcript <span className="tag bg-forest/12 text-forest">Cheapest</span>
+      </h4>
+      <ol className="list-decimal space-y-1 pl-5 text-small text-ink-soft">
+        <li>On YouTube, open the video, click “…more” under it, then “Show transcript”.</li>
+        <li>Select from the first line to the last, with the times, and copy it.</li>
+        <li>Paste it here. Or choose the caption file (.srt, .vtt or .sbv) from YouTube Studio.</li>
+      </ol>
+      <textarea
+        rows={6}
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          setFileNote(null);
+        }}
+        placeholder={'0:00\nHello everyone, today we ride from Kolkata\n5:18\nWe are leaving Kolkata now'}
+        aria-label="The video's transcript, with its times"
+        className="field block w-full font-mono text-small"
+      />
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="btn-secondary btn-small cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-water">
+          Choose a caption file
+          <input type="file" accept=".srt,.vtt,.sbv,.txt,text/vtt,text/plain" onChange={readFile} className="sr-only" />
+        </label>
+        {fileNote && <span className="text-small text-ink-soft">{fileNote}</span>}
+      </div>
+      <p className="text-small text-ink-soft">
+        Only the words are read, so places the rider says out loud are found, and sign boards that are only seen are
+        not. Each place gets the exact moment it&apos;s said.
+      </p>
+      <button type="button" onClick={() => onStart(text)} disabled={busy || text.trim().length < 20} className="btn-ai">
+        {busy ? 'Starting...' : 'Build the route from the transcript'}
+      </button>
+    </section>
+  );
 }
 
 // What the AI gets from a video file uploaded from the owner's computer.
@@ -362,6 +424,22 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
     setBusy(false);
   }
 
+  async function startFromTranscript(text) {
+    const durationSec = Math.round(getDuration());
+    if (!durationSec) {
+      setError('Wait for the video to load, then try again: its length is needed to check the transcript is of this video.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      setJob(await api.startAiFromTranscript(trail._id, { text, durationSec }));
+    } catch (err) {
+      setError(err.message);
+    }
+    setBusy(false);
+  }
+
   async function uploadFile(file, mode, onProgress) {
     const durationSec = Math.round(getDuration());
     if (!durationSec) {
@@ -424,8 +502,9 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
       {available && !running && !reviewing && (
         <>
           <p className="text-ink-soft">
-            Google's Gemini watches the video and lists the towns and landmarks it passes, with the moment each one
-            appears. You check the list, then TrailCast draws the route through them. Works with public videos only.
+            Google&apos;s Gemini reads the video&apos;s transcript, or watches the video, and lists the towns and
+            landmarks it passes, with the moment each one comes. You check the list, then TrailCast draws the route
+            through them.
           </p>
           <TripSetting trail={trail} onSaved={onTrailChange} />
           {job?.state === 'failed' && <ErrorMessage>{job.error || 'The analysis failed.'}</ErrorMessage>}
@@ -446,23 +525,21 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
               </button>
             </p>
           )}
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={highDetail} onChange={(e) => setHighDetail(e.target.checked)} />
-            Read sign boards and milestones closely (about 3× the cost)
-          </label>
-          <button
-            type="button"
-            onClick={() => start(job?.state === 'accepted')}
-            disabled={busy}
-            className={
-              job?.state === 'accepted'
-                ? 'btn-secondary'
-                : 'btn-ai'
-            }
-          >
-            {busy ? 'Starting...' : job?.state === 'accepted' ? 'Analyse the video again' : 'Build the route with AI'}
-          </button>
-          <UploadOption busy={busy} onUpload={uploadFile} maxMb={maxUploadMb} />
+          <TranscriptOption busy={busy} onStart={startFromTranscript} />
+          <section className="space-y-3 rounded-[3px] bg-paper p-4 ring-1 ring-ink/15">
+            <h4 className="font-semibold">No transcript? Let the AI watch the video</h4>
+            <p className="text-small text-ink-soft">
+              For videos without captions. It also reads sign boards and milestones, and costs more. Public videos only.
+            </p>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={highDetail} onChange={(e) => setHighDetail(e.target.checked)} />
+              Read sign boards and milestones closely (about 3× the cost)
+            </label>
+            <button type="button" onClick={() => start(job?.state === 'accepted')} disabled={busy} className="btn-secondary">
+              {busy ? 'Starting...' : job?.state === 'accepted' ? 'Watch the video again' : 'Watch the video'}
+            </button>
+            <UploadOption busy={busy} onUpload={uploadFile} maxMb={maxUploadMb} />
+          </section>
         </>
       )}
 
@@ -503,6 +580,11 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
             </p>
           </div>
 
+          {job.source === 'transcript' && tickedCount < 2 && (
+            <p className="text-ink-soft">
+              The transcript names few places out loud. Let the AI watch the video instead: it also reads sign boards.
+            </p>
+          )}
           {places.length === 0 ? (
             <p className="text-ink-soft">The AI found no places in this video. Add the places by hand instead.</p>
           ) : (

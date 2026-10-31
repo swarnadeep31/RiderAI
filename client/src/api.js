@@ -63,6 +63,8 @@ export const api = {
   startAiRoute: (id, options) => request(`/trails/${id}/ai-route`, { method: 'POST', body: options }),
   latestAiRoute: (id) => request(`/trails/${id}/ai-route`),
   acceptAiRoute: (id, body) => request(`/trails/${id}/ai-route/accept`, { method: 'POST', body }),
+  // The video's transcript instead of the video: { text, durationSec }.
+  startAiFromTranscript: (id, body) => request(`/trails/${id}/ai-route/transcript`, { method: 'POST', body }),
   // A video file from the owner's computer instead of the YouTube link. options:
   // { mode: 'full' | 'picture' | 'sound', durationSec, highDetail }. onProgress gets 0 to 1.
   uploadAiVideo: (id, file, { mode, durationSec, highDetail }, onProgress) =>

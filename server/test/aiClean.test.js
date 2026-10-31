@@ -138,3 +138,21 @@ test('when the trip sets off and arrives: from each clip, then the earliest and 
   const merged = mergeClips([first, second, neither], { minConfidence: 0.5 });
   assert.deepEqual([merged.startTime, merged.endTime], [318, 1620]);
 });
+
+test('a minutes and seconds time written with ":00" after it is not read as hours', () => {
+  const answer = {
+    places: [
+      { time: '24:29:00', stay_until: '29:20:00', name: 'Lava', presence: 'here', confidence: 0.9 },
+      { time: '0:31:13', name: 'Gangtok', presence: 'here', confidence: 0.9 },
+    ],
+    hidden_ranges: [{ start: '0:04', end: '2:51:00', reason: 'intro' }],
+  };
+  const { places, hiddenRanges } = cleanClip(answer, { start: 0, end: 2008 }, 2008);
+  assert.deepEqual(places.map((p) => [p.name, p.time, p.stayUntil]), [
+    ['Lava', 1469, 1760],
+    ['Gangtok', 1873, null],
+  ]);
+  assert.deepEqual(hiddenRanges, [{ start: 4, end: 171, reason: 'intro' }]);
+  // A long video's real hours are kept.
+  assert.equal(cleanClip({ places: [{ time: '1:02:05', name: 'Leh', presence: 'here', confidence: 0.9 }], hidden_ranges: [] }, { start: 0, end: 7200 }, 7200).places[0].time, 3725);
+});

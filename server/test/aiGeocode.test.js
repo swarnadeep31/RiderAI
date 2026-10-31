@@ -76,13 +76,13 @@ test('a whole state or country is not a spot on the route', async () => {
   const search = async (query) =>
     query === 'Geetanjali Dhaba'
       ? [{ ...result('West Bengal', 24, 88) }]
-      : [{ ...result('Bihar', 25.6, 85.1), coarse: true }, result('Bihar Sharif', 25.2, 85.52)];
-  const candidates = [candidate('Geetanjali Dhaba'), candidate('Bihar')];
+      : [{ ...result('Gaya division', 24.8, 85.0), coarse: true }, result('Gaya', 24.78, 85.0)];
+  const candidates = [candidate('Geetanjali Dhaba'), candidate('Gaya')];
   await geocodeCandidates(candidates, { search });
   // Exactly on whole degrees: the search had nothing better than a region's middle.
   assert.deepEqual([candidates[0].lat, candidates[0].checked, candidates[0].flags], [24, false, ['region_only']]);
   // A real place is preferred to the region.
-  assert.deepEqual([candidates[1].label, candidates[1].checked], ['Bihar Sharif, India', true]);
+  assert.deepEqual([candidates[1].label, candidates[1].checked], ['Gaya, India', true]);
 });
 
 test("the trip's start and end are never flagged as detours", () => {
@@ -90,4 +90,29 @@ test("the trip's start and end are never flagged as detours", () => {
   const candidates = [at('Howrah', 22.59, 88.31), at('Kolkata', 26.0, 80.0, { anchor: 'start' }), at('Asansol', 23.68, 86.98)];
   flagDetours(candidates);
   assert.deepEqual(candidates[1].flags, []);
+});
+
+test("with the trip's end known, the same-named place on the way wins over one back near the start or in another state", async () => {
+  const search = async (query) => {
+    if (query.startsWith('Durgapur')) {
+      // Nominatim's own order: the city first, then a village near Kolkata.
+      return [
+        result('Durgapur, Paschim Bardhaman, West Bengal', 23.52, 87.31),
+        result('Durgapur, South 24 Parganas, West Bengal', 22.4, 88.2),
+      ];
+    }
+    return [result('Aurangabad, Murshidabad, West Bengal', 24.6, 88.0), result('Aurangabad, Bihar', 24.75, 84.37)];
+  };
+  const candidates = [candidate('Durgapur', { region: 'Paschim Bardhaman, West Bengal' }), candidate('Aurangabad', { region: 'Bihar' })];
+  await geocodeCandidates(candidates, { search, start: { lat: 22.5726, lng: 88.3639 }, end: { lat: 24.9, lng: 84.18 } });
+  assert.equal(candidates[0].label, 'Durgapur, Paschim Bardhaman, West Bengal, India');
+  assert.equal(candidates[1].label, 'Aurangabad, Bihar, India');
+});
+
+test('a state or country is never a stop, even when the search finds a village that mentions it', async () => {
+  const search = async () => [result('Sittong, Darjeeling, West Bengal', 26.89, 88.37)];
+  const candidates = [candidate('West Bengal'), candidate('Sittong')];
+  await geocodeCandidates(candidates, { search });
+  assert.deepEqual([candidates[0].checked, candidates[0].flags], [false, ['region_only']]);
+  assert.equal(candidates[1].checked, true);
 });
