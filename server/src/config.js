@@ -47,11 +47,20 @@ export function aiConfig() {
 
 export const aiRouteAvailable = () => Boolean(aiConfig().apiKey);
 
+// The main public Overpass server, then another public one (listed on the
+// OpenStreetMap wiki) for when the main one is overloaded.
+const DEFAULT_OVERPASS_URLS = 'https://overpass-api.de/api/interpreter,https://overpass.private.coffee/api/interpreter';
+
 // Settings for the route tools: heights, services along the route and trip stats.
 export function routeConfig() {
   return {
     // Overpass finds fuel stations, mechanics, clinics and ATMs in OpenStreetMap.
-    overpassUrl: process.env.OVERPASS_URL || 'https://overpass-api.de/api/interpreter',
+    // The servers to ask, in order: when one is down or busy, the next is
+    // tried. OVERPASS_URLS (comma-separated) or OVERPASS_URL replace the list.
+    overpassUrls: (process.env.OVERPASS_URLS || process.env.OVERPASS_URL || DEFAULT_OVERPASS_URLS)
+      .split(',')
+      .map((url) => url.trim())
+      .filter(Boolean),
     // "off" hides services along the route entirely.
     services: process.env.ROUTE_SERVICES !== 'off',
     chunkKm: number('SERVICES_CHUNK_KM', 200),

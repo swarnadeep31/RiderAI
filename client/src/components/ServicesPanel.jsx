@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { googleMapsUrl } from '../lib/exports.js';
 import { FUEL_CAVEAT, KIND_ORDER, SERVICE_KINDS, fuelGapSentence, kmAlong, kmLength, longGaps, offRoute, serviceName } from '../lib/services.js';
 import { formatTime } from '../lib/time.js';
 import Icon from './art/Icon.jsx';
+import ErrorMessage from './ErrorMessage.jsx';
 import SectionHeading from './SectionHeading.jsx';
 
 // A service's round symbol: its colour and its own letter (so colour is never the only clue).
@@ -67,11 +68,45 @@ function FuelStrip({ stations, gap, lengthM, approximate, warnKm }) {
   );
 }
 
+// The search for fuel stops failed: when it's tried again by itself, and for
+// the owner, a button to try now (a few times a day).
+function ServicesFailed({ retryAt, onRetry }) {
+  const [state, setState] = useState({ busy: false, error: null });
+  const when = retryAt ? new Date(retryAt) : null;
+  const sameDay = when && when.toDateString() === new Date().toDateString();
+  const at = when?.toLocaleString(undefined, sameDay ? { hour: 'numeric', minute: '2-digit' } : { weekday: 'long', hour: 'numeric', minute: '2-digit' });
+
+  async function retry() {
+    setState({ busy: true, error: null });
+    try {
+      await onRetry();
+    } catch (err) {
+      setState({ busy: false, error: err.message });
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-ink-soft">
+        Couldn&apos;t load the fuel stops right now. The rest of the page works as normal.
+        {at && ` TrailCast will try again by itself ${sameDay ? 'at' : 'on'} ${at}.`}
+      </p>
+      {onRetry && (
+        <button type="button" onClick={retry} disabled={state.busy} className="btn-secondary btn-small">
+          {state.busy ? 'Asking again...' : 'Try again now'}
+        </button>
+      )}
+      {state.error && <ErrorMessage>{state.error}</ErrorMessage>}
+    </div>
+  );
+}
+
 // "Along the route": fuel stops, mechanics, medical help and ATMs near the
 // route from OpenStreetMap, in the order the rider passes them. The legend
 // switches each kind on or off (on the map too); the time watches the moment
 // the rider passes.
-export default function ServicesPanel({ services, lengthM, approximate, warnKm, visibleKinds, onToggleKind, momentAt, onSeek, onFocus }) {
+// onRetry: for the trail's owner, asks the server to look again now.
+export default function ServicesPanel({ services, lengthM, approximate, warnKm, visibleKinds, onToggleKind, momentAt, onSeek, onFocus, onRetry }) {
   const items = services?.status === 'ready' ? services.items : [];
   const counts = useMemo(() => Object.fromEntries(KIND_ORDER.map((kind) => [kind, items.filter((item) => item.kind === kind).length])), [items]);
   const gaps = services?.status === 'ready' ? services.fuelGaps : [];
@@ -96,7 +131,7 @@ export default function ServicesPanel({ services, lengthM, approximate, warnKm, 
           <Icon name="compass" className="h-4 w-4 text-road motion-safe:animate-spin" /> Finding fuel stops along the route…
         </p>
       )}
-      {services.status === 'failed' && <p className="text-ink-soft">Couldn&apos;t load the fuel stops right now. The rest of the page works as normal.</p>}
+      {services.status === 'failed' && <ServicesFailed retryAt={services.retryAt} onRetry={onRetry} />}
       {services.status === 'unavailable' && (
         <p className="text-ink-soft">This route is drawn as straight lines, so the fuel stops near it can&apos;t be worked out. Draw it along roads or footpaths instead.</p>
       )}

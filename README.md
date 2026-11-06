@@ -129,9 +129,11 @@ key at https://openrouteservice.org and set `ORS_API_KEY` in `server/.env`. With
 key gives routes their heights for the elevation chart.
 
 **Services along the route:** fuel stops and the like come from OpenStreetMap through Overpass, with no key. They're
-found in the background a few seconds after a route is saved. `.env.example` has the settings (another Overpass
-server, switching it off, the 150 km fuel warning). After updating an existing site, run
-`npm run backfill-route-extras -w server` once so trails saved before get them too.
+found in the background a few seconds after a route is saved. When the main Overpass server is down or busy, a
+backup one is asked; if both fail, TrailCast tries again 1, 3, 6, 12, 24 and 48 hours later (about four days),
+carrying on from the parts of the route already found, and the trail's owner can press "Try again now".
+`.env.example` has the settings (the Overpass servers, switching it off, the 150 km fuel warning). After updating an
+existing site, run `npm run backfill-route-extras -w server` once so trails saved before get them too.
 
 **AI route builder (optional):** get a Gemini API key at https://aistudio.google.com ("Get API key") and set
 `GEMINI_API_KEY` in `server/.env`. `.env.example` lists the other settings: the model, backup models, the daily limit

@@ -197,7 +197,7 @@ export default function TrailPage() {
     [trail?.track, trail?.trackTimes, trail?.videoStartsAt, trail?.hiddenRanges],
   );
   // Fuel stops and the like along the route, found by the server once per route version.
-  const services = useRouteServices(trail?._id, trail?.routeVersion, trail?.track.length > 1);
+  const [services, retryServices] = useRouteServices(trail?._id, trail?.routeVersion, trail?.track.length > 1);
   const ready = services?.status === 'ready' ? services : null;
   const longestGap = ready?.fuelGaps[0];
   const fuelGapLine = useMemo(
@@ -647,6 +647,7 @@ export default function TrailPage() {
             momentAt={(alongM) => videoTimeAtDistance(route, alongM, { duration: video.getDuration() })}
             onSeek={(seconds) => video.seekTo(seconds)}
             onFocus={(location) => setFocus({ location })}
+            onRetry={isOwner ? retryServices : undefined}
           />
 
           {(trail.points.length > 0 || trail.track.length > 0) && (

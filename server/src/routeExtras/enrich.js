@@ -17,9 +17,11 @@ import { computeStats } from './stats.js';
 // The outside services, replaceable in tests.
 export const defaultEnrichServices = { heightsAvailable, lineHeights, overpass: runOverpassQuery };
 
-// When the services search fails, it's tried again this much later, at most this many times.
-const SERVICES_RETRY_MS = 6 * 60 * 60 * 1000;
-const SERVICES_MAX_RETRIES = 3;
+// When the services search fails, it's tried again after each of these waits
+// in turn (hours), then given up on: about four days in all, because the
+// public Overpass servers can be overloaded for a day or more.
+export const SERVICES_RETRY_HOURS = [1, 3, 6, 12, 24, 48];
+const HOUR_MS = 60 * 60 * 1000;
 
 // The route changed (or the trail was deleted) while the job ran: its work is out of date.
 class RouteChanged extends Error {}
@@ -77,6 +79,48 @@ async function addHeights(job, services) {
   if (profile) await saveForVersion(job, { elevationProfile: { ...profile, routeVersion: job.routeVersion } });
 }
 
+// Queues another go at the services search for the job's route version,
+// starting at `at`. `chunks`: the pieces of the route already answered, so the
+// next go carries on from there instead of asking for them again.
+function queueServicesRetry(job, at, chunks = []) {
+  return Job.create({
+    type: 'route-enrich',
+    trail: job.trail,
+    user: job.user,
+    routeVersion: job.routeVersion,
+    stage: 'services',
+    lockedUntil: at,
+    ...(chunks?.length && { chunks }),
+  });
+}
+
+// Services searches that failed and have nothing queued to try them again:
+// ones that gave up under an older, shorter retry schedule, or whose retry
+// was lost. Each gets one queued now (if it has retries left). Run when the
+// server starts. Returns how many were queued.
+export async function requeueStuckServices() {
+  const failed = await RouteServices.find({ status: 'failed', attempts: { $lte: SERVICES_RETRY_HOURS.length } })
+    .select('trail routeVersion retryAt')
+    .lean();
+  let queued = 0;
+  for (const found of failed) {
+    // Its retry is still to come, and queued.
+    if (found.retryAt && found.retryAt > new Date()) continue;
+    const trail = await Trail.findById(found.trail).select('owner routeVersion').lean();
+    if (!trail || trail.routeVersion !== found.routeVersion) continue;
+    const waiting = await Job.exists({
+      type: 'route-enrich',
+      trail: trail._id,
+      routeVersion: trail.routeVersion,
+      state: { $in: ['queued', 'running'] },
+    });
+    if (waiting) continue;
+    await queueServicesRetry({ trail: trail._id, user: trail.owner, routeVersion: trail.routeVersion }, new Date());
+    queued++;
+  }
+  return queued;
+}
+
 // Saves what was found for this route version, clearing what no longer applies.
 async function saveServices(job, fields) {
   const clear = Object.fromEntries(['reason', 'error', 'retryAt'].filter((key) => fields[key] === undefined).map((key) => [key, 1]));
@@ -91,8 +135,9 @@ async function saveServices(job, fields) {
 // Fuel stations, mechanics, medical help and ATMs near the route, from
 // OpenStreetMap. The route is sent in pieces of about 200 km, one Overpass
 // query each, one at a time; each answer is saved in the job before the next,
-// so a restart doesn't ask again. If Overpass fails, it's tried again 6 hours
-// later (at most 3 times), and the rest of the page works as normal.
+// so a restart doesn't ask again. If Overpass fails, it's tried again later
+// (SERVICES_RETRY_HOURS), carrying on from the pieces already answered, and
+// the rest of the page works as normal.
 async function findServices(job, services) {
   const trail = await currentTrail(job);
   const config = routeConfig();
@@ -119,11 +164,10 @@ async function findServices(job, services) {
     if (err instanceof RouteChanged) throw err;
     const previous = await RouteServices.findOne({ trail: job.trail, routeVersion: job.routeVersion });
     const attempts = (previous?.attempts ?? 0) + 1;
-    const retryAt = attempts <= SERVICES_MAX_RETRIES ? new Date(Date.now() + SERVICES_RETRY_MS) : null;
+    const waitHours = SERVICES_RETRY_HOURS[attempts - 1];
+    const retryAt = waitHours ? new Date(Date.now() + waitHours * HOUR_MS) : null;
     await saveServices(job, { status: 'failed', error: err.message, retryAt, attempts });
-    if (retryAt) {
-      await Job.create({ type: 'route-enrich', trail: job.trail, user: job.user, routeVersion: job.routeVersion, stage: 'services', lockedUntil: retryAt });
-    }
+    if (retryAt) await queueServicesRetry(job, retryAt, job.chunks);
     return;
   }
 
