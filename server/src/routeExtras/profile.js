@@ -94,9 +94,51 @@ export function resample(alongM, heights, count) {
   return { d, e };
 }
 
+// How many neighbours on each side of value i a centred window can have: up
+// to `half`, fewer near the ends, the same number on both sides. So the first
+// and last values stay as they are, and a steady slope isn't changed at all.
+const reach = (i, length, half) => Math.min(half, i, length - 1 - i);
+
+// Each value replaced by the average of itself and up to `half` values on each side.
+export function movingAverage(values, half) {
+  const sums = [0];
+  for (const v of values) sums.push(sums.at(-1) + v);
+  return values.map((_, i) => {
+    const k = reach(i, values.length, half);
+    return (sums[i + k + 1] - sums[i - k]) / (2 * k + 1);
+  });
+}
+
+// Each value replaced by the middle one of itself and up to 2 values on each side.
+function centredMedian5(values) {
+  return values.map((_, i) => {
+    const k = reach(i, values.length, 2);
+    return values.slice(i - k, i + k + 1).sort((a, b) => a - b)[k];
+  });
+}
+
+// Heights from a map (OpenRouteService) rather than a recording. On a road
+// cut into a steep valley side, the map's height wobbles by tens to hundreds
+// of metres within a few hundred metres (388 m within 1 km, on the live Spiti
+// ride), and every wobble would count as climbing: that ride showed 19,954 m
+// of climb. So they're put on an even grid and averaged over 1.5 km, which
+// keeps passes and long climbs (the highest point moved by 15 m) and brings
+// it to about 8,600 m. Returns { alongM, heights } on the grid.
+export const MAP_GRID_M = 50;
+export const MAP_SMOOTHING_M = 1500;
+const MAX_GRID_POINTS = 200000; // beyond 10,000 km the grid gets coarser
+export function smoothMapHeights(alongM, heights) {
+  const total = alongM.at(-1);
+  const count = Math.max(2, Math.min(Math.floor(total / MAP_GRID_M) + 1, MAX_GRID_POINTS));
+  const { d, e } = resample(alongM, heights, count);
+  const half = Math.max(1, Math.round(MAP_SMOOTHING_M / 2 / (total / (count - 1))));
+  return { alongM: d, heights: movingAverage(centredMedian5(e), half) };
+}
+
 // alongM: metres from the start for each height. source: 'gpx' (the
 // recording, which is noisy and gets smoothed), 'ors' (heights OpenRouteService
-// gave with a drawn route) or 'dem' (OpenRouteService's elevation service).
+// gave with a drawn route) or 'dem' (OpenRouteService's elevation service),
+// both from a map and smoothed over a longer distance (smoothMapHeights).
 // Returns { d, e, source, summary } or null when the heights can't be used.
 // The summary comes from the full series: on a 1,000 km trip, the profile's
 // 1 km spacing would hide short climbs.
@@ -104,21 +146,22 @@ export function buildProfile({ alongM, heights, source }) {
   if (alongM.length < 2 || alongM.at(-1) <= 0) return null;
   const filled = fillHeights(alongM, heights);
   if (!filled) return null;
-  const smooth = source === 'gpx' ? mean3(median5(filled)) : filled;
+  const series = source === 'gpx' ? { alongM, heights: mean3(median5(filled)) } : smoothMapHeights(alongM, filled);
+  const smooth = series.heights;
 
   let highest = 0;
   smooth.forEach((h, i) => {
     if (h > smooth[highest]) highest = i;
   });
   const { ascentM, descentM } = climb(smooth);
-  const { d, e } = resample(alongM, smooth, Math.min(MAX_PROFILE_POINTS, alongM.length));
+  const { d, e } = resample(series.alongM, smooth, Math.min(MAX_PROFILE_POINTS, alongM.length));
   return {
     d: d.map((v) => Math.round(v / 10) * 10),
     e: e.map((v) => Math.round(v)),
     source,
     summary: {
       highestM: Math.round(smooth[highest]),
-      highestAlongM: Math.round(alongM[highest]),
+      highestAlongM: Math.round(series.alongM[highest]),
       ascentM: Math.round(ascentM),
       descentM: Math.round(descentM),
     },

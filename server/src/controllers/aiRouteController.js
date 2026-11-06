@@ -5,6 +5,7 @@ import { mkdir, rm, statfs } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { farOffPlaces } from '../aiRoute/geocode.js';
 import { tripKey, tripOf } from '../aiRoute/trip.js';
 import { aiConfig } from '../config.js';
 import { Job, MEDIA_MODES } from '../models/Job.js';
@@ -367,6 +368,24 @@ export async function acceptAiRoute(req, res) {
 
   const places = req.body?.places;
   if (!Array.isArray(places) || places.length < 2) throw httpError(400, 'Keep at least two places to draw a route.');
+
+  // A place that sends the route hundreds of kilometres off its way is
+  // usually another place with the same name. It's only kept when the owner
+  // says so (keepFarPlaces), after being told which.
+  if (req.body?.keepFarPlaces !== true) {
+    const inOrder = places.filter((p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng)).sort((a, b) => a.time - b.time);
+    const far = farOffPlaces(inOrder).map((p) => p.name);
+    if (far.length) {
+      const names = far.length === 1 ? far[0] : `${far.slice(0, -1).join(', ')} and ${far.at(-1)}`;
+      throw Object.assign(
+        httpError(
+          409,
+          `${names} would send the route far off its way: probably ${far.length === 1 ? 'a place' : 'places'} with the same name somewhere else. Move or untick ${far.length === 1 ? 'it' : 'them'}, or keep ${far.length === 1 ? 'it' : 'them'} anyway.`,
+        ),
+        { code: 'far_places' },
+      );
+    }
+  }
 
   // Replace the earlier AI places, keep the ones people added by hand.
   trail.points = [...trail.points.filter((p) => p.origin !== 'ai'), ...places.map(acceptedPlace)];

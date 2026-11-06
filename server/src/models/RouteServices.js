@@ -38,7 +38,7 @@ const routeServicesSchema = new mongoose.Schema(
     // Every stretch between fuel stations, longest first.
     fuelGaps: { type: [gapSchema], default: [] },
     computedAt: Date,
-    // failed: what went wrong, and when it's tried again (at most 3 times).
+    // failed: what went wrong, when it's tried again (see SERVICES_RETRY_HOURS), and how often it failed.
     error: String,
     retryAt: Date,
     attempts: { type: Number, default: 0 },

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api.js';
 
 const CHECK_EVERY_MS = 10000;
@@ -7,11 +7,20 @@ const KEEP_CHECKING_MS = 2 * 60 * 1000;
 // The services along a trail's route: { status: 'ready', items, fuelGaps },
 // 'pending' (still being looked for: checked again every 10 seconds for up to
 // 2 minutes), 'failed' or 'unavailable'. Null while loading, or without a route.
+// Returns [services, retry]: retry (for the trail's owner) asks the server to
+// look again now, and starts checking again.
 export function useRouteServices(trailId, routeVersion, hasRoute) {
   const [services, setServices] = useState(null);
+  // Bumped by retry, to start checking again.
+  const [round, setRound] = useState(0);
 
+  // Another trail or route: nothing known yet.
   useEffect(() => {
     setServices(null);
+    setRound(0);
+  }, [trailId, routeVersion, hasRoute]);
+
+  useEffect(() => {
     if (!trailId || !hasRoute) return undefined;
     let cancelled = false;
     let timer;
@@ -30,7 +39,13 @@ export function useRouteServices(trailId, routeVersion, hasRoute) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [trailId, routeVersion, hasRoute]);
+  }, [trailId, routeVersion, hasRoute, round]);
 
-  return services;
+  const retry = useCallback(async () => {
+    await api.enrich(trailId);
+    setServices({ status: 'pending' });
+    setRound((n) => n + 1);
+  }, [trailId]);
+
+  return [services, retry];
 }

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, test } from 'node:test';
 import { processNextJob } from '../src/jobs/worker.js';
 import { Job } from '../src/models/Job.js';
 import { RouteServices } from '../src/models/RouteServices.js';
+import { requeueStuckServices, SERVICES_RETRY_HOURS } from '../src/routeExtras/enrich.js';
 import { buildQuery, capItems, chunkRoute, fuelGaps, placeItems, readElements } from '../src/routeExtras/services.js';
 import { cumulativeDistances } from '../src/utils/geo.js';
 import { signedUpAgent, startFakeService, useTestDatabase } from './helpers.js';
@@ -222,7 +223,7 @@ describe('the services stage of the route-enrich job', () => {
     }
   });
 
-  test('when Overpass keeps failing, it says so and tries again in 6 hours', async () => {
+  test('when Overpass keeps failing, it says so and tries again later, waiting longer each time', async () => {
     const restore = await fakeOverpass([500, { remark: 'broken' }]);
     try {
       const { body: trail } = await alice.post('/api/trails').send({ title: 'Sample', youtubeUrl, track: sampleTrack });
@@ -231,22 +232,104 @@ describe('the services stage of the route-enrich job', () => {
       assert.equal(failed.status, 'failed');
       assert.match(failed.error, /Overpass/);
       const hours = (Date.parse(failed.retryAt) - Date.now()) / 3600000;
-      assert.ok(hours > 5.9 && hours <= 6, `retry in ${hours} hours`);
+      assert.ok(hours > 0.9 && hours <= 1, `retry in ${hours} hours`);
 
       // The first job still finished (heights and stats don't need Overpass)...
       const jobs = await Job.find({ type: 'route-enrich', trail: trail._id }).sort({ createdAt: 1 }).lean();
       assert.equal(jobs[0].state, 'done');
       // ...and a retry waits for its time, starting at the services stage.
       assert.deepEqual([jobs[1].state, jobs[1].stage], ['queued', 'services']);
-      assert.ok(jobs[1].lockedUntil > new Date(Date.now() + 5.9 * 3600000));
+      assert.ok(jobs[1].lockedUntil > new Date(Date.now() + 0.9 * 3600000));
 
-      // At most 3 retries.
-      await RouteServices.updateOne({ trail: trail._id }, { attempts: 3 });
+      // The second failure waits 3 hours.
       await Job.updateOne({ _id: jobs[1]._id }, { lockedUntil: new Date(0) });
+      await processNextJob();
+      const { body: again } = await alice.get(`/api/trails/${trail._id}/services`);
+      const later = (Date.parse(again.retryAt) - Date.now()) / 3600000;
+      assert.ok(later > 2.9 && later <= 3, `retry in ${later} hours`);
+      const third = await Job.findOne({ type: 'route-enrich', trail: trail._id, state: 'queued' });
+
+      // At most 6 retries, about four days in all.
+      assert.equal(SERVICES_RETRY_HOURS.length, 6);
+      await RouteServices.updateOne({ trail: trail._id }, { attempts: 6 });
+      await Job.updateOne({ _id: third._id }, { lockedUntil: new Date(0) });
       await processNextJob();
       const { body: last } = await alice.get(`/api/trails/${trail._id}/services`);
       assert.equal(last.retryAt, null);
-      assert.equal(await Job.countDocuments({ type: 'route-enrich', trail: trail._id }), 2);
+      assert.equal(await Job.countDocuments({ type: 'route-enrich', trail: trail._id }), 3);
+    } finally {
+      restore();
+    }
+  });
+
+  test('when the main Overpass server is down or busy, the next one is asked', async () => {
+    const backup = await startFakeService(() => [200, recorded]);
+    overpass = await startFakeService(() => [504, { remark: 'busy' }]);
+    process.env.OVERPASS_URLS = `${overpass.url}/api/interpreter,${backup.url}/api/interpreter`;
+    try {
+      const { body: trail } = await alice.post('/api/trails').send({ title: 'Sample', youtubeUrl, track: sampleTrack });
+      await processNextJob();
+      assert.equal(overpass.requests.length, 1);
+      assert.equal(backup.requests.length, 1);
+      assert.equal((await alice.get(`/api/trails/${trail._id}/services`)).body.status, 'ready');
+
+      // The next search starts at the server that answered.
+      await alice.patch(`/api/trails/${trail._id}`).send({ track: sampleTrack.slice(0, 300) });
+      await processNextJob();
+      assert.equal(overpass.requests.length, 1);
+      assert.equal(backup.requests.length, 2);
+    } finally {
+      delete process.env.OVERPASS_URLS;
+      await backup.close();
+    }
+  });
+
+  test('a retry carries on from the pieces of the route already answered', async () => {
+    process.env.SERVICES_CHUNK_KM = '2';
+    const restore = await fakeOverpass([200, recorded], [500, { remark: 'broken' }], ...Array(10).fill([200, recorded]));
+    try {
+      const { body: trail } = await alice.post('/api/trails').send({ title: 'Sample', youtubeUrl, track: sampleTrack });
+      await processNextJob();
+      assert.equal(overpass.requests.length, 2, 'the first piece answered, the second failed');
+      const first = await Job.findOne({ type: 'route-enrich', trail: trail._id, state: 'done' });
+      const pieces = first.progress.total;
+      assert.ok(pieces >= 3, `${pieces} pieces`);
+      const retry = await Job.findOne({ type: 'route-enrich', trail: trail._id, state: 'queued' });
+      assert.equal(retry.chunks.length, 1);
+
+      await Job.updateOne({ _id: retry._id }, { lockedUntil: new Date(0) });
+      await processNextJob();
+      assert.equal(overpass.requests.length, 2 + pieces - 1, 'only the pieces not yet answered are asked for');
+      assert.equal((await alice.get(`/api/trails/${trail._id}/services`)).body.status, 'ready');
+    } finally {
+      delete process.env.SERVICES_CHUNK_KM;
+      restore();
+    }
+  });
+
+  test('when the server starts, a services search that gave up or lost its retry gets another go', async () => {
+    const restore = await fakeOverpass([200, recorded]);
+    try {
+      const { body: stuck } = await alice.post('/api/trails').send({ title: 'Stuck', youtubeUrl, track: sampleTrack });
+      const { body: done } = await alice.post('/api/trails').send({ title: 'Done', youtubeUrl, track: sampleTrack });
+      const { body: waiting } = await alice.post('/api/trails').send({ title: 'Waiting', youtubeUrl, track: sampleTrack });
+      await Job.updateMany({}, { state: 'done', lockedUntil: new Date(0) });
+      const failed = (trail, fields) => RouteServices.create({ trail: trail._id, routeVersion: 1, status: 'failed', error: 'down', ...fields });
+      // Gave up under the old schedule (3 retries).
+      await failed(stuck, { attempts: 4, retryAt: null });
+      // No retries left.
+      await failed(done, { attempts: 7, retryAt: null });
+      // Its retry is still to come.
+      await failed(waiting, { attempts: 1, retryAt: new Date(Date.now() + 3600000) });
+
+      assert.equal(await requeueStuckServices(), 1);
+      assert.equal(await requeueStuckServices(), 0, 'not queued twice');
+      const job = await Job.findOne({ state: 'queued' });
+      assert.equal(String(job.trail), stuck._id);
+      assert.equal(job.stage, 'services');
+
+      await processNextJob();
+      assert.equal((await alice.get(`/api/trails/${stuck._id}/services`)).body.status, 'ready');
     } finally {
       restore();
     }

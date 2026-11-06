@@ -1,0 +1,24 @@
+# Render's free plan puts the API to sleep after 15 minutes without visitors;
+# waking it takes up to a minute, and background work (AI analyses, fuel stop
+# searches and their retries) only runs while it's awake. This asks the API's
+# health check every 10 minutes so it stays awake.
+#
+# An API that's always awake uses about 744 of the 750 free instance hours
+# Render gives each workspace a month: fine for this one service, but delete
+# this file if you add other free services there, or move to a paid plan.
+name: Keep the API awake
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ask the API's health check
+        run: curl --fail --silent --show-error --max-time 120 --retry 2 https://trailcast-api.onrender.com/api/health

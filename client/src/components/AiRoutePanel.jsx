@@ -366,6 +366,8 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
   const [reviewing, setReviewing] = useState(false);
   const [highDetail, setHighDetail] = useState(false);
   const [error, setError] = useState(null);
+  // The server's warning about places far off the way, until the list changes.
+  const [farWarning, setFarWarning] = useState(null);
   const [busy, setBusy] = useState(false);
   const onPreviewRef = useRef(onPreview);
   onPreviewRef.current = onPreview;
@@ -398,6 +400,7 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
     if (!job?.result || loadedJobId.current === job._id) return;
     loadedJobId.current = job._id;
     setPlaces(job.result.candidates.map((c) => ({ ...c })));
+    setFarWarning(null);
     setHidden((job.result.hiddenRanges ?? []).map((r) => ({ ...r })));
     setReviewing(job.state === 'needs_review');
   }, [job]);
@@ -464,25 +467,32 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
     }
   }
 
-  async function accept() {
+  // keepFarPlaces: the owner was told some places send the route far off its way, and keeps them.
+  async function accept(keepFarPlaces = false) {
     setBusy(true);
     setError(null);
+    setFarWarning(null);
     try {
       const updated = await api.acceptAiRoute(trail._id, {
         jobId: job._id,
         places: places.filter((p) => p.checked),
         hiddenRanges: hidden,
+        ...(keepFarPlaces && { keepFarPlaces: true }),
       });
       setJob({ ...job, state: 'accepted' });
       setReviewing(false);
       onAccepted(updated);
     } catch (err) {
-      setError(err.message);
+      if (err.code === 'far_places') setFarWarning(err.message);
+      else setError(err.message);
     }
     setBusy(false);
   }
 
-  const updatePlace = (id, changes) => setPlaces((list) => list.map((p) => (p.id === id ? { ...p, ...changes } : p)));
+  const updatePlace = (id, changes) => {
+    setFarWarning(null);
+    setPlaces((list) => list.map((p) => (p.id === id ? { ...p, ...changes } : p)));
+  };
   const updateHidden = (i, changes) => setHidden((list) => list.map((r, j) => (j === i ? { ...r, ...changes } : r)));
   const tickedCount = places.filter((p) => p.checked).length;
 
@@ -616,7 +626,7 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={accept}
+              onClick={() => accept()}
               disabled={busy || tickedCount < 2}
               className="btn-ai"
             >
@@ -627,6 +637,17 @@ export default function AiRoutePanel({ trail, getDuration, onSeek, onPreview, on
             </button>
           </div>
           {tickedCount < 2 && <p className="text-ink-soft">Tick at least two places to draw a route.</p>}
+          {farWarning && (
+            <div className="space-y-2">
+              <ErrorMessage>
+                <Icon name="warning" className="mr-1.5 inline h-4 w-4 align-[-3px] text-road" />
+                {farWarning}
+              </ErrorMessage>
+              <button type="button" onClick={() => accept(true)} disabled={busy} className="btn-secondary btn-small">
+                Keep and draw the route anyway
+              </button>
+            </div>
+          )}
         </div>
       )}
 

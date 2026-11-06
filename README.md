@@ -34,8 +34,9 @@ that moment, and save the places to Google Maps, a GPS app or a printable trip s
   - An elevation chart under the map shows how high the route goes, with a blue line at the video's current moment
     and the highest point labelled. Hover or touch it to see the distance, height and moment (the spot shows on the
     map too); click to watch from there. Heights come from the GPX file, from OpenRouteService for routes drawn
-    along roads and footpaths, or from OpenRouteService's elevation service for everything else. The trip sheet
-    lists the passes and summits on the way.
+    along roads and footpaths, or from OpenRouteService's elevation service for everything else. GPS heights are
+    smoothed a little; heights from the map wobble a lot on mountain roads, so they're averaged over 1.5 km before
+    the climb is added up. The trip sheet lists the passes and summits on the way.
   - Trip stats under the title: distance, riding days, the highest point (named after the nearest key point; click
     it to watch that moment) and the total climb. Riding days come from the GPS recording (a stop of 6 hours or
     more counts as a night), from key points marked "Stayed the night here", or from the creator. A number that
@@ -129,9 +130,11 @@ key at https://openrouteservice.org and set `ORS_API_KEY` in `server/.env`. With
 key gives routes their heights for the elevation chart.
 
 **Services along the route:** fuel stops and the like come from OpenStreetMap through Overpass, with no key. They're
-found in the background a few seconds after a route is saved. `.env.example` has the settings (another Overpass
-server, switching it off, the 150 km fuel warning). After updating an existing site, run
-`npm run backfill-route-extras -w server` once so trails saved before get them too.
+found in the background a few seconds after a route is saved. When the main Overpass server is down or busy, a
+backup one is asked; if both fail, TrailCast tries again 1, 3, 6, 12, 24 and 48 hours later (about four days),
+carrying on from the parts of the route already found, and the trail's owner can press "Try again now".
+`.env.example` has the settings (the Overpass servers, switching it off, the 150 km fuel warning). After updating an
+existing site, run `npm run backfill-route-extras -w server` once so trails saved before get them too.
 
 **AI route builder (optional):** get a Gemini API key at https://aistudio.google.com ("Get API key") and set
 `GEMINI_API_KEY` in `server/.env`. `.env.example` lists the other settings: the model, backup models, the daily limit
@@ -195,9 +198,12 @@ SHA-256 hash, so changing that script means updating the hash (`npm test -w clie
 
 Good to know about the free plans:
 
-- Render's free API **sleeps after 15 minutes without visitors** and takes about a minute to wake up, so the first
-  visit after a quiet spell is slow (and may need a reload). Background work (AI analyses, fuel stops) only runs
-  while it's awake; it carries on where it stopped. Render's paid plan ($7 a month) stays awake.
+- Render's free API **sleeps after 15 minutes without visitors** and takes about a minute to wake up. Background
+  work (AI analyses, fuel stops) only runs while it's awake; it carries on where it stopped. To keep it awake for
+  free, the GitHub Actions workflow `.github/workflows/keep-api-awake.yml` asks its health check every 10 minutes.
+  That uses about 744 of the 750 free hours Render gives a workspace each month, so delete the workflow if you add
+  other free services there; Render's paid plan ($7 a month) stays awake by itself. When the API is slow to
+  answer anyway, the website says it's waking up.
 - Render's Node servers don't have **FFmpeg**, so the AI route builder's "use the video file" option won't work
   there; YouTube links do. Big uploads would also go through Vercel's forwarding, which isn't made for them.
 - OpenStreetMap's own map tiles are meant for light use. Before real traffic, switch to a tile provider with a free
