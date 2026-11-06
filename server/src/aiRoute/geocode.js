@@ -126,20 +126,49 @@ export async function geocodeCandidates(candidates, { search = searchPlaces, onP
   return candidates;
 }
 
-// Place B between A and C is suspicious if going through it makes the trip
+// How much longer the trip gets by going from A through `run` to C, or 0 when
+// that's not out of the ordinary.
+function detourExtra(a, run, c) {
+  const at = (p) => [p.lat, p.lng];
+  const direct = distanceMeters(at(a), at(c));
+  let via = 0;
+  [a, ...run, c].forEach((p, i, path) => {
+    if (i > 0) via += distanceMeters(at(path[i - 1]), at(p));
+  });
+  return via > DETOUR_FACTOR * direct && via - direct > DETOUR_MIN_EXTRA_M ? via - direct : 0;
+}
+
+// Places between A and C are suspicious if going through them makes the trip
 // much longer. Never judged by speed: vlogs squeeze hours into minutes.
+// The worst detour is taken out first and the rest judged again without it.
+// When no single place stands out, two in a row are tried together: two wrong
+// places next to each other (Nakee La in Tibet, then Pang in Nepal, on a ride
+// to Leh) each look fine next to the other.
 export function flagDetours(candidates) {
-  const kept = candidates.filter((c) => c.checked && c.lat !== null);
-  for (let i = 1; i < kept.length - 1; i++) {
-    // The trip's start and end were confirmed by the owner.
-    if (kept[i].anchor) continue;
-    const [a, b, c] = [kept[i - 1], kept[i], kept[i + 1]].map((p) => [p.lat, p.lng]);
-    const direct = distanceMeters(a, c);
-    const via = distanceMeters(a, b) + distanceMeters(b, c);
-    if (via > DETOUR_FACTOR * direct && via - direct > DETOUR_MIN_EXTRA_M) {
-      kept[i].flags = unique([...kept[i].flags, 'detour']);
-      kept[i].checked = false;
+  for (;;) {
+    const kept = candidates.filter((c) => c.checked && c.lat !== null);
+    let worst = null;
+    for (const size of [1, 2]) {
+      for (let i = 1; i + size < kept.length; i++) {
+        const run = kept.slice(i, i + size);
+        // The trip's start and end were confirmed by the owner.
+        if (run.some((c) => c.anchor)) continue;
+        const extra = detourExtra(kept[i - 1], run, kept[i + size]);
+        if (extra > (worst?.extra ?? 0)) worst = { run, extra };
+      }
+      if (worst) break;
+    }
+    if (!worst) return candidates;
+    for (const c of worst.run) {
+      c.flags = unique([...c.flags, 'detour']);
+      c.checked = false;
     }
   }
-  return candidates;
+}
+
+// The places in a reviewed list (in video order) that would send the route far
+// off its way, by the same rule: [{ name }]. The list itself isn't changed.
+export function farOffPlaces(places) {
+  const probe = places.map((p) => ({ name: p.name, lat: p.lat, lng: p.lng, anchor: p.anchor, checked: true, flags: [] }));
+  return flagDetours(probe).filter((p) => p.flags.includes('detour'));
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { buildProfile, climb, fillHeights, MAX_PROFILE_POINTS, mean3, median5, resample } from '../src/routeExtras/profile.js';
+import { buildProfile, climb, fillHeights, MAX_PROFILE_POINTS, mean3, median5, movingAverage, resample } from '../src/routeExtras/profile.js';
 
 describe('fillHeights', () => {
   const alongM = Array.from({ length: 10 }, (_, i) => i * 100);
@@ -79,10 +79,35 @@ describe('buildProfile', () => {
     spiky[100] = 3500; // one short, sharp peak between two profile samples
     spiky[101] = 3500;
     spiky[102] = 3500;
-    const profile = buildProfile({ alongM: along, heights: spiky, source: 'ors' });
+    const profile = buildProfile({ alongM: along, heights: spiky, source: 'gpx' });
     assert.equal(profile.summary.highestM, 3500);
-    assert.equal(profile.summary.highestAlongM, 5000);
+    assert.equal(profile.summary.highestAlongM, 5050);
     assert.ok(Math.max(...profile.e) < 3500, 'the samples alone miss it');
+  });
+
+  test("a map's wobbles on a mountain road don't count as climbing, but the climb itself does", () => {
+    // Up 1,000 m over 50 km, with the map's height swinging 150 m up and down every 400 m.
+    const road = Array.from({ length: 2001 }, (_, i) => i * 25);
+    const wobbly = road.map((d) => 2000 + d / 50 + 150 * Math.sin((2 * Math.PI * d) / 400));
+    const profile = buildProfile({ alongM: road, heights: wobbly, source: 'ors' });
+    const { ascentM, highestM } = profile.summary;
+    assert.ok(climb(wobbly).ascentM > 30000, 'taken as it is, it looks like 30 km of climbing');
+    // The first and last 750 m are smoothed less (so the start and the end keep
+    // their true height), and these swings are far bigger than real ones.
+    assert.ok(ascentM >= 950 && ascentM <= 1200, `climbed ${ascentM} m`);
+    assert.ok(highestM >= 2950 && highestM <= 3010, `highest ${highestM} m`);
+    // The same smoothing for heights from the elevation service.
+    assert.equal(buildProfile({ alongM: road, heights: wobbly, source: 'dem' }).summary.ascentM, ascentM);
+  });
+
+  test('a pass on map heights keeps its height', () => {
+    // Up 1,500 m over 30 km to a pass, and down again.
+    const road = Array.from({ length: 1201 }, (_, i) => i * 50);
+    const pass = road.map((d) => 3500 + 1500 * (1 - Math.abs(d - 30000) / 30000));
+    const { summary } = buildProfile({ alongM: road, heights: pass, source: 'ors' });
+    assert.ok(summary.highestM >= 4975, `highest ${summary.highestM} m`);
+    assert.ok(Math.abs(summary.highestAlongM - 30000) <= 100);
+    assert.ok(Math.abs(summary.ascentM - 1500) <= 75, `climbed ${summary.ascentM} m`);
   });
 
   test('GPS heights are smoothed, so a one-point spike disappears', () => {
@@ -97,4 +122,10 @@ describe('buildProfile', () => {
     assert.equal(buildProfile({ alongM: [0, 10, 20, 30, 40], heights: [null, null, 5, null, null], source: 'gpx' }), null);
     assert.equal(buildProfile({ alongM: [0, 0], heights: [1, 2], source: 'gpx' }), null);
   });
+});
+
+test('movingAverage averages over a centred window, so the ends and steady slopes stay as they are', () => {
+  assert.deepEqual(movingAverage([0, 3, 6, 9], 1), [0, 3, 6, 9]);
+  assert.deepEqual(movingAverage([0, 3, 0, 3, 0], 1), [0, 1, 2, 1, 0]);
+  assert.deepEqual(movingAverage([5], 3), [5]);
 });
