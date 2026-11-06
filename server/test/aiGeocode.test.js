@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { flagDetours, geocodeCandidates } from '../src/aiRoute/geocode.js';
+import { farOffPlaces, flagDetours, geocodeCandidates } from '../src/aiRoute/geocode.js';
 
 const candidate = (name, extra = {}) => ({ name, region: '', altNames: [], checked: true, flags: [], lat: null, lng: null, ...extra });
 const result = (name, lat, lng) => ({ name, description: `${name}, India`, lat, lng });
@@ -42,6 +42,40 @@ test('flags a place that would send the route on a huge detour', () => {
   assert.deepEqual(candidates[1].flags, ['detour']);
   assert.equal(candidates[1].checked, false);
   assert.deepEqual(candidates[0].flags, []);
+});
+
+// The live "Delhi to Leh" ride: Nakee La and Pang were found in Tibet and Nepal.
+// Each looked fine next to the other, so the route went about 2,000 km off its way.
+const delhiToLeh = () =>
+  [
+    ['Sarchu', 32.89, 77.53],
+    ['Gata Loops', 33.03, 77.6],
+    ['Nakee La', 32.16, 85.98],
+    ['Pang', 28.26, 83.62],
+    ['Taglang La Pass', 33.51, 77.77],
+    ['Upshi', 33.82, 77.82],
+    ['Leh', 34.05, 77.99],
+  ].map(([name, lat, lng]) => candidate(name, { lat, lng }));
+
+test('flags two wrong places in a row, which hide each other', () => {
+  const candidates = delhiToLeh();
+  flagDetours(candidates);
+  assert.deepEqual(
+    candidates.filter((c) => !c.checked).map((c) => c.name),
+    ['Nakee La', 'Pang'],
+  );
+  assert.ok(candidates.filter((c) => c.checked).every((c) => c.flags.length === 0));
+});
+
+test('farOffPlaces lists them without changing the list', () => {
+  const places = delhiToLeh();
+  assert.deepEqual(
+    farOffPlaces(places).map((p) => p.name),
+    ['Nakee La', 'Pang'],
+  );
+  assert.ok(places.every((p) => p.checked && p.flags.length === 0));
+  // A list that stays on its way has none.
+  assert.deepEqual(farOffPlaces(places.filter((p) => !['Nakee La', 'Pang'].includes(p.name))), []);
 });
 
 test("inside the trip's area first, and starting from its start; found only outside it, the place is unticked", async () => {

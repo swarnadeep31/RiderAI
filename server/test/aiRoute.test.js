@@ -216,6 +216,24 @@ describe('AI route jobs', () => {
     assert.deepEqual(again.body.points.map((p) => p.name), ['My note', 'Howrah', 'Durgapur']);
   });
 
+  test('places far off the way are only kept when the owner says so', async () => {
+    const { body: job } = await start();
+    await processNextJob(fakeServices().services);
+    // The owner moved Durgapur to a same-named spot in Tibet.
+    const { body: done } = await alice.get(`/api/jobs/${job._id}`);
+    const places = done.result.candidates.filter((c) => c.checked);
+    const moved = places.map((p) => (p.name === 'Durgapur' ? { ...p, lat: 32.16, lng: 85.98 } : p));
+    const refused = await alice.post(`/api/trails/${trailId}/ai-route/accept`).send({ jobId: job._id, places: moved });
+    assert.equal(refused.status, 409);
+    assert.equal(refused.body.code, 'far_places');
+    assert.match(refused.body.error, /^Durgapur would send the route far off its way/);
+    assert.equal((await alice.get(`/api/trails/${trailId}`)).body.points.length, 0, 'nothing was saved');
+
+    const kept = await alice.post(`/api/trails/${trailId}/ai-route/accept`).send({ jobId: job._id, places: moved, keepFarPlaces: true });
+    assert.equal(kept.status, 200);
+    assert.ok(kept.body.points.some((p) => p.name === 'Durgapur' && p.lat === 32.16));
+  });
+
   test('the same video analysed before is reused for free', async () => {
     const { body: first } = await start();
     const { services, calls } = fakeServices();
