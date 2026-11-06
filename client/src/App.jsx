@@ -1,13 +1,16 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Link, Outlet, Route, Routes, useLocation } from 'react-router';
 import { AuthProvider, useAuth } from './auth.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import RequireAuth from './components/RequireAuth.jsx';
 import Icon from './components/art/Icon.jsx';
 import { LogoMark } from './components/art/Sheet.jsx';
 import { toggleTheme, useTheme } from './lib/theme.js';
 import AccountPage from './pages/AccountPage.jsx';
+import ErrorPage, { ErrorRoute } from './pages/ErrorPage.jsx';
 import FeedbackPage from './pages/FeedbackPage.jsx';
 import HomePage from './pages/HomePage.jsx';
+import { PrivacyPage, TermsPage } from './pages/LegalPages.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import NewTrailPage from './pages/NewTrailPage.jsx';
 import SignupPage from './pages/SignupPage.jsx';
@@ -89,6 +92,7 @@ function DayNightSwitch({ worded = false }) {
 }
 
 function Layout() {
+  const { pathname } = useLocation();
   return (
     <div className="flex min-h-svh flex-col">
       <header className="sticky top-0 z-[1100] border-b border-ink/12 bg-paper">
@@ -115,7 +119,10 @@ function Layout() {
         </div>
       </header>
       <div className="flex-1">
-        <Outlet />
+        {/* A page that breaks shows the error page; going to another page starts afresh. */}
+        <ErrorBoundary key={pathname}>
+          <Outlet />
+        </ErrorBoundary>
       </div>
       <footer className="mt-24 bg-field">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:grid-cols-[1.4fr_1fr_1fr]">
@@ -145,23 +152,17 @@ function Layout() {
             <Link to="/feedback" className="link">
               Send feedback
             </Link>
+            <Link to="/terms" className="link">
+              Terms of use
+            </Link>
+            <Link to="/privacy" className="link">
+              Privacy policy
+            </Link>
             <DayNightSwitch worded />
           </div>
         </div>
       </footer>
     </div>
-  );
-}
-
-function NotFound() {
-  return (
-    <main className="mx-auto max-w-3xl px-4 py-16">
-      <h1 className="text-display uppercase">This page is off the map</h1>
-      <p className="mt-4 max-w-xl text-lead text-ink-soft">The link may be missing a part, or the trail was deleted.</p>
-      <Link to="/" className="btn-primary mt-8">
-        Back to the rides
-      </Link>
-    </main>
   );
 }
 
@@ -215,16 +216,22 @@ export default function App() {
                   </Suspense>
                 }
               />
-              <Route path="*" element={<NotFound />} />
+              <Route path="terms" element={<TermsPage />} />
+              <Route path="privacy" element={<PrivacyPage />} />
+              {/* Any error page by its code (/error/504), and the one for links that go nowhere. */}
+              <Route path="error/:code" element={<ErrorRoute />} />
+              <Route path="*" element={<ErrorPage code={404} />} />
             </Route>
             {/* The onboarding tour: full screen, without the site's header and footer. */}
             <Route path="tour" element={<TourPage />} />
             <Route
               path="trails/:id/print"
               element={
-                <Suspense fallback={<PageLoading />}>
-                  <PrintPage />
-                </Suspense>
+                <ErrorBoundary>
+                  <Suspense fallback={<PageLoading />}>
+                    <PrintPage />
+                  </Suspense>
+                </ErrorBoundary>
               }
             />
           </Routes>

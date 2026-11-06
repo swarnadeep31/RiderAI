@@ -114,6 +114,17 @@ export default function SignupPage() {
             {saving ? 'Creating your account...' : 'Sign up'}
           </button>
         </form>
+        <p className="text-small text-ink-soft">
+          By signing up, with Google or a password, you agree to the{' '}
+          <Link to="/terms" className="link">
+            terms of use
+          </Link>{' '}
+          and the{' '}
+          <Link to="/privacy" className="link">
+            privacy policy
+          </Link>
+          .
+        </p>
       </div>
     </AuthShell>
   );

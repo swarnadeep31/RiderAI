@@ -100,6 +100,18 @@ export default function LoginPage() {
             {saving ? 'Logging in...' : 'Log in'}
           </button>
         </form>
+        {/* "Continue with Google" makes an account here too, for someone new. */}
+        <p className="text-small text-ink-soft">
+          New here? Continuing with Google makes you an account, and means you agree to the{' '}
+          <Link to="/terms" className="link">
+            terms of use
+          </Link>{' '}
+          and the{' '}
+          <Link to="/privacy" className="link">
+            privacy policy
+          </Link>
+          .
+        </p>
       </div>
     </AuthShell>
   );
