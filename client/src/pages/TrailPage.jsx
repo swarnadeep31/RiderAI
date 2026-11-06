@@ -8,6 +8,7 @@ import AiRoutePanel, { HIDDEN_REASONS } from '../components/AiRoutePanel.jsx';
 import ElevationChart from '../components/ElevationChart.jsx';
 import Icon from '../components/art/Icon.jsx';
 import ErrorMessage from '../components/ErrorMessage.jsx';
+import ErrorPage, { errorCodeFor, serverWords } from './ErrorPage.jsx';
 import KeyPointList from '../components/KeyPointList.jsx';
 import RoutePanel from '../components/RoutePanel.jsx';
 import SaveOptions from '../components/SaveOptions.jsx';
@@ -175,7 +176,7 @@ export default function TrailPage() {
     let cancelled = false;
     api.getTrail(id).then(
       (loaded) => !cancelled && setTrail(loaded),
-      (err) => !cancelled && setLoadError(err.message),
+      (err) => !cancelled && setLoadError(err),
     );
     return () => {
       cancelled = true;
@@ -219,17 +220,7 @@ export default function TrailPage() {
     });
   }
 
-  if (loadError) {
-    return (
-      <main className="mx-auto max-w-2xl space-y-6 px-4 py-16">
-        <h1 className="text-title uppercase">This ride couldn&apos;t be opened</h1>
-        <ErrorMessage>{loadError}</ErrorMessage>
-        <Link to="/" className="btn-primary">
-          Back to the rides
-        </Link>
-      </main>
-    );
-  }
+  if (loadError) return <ErrorPage code={errorCodeFor(loadError)} detail={serverWords(loadError)} />;
   if (!trail) {
     return (
       <p className="flex items-center justify-center gap-2 px-4 py-16 font-medium text-ink-soft">

@@ -18,6 +18,11 @@ that moment, and save the places to Google Maps, a GPS app or a printable trip s
   welcome question (what they'll use TrailCast for), plus two optional ones. Anyone can watch; you need an account to
   add trails, and only the person who added a trail can change it.
 - **Feedback:** logged-in users can send feedback from the link at the bottom of every page.
+- **Terms of use and privacy policy** (`/terms`, `/privacy`), in plain words and linked from the footer. Signing up,
+  with a password or with Google, says that it means agreeing to them.
+- **Error pages that say what to do:** a link that goes nowhere, a ride that was deleted, a server that's waking up
+  or down, no connection, a newer version of the site, or a page that broke, each with its own words, next step and
+  drawing. `/error/504` (or any code) shows one.
 - **Add a trail:** paste a YouTube link (normal video or live stream) and, optionally, upload the GPS route as a
   `.gpx` file from Strava, Garmin, Komoot or any tracking app.
 - **Credit where it's due:** trail pages and cards say "Video by" the video's creator: the YouTube channel's name
@@ -225,7 +230,8 @@ Good to know about the free plans:
 client/                  React website (Vite, Tailwind CSS, Leaflet)
   src/
     pages/               One file per page: Home, NewTrail, Trail (watch + edit), Print (trip sheet),
-                         Signup, Login, Welcome (questions after signing up), Account, Feedback
+                         Signup, Login, Welcome (questions after signing up), Account, Feedback,
+                         Legal (terms of use and privacy policy), Error (every error page)
     components/          Pieces used by the pages: the map (with the gliding, draggable marker), the
                          elevation chart, trip stats chips, "Along the route" services panel, key point list,
                          add-point form, route panel, AI route panel (start, progress, review), RequireAuth
