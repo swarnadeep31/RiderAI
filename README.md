@@ -34,8 +34,9 @@ that moment, and save the places to Google Maps, a GPS app or a printable trip s
   - An elevation chart under the map shows how high the route goes, with a blue line at the video's current moment
     and the highest point labelled. Hover or touch it to see the distance, height and moment (the spot shows on the
     map too); click to watch from there. Heights come from the GPX file, from OpenRouteService for routes drawn
-    along roads and footpaths, or from OpenRouteService's elevation service for everything else. The trip sheet
-    lists the passes and summits on the way.
+    along roads and footpaths, or from OpenRouteService's elevation service for everything else. GPS heights are
+    smoothed a little; heights from the map wobble a lot on mountain roads, so they're averaged over 1.5 km before
+    the climb is added up. The trip sheet lists the passes and summits on the way.
   - Trip stats under the title: distance, riding days, the highest point (named after the nearest key point; click
     it to watch that moment) and the total climb. Riding days come from the GPS recording (a stop of 6 hours or
     more counts as a night), from key points marked "Stayed the night here", or from the creator. A number that
