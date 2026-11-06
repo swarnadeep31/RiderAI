@@ -198,9 +198,12 @@ SHA-256 hash, so changing that script means updating the hash (`npm test -w clie
 
 Good to know about the free plans:
 
-- Render's free API **sleeps after 15 minutes without visitors** and takes about a minute to wake up, so the first
-  visit after a quiet spell is slow (and may need a reload). Background work (AI analyses, fuel stops) only runs
-  while it's awake; it carries on where it stopped. Render's paid plan ($7 a month) stays awake.
+- Render's free API **sleeps after 15 minutes without visitors** and takes about a minute to wake up. Background
+  work (AI analyses, fuel stops) only runs while it's awake; it carries on where it stopped. To keep it awake for
+  free, the GitHub Actions workflow `.github/workflows/keep-api-awake.yml` asks its health check every 10 minutes.
+  That uses about 744 of the 750 free hours Render gives a workspace each month, so delete the workflow if you add
+  other free services there; Render's paid plan ($7 a month) stays awake by itself. When the API is slow to
+  answer anyway, the website says it's waking up.
 - Render's Node servers don't have **FFmpeg**, so the AI route builder's "use the video file" option won't work
   there; YouTube links do. Big uploads would also go through Vercel's forwarding, which isn't made for them.
 - OpenStreetMap's own map tiles are meant for light use. Before real traffic, switch to a tile provider with a free
