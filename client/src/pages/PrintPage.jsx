@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { api } from '../api.js';
-import ErrorMessage from '../components/ErrorMessage.jsx';
+import ErrorPage, { errorCodeFor, serverWords } from './ErrorPage.jsx';
 import { ACTIVITIES } from '../lib/activities.js';
 import { formatKm, formatMetres, nameNear, notablePeaks } from '../lib/elevation.js';
 import { FUEL_CAVEAT, fuelGapSentence, kmAlong, kmLength, longGaps, offRoute, serviceName } from '../lib/services.js';
@@ -106,7 +106,7 @@ export default function PrintPage() {
   const [warnKm, setWarnKm] = useState(150);
 
   useEffect(() => {
-    api.getTrail(id).then(setTrail, (err) => setError(err.message));
+    api.getTrail(id).then(setTrail, setError);
     api.getServices(id).then(setServices, () => {});
     api.getConfig().then((config) => config.fuelGapWarnKm && setWarnKm(config.fuelGapWarnKm), () => {});
   }, [id]);
@@ -121,7 +121,7 @@ export default function PrintPage() {
     };
   }, []);
 
-  if (error) return <ErrorMessage>{error}</ErrorMessage>;
+  if (error) return <ErrorPage code={errorCodeFor(error)} detail={serverWords(error)} />;
   if (!trail) return <p className="p-8 text-ink-soft">Loading...</p>;
 
   // "475 km · 2 days · Highest 5,328 m · Taglang La · 5,840 m climb"

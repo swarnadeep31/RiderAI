@@ -1,5 +1,24 @@
 // Every call to the Express API goes through here. The browser sends the
 // login cookie along automatically, because the API is on the same site.
+// A failed call throws an error with the server's words and its `status`
+// (0 when the server couldn't be reached at all), so a page can show the
+// right error page (see pages/ErrorPage.jsx).
+
+// When the server answers with an error page instead of its own words (the
+// hosting's, while the server is asleep, restarting or down).
+const NO_ANSWER = {
+  502: "TrailCast's server sent back a broken answer. Try again in a minute.",
+  503: "TrailCast's server is busy or being updated. Try again in a few minutes.",
+  504: "TrailCast's server took too long to answer. It may be waking up: try again in a minute.",
+};
+
+// The server couldn't be reached: no connection, or the network dropped.
+export function unreachable() {
+  const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+  return Object.assign(new Error(offline ? "You're offline. Check your connection and try again." : "Couldn't reach TrailCast. Check your connection and try again."), {
+    status: 0,
+  });
+}
 
 async function request(path, { method = 'GET', body } = {}) {
   let res;
@@ -10,12 +29,14 @@ async function request(path, { method = 'GET', body } = {}) {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new Error("Can't reach the TrailCast server. Is it running?");
+    throw unreachable();
   }
 
   const data = res.status === 204 ? null : await res.json().catch(() => null);
   if (!res.ok) {
-    if (!data && res.status >= 500) throw new Error("Can't reach the TrailCast server. Is it running?");
+    if (!data && res.status >= 500) {
+      throw Object.assign(new Error(NO_ANSWER[res.status] ?? "TrailCast's server had a problem. Try again in a minute."), { status: res.status });
+    }
     // code: something the page can act on, like 'exists' (an account is already there).
     throw Object.assign(new Error(data?.error ?? `Request failed (${res.status})`), { code: data?.code, status: res.status });
   }
@@ -85,7 +106,7 @@ export const api = {
         if (xhr.status >= 200 && xhr.status < 300) resolve(data);
         else reject(new Error(data?.error ?? `The upload failed (${xhr.status}).`));
       };
-      xhr.onerror = () => reject(new Error("Can't reach the TrailCast server. Is it running?"));
+      xhr.onerror = () => reject(unreachable());
       xhr.send(file);
     }),
   getJob: (jobId) => request(`/jobs/${jobId}`),
