@@ -25,13 +25,20 @@ export function hiddenRangeAt(hiddenRanges, t) {
   return hiddenRanges?.find((r) => t >= r.start && t < r.end) ?? null;
 }
 
+// The hidden parts the rider waits through in view (on a drawn route): a
+// drone shot or montage usually shows where they just were.
+export const waitsDuring = (range) => range?.reason === 'montage';
+
 // Where the rider was `videoTime` seconds into the video, or null if the
 // video is outside the GPS recording, in a hidden part, or the route has no times.
 // hold: before the route starts the rider waits at its start, and after it
 // ends at its end (a drawn route: they were there, just not yet moving).
+// A drawn route also keeps the marker in view during a drone shot or montage:
+// the rider waits where they were until the riding footage is back.
 export function positionAt(track, trackTimes, videoStartsAt, videoTime, hiddenRanges = [], { hold = false } = {}) {
   if (!trackTimes?.length || trackTimes.length !== track.length) return null;
-  if (hiddenRangeAt(hiddenRanges, videoTime)) return null;
+  const hidden = hiddenRangeAt(hiddenRanges, videoTime);
+  if (hidden && !(hold && waitsDuring(hidden))) return null;
   const t = videoTime + videoStartsAt;
   if (t < trackTimes[0]) return hold ? track[0] : null;
   if (t > trackTimes.at(-1)) return hold ? track.at(-1) : null;

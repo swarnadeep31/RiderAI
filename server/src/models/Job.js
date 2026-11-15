@@ -25,6 +25,10 @@ const clipSchema = new mongoose.Schema(
     raw: String, // Gemini's answer, kept for checking and re-cleaning without paying again
     answer: mongoose.Schema.Types.Mixed,
     usage: mongoose.Schema.Types.Mixed,
+    // 'gap': a part of the video a transcript said nothing about, watched after reading it.
+    kind: { type: String, enum: ['gap'] },
+    // A gap that couldn't be watched (a private video, say): why. The analysis goes on without it.
+    skipped: String,
   },
   { _id: false },
 );
@@ -65,6 +69,8 @@ const jobSchema = new mongoose.Schema(
     fileHash: String,
     // transcript: the words said in the video, as the timed lines the AI reads.
     transcript: String,
+    // The gaps the transcript left have been planned (see planGapClips).
+    gapsPlanned: Boolean,
 
     state: { type: String, enum: JOB_STATES, default: 'queued' },
     stage: { type: String, enum: JOB_STAGES, default: 'check' },

@@ -162,3 +162,37 @@ export function planClips(durationSec, clipMinutes, overlapSec = 60) {
   }
   return clips;
 }
+
+// The parts of the video a transcript says nothing useful about: stretches of
+// at least `minGapSec` with no place the rider was at (not counting hidden
+// parts like intros and recaps, which aren't the ride). Watching only those
+// finds the places shown on sign boards and milestones but never said aloud,
+// for a fraction of what watching the whole video costs. Longest first, up to
+// `maxTotalSec` in all, each at most `maxClipSec` long; returned in video order.
+// cleaned: what cleanClip made of the transcript's answer.
+export function planGapClips(cleaned, durationSec, { minGapSec = 600, maxTotalSec = 3600, maxClipSec = 3600 } = {}) {
+  // Where the ride is known: each place it was at (with its stop), and the hidden parts.
+  const known = mergeHiddenRanges([
+    ...cleaned.places.filter((p) => p.presence === 'here').map((p) => ({ start: p.time, end: p.stayUntil ?? p.time })),
+    ...cleaned.hiddenRanges,
+  ]);
+  const gaps = [];
+  let from = 0;
+  for (const range of [...known, { start: durationSec, end: durationSec }]) {
+    if (range.start - from >= minGapSec) gaps.push({ start: from, end: range.start });
+    from = Math.max(from, range.end);
+  }
+  // Long gaps first, cut into clips no longer than maxClipSec, until the total is used up.
+  const clips = [];
+  let left = maxTotalSec;
+  for (const gap of gaps.sort((a, b) => b.end - b.start - (a.end - a.start))) {
+    for (let start = gap.start; start < gap.end && left >= minGapSec; ) {
+      const end = Math.min(start + maxClipSec, gap.end, start + left);
+      if (end - start < minGapSec) break;
+      clips.push({ start: Math.round(start), end: Math.round(end) });
+      left -= end - start;
+      start = end;
+    }
+  }
+  return clips.sort((a, b) => a.start - b.start);
+}

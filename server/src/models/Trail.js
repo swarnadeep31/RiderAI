@@ -63,6 +63,9 @@ const tripEndSchema = new mongoose.Schema(
 
 // Parts of the video that don't show the journey (intro, recap, drone montage):
 // no marker is shown then.
+// See trailSchema.timing. Drawn routes from before are retimed when the server starts.
+export const ROUTE_TIMING = 2;
+
 export const HIDDEN_REASONS = ['intro', 'recap', 'montage', 'flashback', 'off_route'];
 const hiddenRangeSchema = new mongoose.Schema(
   {
@@ -171,6 +174,9 @@ const trailSchema = new mongoose.Schema(
     // Where the route came from: a GPX recording, or drawn between the key points
     // (then trackTimes are estimated video times, and the route is approximate).
     routeSource: { type: String, enum: ['gpx', 'keypoints'] },
+    // How a drawn route's times were worked out: ROUTE_TIMING when hidden
+    // parts (drone shots, recaps) pause the rider instead of moving them on.
+    timing: Number,
     // Goes up by one whenever the shape of the route changes. Whatever was
     // worked out for a route (heights, services, stats) records the version
     // it was made for; a different version means it's out of date.

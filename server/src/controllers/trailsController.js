@@ -1,12 +1,12 @@
 import mongoose from 'mongoose';
 import { Job } from '../models/Job.js';
 import { RouteServices } from '../models/RouteServices.js';
-import { ROUTE_STYLES, Trail } from '../models/Trail.js';
+import { ROUTE_STYLES, ROUTE_TIMING, Trail } from '../models/Trail.js';
 import { queueRouteEnrich } from '../routeExtras/enrich.js';
 import { profileForTrack } from '../routeExtras/profile.js';
 import { routeSegments } from '../services/routing.js';
 import { fetchChannel, fetchVideoInfo } from '../services/youtubeInfo.js';
-import { thinSegments, timedTrack } from '../utils/geo.js';
+import { pauseForHiddenParts, thinSegments, timedTrack } from '../utils/geo.js';
 import { httpError } from '../utils/httpError.js';
 import { concurrencyLimit } from '../utils/limit.js';
 import { parseYouTubeId } from '../utils/youtube.js';
@@ -158,9 +158,11 @@ export async function drawRouteFromPoints(trail) {
   }
   const previousTrack = JSON.stringify(trail.track);
   const { segments, notice } = await routeSegments(points, trail.routeStyle);
-  const { track, trackTimes, trackElevations } = timedTrack(points, thinSegments(segments, MAX_DRAWN_POINTS), MAX_DRAWN_POINTS);
+  const timed = timedTrack(points, thinSegments(segments, MAX_DRAWN_POINTS), MAX_DRAWN_POINTS);
+  // Drone shots, recaps and the like between places don't move the rider on.
+  const { track, trackTimes, trackElevations } = pauseForHiddenParts(timed, points, trail.hiddenRanges ?? []);
   // The times are video times already, so the video and route need no lining up.
-  trail.set({ track, trackTimes, routeSource: 'keypoints', videoStartsAt: 0, recordedAt: undefined });
+  trail.set({ track, trackTimes, routeSource: 'keypoints', videoStartsAt: 0, recordedAt: undefined, timing: ROUTE_TIMING });
   const version = trail.routeVersion;
   bumpVersionIfReshaped(trail, previousTrack);
   // Roads and footpaths come with heights from OpenRouteService; straight lines don't.

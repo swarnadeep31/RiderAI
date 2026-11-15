@@ -11,7 +11,8 @@ import { deleteUploadedVideo, extractPlacesWithFallback, uploadVideo } from '../
 import { extractSound, prepareVideo } from '../services/videoFile.js';
 import { checkVideo } from '../services/youtubeInfo.js';
 import { addUsage, summarizeUsage } from './cost.js';
-import { cleanClip, mergeClips, planClips } from './clean.js';
+import { spentThisMonthUsd } from './budget.js';
+import { cleanClip, mergeClips, planClips, planGapClips } from './clean.js';
 import { geocodeCandidates } from './geocode.js';
 import { pinTripEnds, tripArea } from './trip.js';
 
@@ -75,13 +76,14 @@ async function extractClip(job, clip, services) {
   try {
     if (job.source === 'upload') return await services.extractFromUpload({ job, clip });
     // A transcript is read whole: it's text, a small part of a video's tokens.
-    if (job.source === 'transcript') return await services.extract({ transcript: job.transcript, model: job.model, trip: tripFor(job) });
+    if (job.source === 'transcript' && clip.kind !== 'gap') return await services.extract({ transcript: job.transcript, model: job.model, trip: tripFor(job) });
     return await services.extract({
       youtubeId: job.youtubeId,
       // One clip covering the whole video is sent without offsets.
       clipStart: clip.start,
       clipEnd: clip.start === 0 && clip.end >= job.durationSec ? null : clip.end,
-      model: job.model,
+      // The gaps a transcript left are watched by the model that watches videos.
+      model: clip.kind === 'gap' ? aiConfig().model : job.model,
       highDetail: job.highDetail,
       trip: tripFor(job),
     });
@@ -125,6 +127,53 @@ export async function runJob(job, services = defaultServices) {
   }
 }
 
+// Asks Gemini about each clip not answered yet, saving each answer as it comes.
+async function extractPending(job, services) {
+  for (const clip of job.clips) {
+    if (clip.status === 'done') continue;
+    await stopIfCancelled(job);
+    let result;
+    try {
+      result = await extractClip(job, clip, services);
+    } catch (err) {
+      // A gap that can't be watched (a private video, say) is left out: the transcript's places still count.
+      if (clip.kind !== 'gap' || err instanceof RetryLater) throw err;
+      Object.assign(clip, { status: 'done', skipped: String(err.message ?? err).slice(0, 300) });
+      job.markModified('clips');
+      await job.save();
+      continue;
+    }
+    // Priced (and remembered) by the model that actually answered, which may be a backup.
+    const model = result.model ?? (clip.kind === 'gap' ? aiConfig().model : job.model);
+    const usage = { ...summarizeUsage(model, result.usage), model };
+    Object.assign(clip, { status: 'done', raw: result.raw, answer: result.data, usage });
+    job.usage = addUsage(job.usage, usage);
+    job.progress = { done: job.clips.filter((c) => c.status === 'done').length, total: job.clips.length };
+    job.markModified('clips');
+    await job.save();
+  }
+}
+
+// Adds a clip for each part of the video the transcript said nothing about
+// (planGapClips), unless switched off or this month's budget is used up.
+async function planGaps(job) {
+  const config = aiConfig();
+  const transcript = job.clips.find((clip) => clip.kind !== 'gap');
+  if (config.watchGaps && transcript?.answer && (await spentThisMonthUsd()) < config.monthlyBudgetUsd) {
+    const cleaned = cleanClip(transcript.answer, transcript, job.durationSec);
+    const gaps = planGapClips(cleaned, job.durationSec, {
+      minGapSec: config.gapMinMinutes * 60,
+      maxTotalSec: config.gapMaxMinutes * 60,
+      maxClipSec: config.clipMinutes * 60,
+    });
+    job.clips.push(...gaps.map((gap) => ({ ...gap, kind: 'gap', status: 'pending' })));
+    job.progress = { done: job.clips.filter((c) => c.status === 'done').length, total: job.clips.length };
+  }
+  job.gapsPlanned = true;
+  job.markModified('clips');
+  await job.save();
+}
+
 async function runStages(job, services) {
   const config = aiConfig();
 
@@ -150,17 +199,11 @@ async function runStages(job, services) {
   }
 
   if (job.stage === 'extract') {
-    for (const clip of job.clips) {
-      if (clip.status === 'done') continue;
-      await stopIfCancelled(job);
-      const result = await extractClip(job, clip, services);
-      // Priced (and remembered) by the model that actually answered, which may be a backup.
-      const usage = { ...summarizeUsage(result.model ?? job.model, result.usage), model: result.model ?? job.model };
-      Object.assign(clip, { status: 'done', raw: result.raw, answer: result.data, usage });
-      job.usage = addUsage(job.usage, usage);
-      job.progress = { done: job.clips.filter((c) => c.status === 'done').length, total: job.clips.length };
-      job.markModified('clips');
-      await job.save();
+    await extractPending(job, services);
+    // A transcript read, the parts of the video it says nothing about are watched.
+    if (job.source === 'transcript' && !job.gapsPlanned) {
+      await planGaps(job);
+      await extractPending(job, services);
     }
     job.stage = 'clean';
     await job.save();
