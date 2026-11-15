@@ -1,6 +1,7 @@
 import { createApp } from './app.js';
 import { connectDatabase, disconnectDatabase } from './db.js';
 import { startWorker } from './jobs/worker.js';
+import { startKeepAwake } from './keepAwake.js';
 import { requeueStuckServices } from './routeExtras/enrich.js';
 import { retimeDrawnRoutes } from './routeExtras/retime.js';
 
@@ -33,12 +34,16 @@ try {
 // Runs AI route analyses in the background.
 const stopWorker = startWorker();
 
+// On Render's free plan: visit itself every 10 minutes so it never falls asleep.
+const stopKeepAwake = startKeepAwake();
+
 const server = createApp().listen(port, () => {
   console.log(`TrailCast API listening on http://localhost:${port}`);
 });
 
 async function shutDown() {
   stopWorker();
+  stopKeepAwake();
   server.close();
   await disconnectDatabase();
   process.exit(0);
