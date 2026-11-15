@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { api } from '../api.js';
 import { useAuth } from '../auth.jsx';
 import ActivityBadge from '../components/ActivityBadge.jsx';
+import DaysSetting from '../components/DaysSetting.jsx';
 import AddPointForm from '../components/AddPointForm.jsx';
 import AiRoutePanel, { HIDDEN_REASONS } from '../components/AiRoutePanel.jsx';
 import ElevationChart from '../components/ElevationChart.jsx';
@@ -17,9 +18,10 @@ import ServicesPanel, { ServiceBadge } from '../components/ServicesPanel.jsx';
 import TrailMap from '../components/TrailMap.jsx';
 import TripStats, { Readout } from '../components/TripStats.jsx';
 import { useRouteServices } from '../hooks/useRouteServices.js';
+import { useServiceKinds } from '../hooks/useServiceKinds.js';
 import { useConfirm, useToast } from '../notices.jsx';
 import { useYouTubePlayer } from '../hooks/useYouTubePlayer.js';
-import { FUEL_CAVEAT, KIND_ORDER, afterWhat, fuelGapSentence, kmLength } from '../lib/services.js';
+import { FUEL_CAVEAT, afterWhat, fuelGapSentence, kmLength } from '../lib/services.js';
 import {
   cumulativeDistances,
   hiddenRangeAt,
@@ -27,6 +29,7 @@ import {
   locationAtDistance,
   nearestIndex,
   positionAt,
+  routeBetween,
   videoTimeAtDistance,
   waitsDuring,
 } from '../lib/track.js';
@@ -73,72 +76,6 @@ function CreatorSetting({ trail, onSaved }) {
   );
 }
 
-// The owner can say how many days the trip took, when the worked-out number is wrong.
-function DaysSetting({ trail, onSaved }) {
-  const [text, setText] = useState(trail.daysOverride ? String(trail.daysOverride) : '');
-  const [error, setError] = useState(null);
-  const worked = trail.stats?.daysSource && trail.stats.daysSource !== 'owner' ? trail.stats.days : null;
-
-  async function save(event) {
-    event.preventDefault();
-    const days = text.trim() === '' ? null : Number(text);
-    try {
-      setError(null);
-      onSaved(await api.updateTrail(trail._id, { daysOverride: days }));
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
-  return (
-    <form onSubmit={save} className="space-y-2">
-      <h3 className="text-[1.3rem] leading-tight">Riding days</h3>
-      <p className="text-small text-ink-soft">
-        {trail.daysOverride
-          ? `You set ${trail.daysOverride}. Empty the box and save to work it out again.`
-          : worked
-            ? `Worked out from the ${trail.stats.daysSource === 'gps' ? 'GPS recording' : 'overnight stops'}: ${worked}. Change it if that's wrong.`
-            : 'Mark the places you stayed the night (the moon beside a place), or type the number of days.'}
-      </p>
-      <div className="flex items-center gap-2">
-        <input
-          type="number"
-          min="1"
-          max="365"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder={worked ? String(worked) : 'Days'}
-          aria-label="Riding days"
-          className="field w-24"
-        />
-        <button type="submit" className="btn-secondary btn-small">
-          Save
-        </button>
-      </div>
-      {error && <ErrorMessage>{error}</ErrorMessage>}
-    </form>
-  );
-}
-
-// Which kinds of services (fuel, mechanics...) the viewer has switched on,
-// remembered in this browser.
-const KINDS_KEY = 'trailcast.serviceKinds';
-function loadKinds() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(KINDS_KEY));
-    if (Array.isArray(saved)) return new Set(saved.filter((kind) => KIND_ORDER.includes(kind)));
-  } catch {
-    // No storage (private window): everything is on.
-  }
-  return new Set(KIND_ORDER);
-}
-
-// The part of the route between two distances, for outlining it on the map.
-function routeBetween(route, fromM, toM) {
-  const inside = route.track.filter((_, i) => route.cum[i] > fromM && route.cum[i] < toM);
-  return [locationAtDistance(route.track, route.cum, fromM), ...inside, locationAtDistance(route.track, route.cum, toM)];
-}
-
 function describeSync(videoStartsAt) {
   if (videoStartsAt === 0) return 'The video and the GPS recording start at the same moment.';
   return videoStartsAt > 0
@@ -166,7 +103,9 @@ export default function TrailPage() {
   const [preview, setPreview] = useState([]);
   // The spot under the pointer on the elevation chart, shown on the map too.
   const [ghost, setGhost] = useState(null);
-  const [serviceKinds, setServiceKinds] = useState(loadKinds);
+  const [serviceKinds, toggleKind] = useServiceKinds();
+  // Each new number plays the route reveal on the map.
+  const [reveal, setReveal] = useState(0);
   const [fuelGapWarnKm, setFuelGapWarnKm] = useState(150);
 
   useEffect(() => {
@@ -206,20 +145,6 @@ export default function TrailPage() {
     () => (route && longestGap && serviceKinds.has('fuel') ? routeBetween(route, longestGap.fromM, longestGap.toM) : null),
     [route, longestGap, serviceKinds],
   );
-
-  function toggleKind(kind) {
-    setServiceKinds((kinds) => {
-      const next = new Set(kinds);
-      if (next.has(kind)) next.delete(kind);
-      else next.add(kind);
-      try {
-        localStorage.setItem(KINDS_KEY, JSON.stringify([...next]));
-      } catch {
-        // Not remembered, but still switched.
-      }
-      return next;
-    });
-  }
 
   if (loadError) return <ErrorPage code={errorCodeFor(loadError)} detail={serverWords(loadError)} />;
   if (!trail) {
@@ -488,6 +413,8 @@ export default function TrailPage() {
               services={ready?.items}
               serviceKinds={serviceKinds}
               fuelGapLine={fuelGapLine}
+              reveal={reveal}
+              onReplay={mapMode || preview.length ? null : () => setReveal((n) => n + 1)}
             />
           </div>
           {profile && (
@@ -596,6 +523,7 @@ export default function TrailPage() {
                     applyUpdate(updated);
                     if (!updated.routeNotice) setNotice('Route drawn. Play the video to watch the blue dot follow it.');
                     setFollow(true);
+                    setReveal((n) => n + 1);
                   }}
                 />
               )}
@@ -606,6 +534,7 @@ export default function TrailPage() {
                     applyUpdate(updated);
                     if (!updated.routeNotice) setNotice('Route drawn. Play the video to watch the blue dot follow it.');
                     setFollow(true);
+                    setReveal((n) => n + 1);
                   }}
                 />
               )}
