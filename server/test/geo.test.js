@@ -6,6 +6,7 @@ import {
   distanceAtTime,
   distanceMeters,
   locationAtDistance,
+  pauseForHiddenParts,
   projectOnTrack,
   simplify,
   thinSegments,
@@ -183,4 +184,71 @@ test('thinSegments keeps the shape of a road and the key points, with far fewer 
 test('timedTrack rounds drawn routes to about a metre', () => {
   const { track } = timedTrack([{ time: 0 }, { time: 10 }], [[[22.1234567, 88.7654321], [22.2, 88.8]]]);
   assert.deepEqual(track[0], [22.12346, 88.76543]);
+});
+
+describe('pauseForHiddenParts', () => {
+  // A straight road from (0, 0) to (0, 1), four points along it.
+  const road = [[[0, 0], [0, 0.25], [0, 0.5], [0, 0.75], [0, 1]]];
+  const ride = (points) => timedTrack(points, road);
+  const two = [{ time: 0, lat: 0, lng: 0 }, { time: 100, lat: 0, lng: 1 }];
+  const lngs = (route) => route.track.map((p) => p[1]);
+  // How far east the marker is at video time t (as the website works it out).
+  const eastAt = (route, t) => {
+    const { track, trackTimes } = route;
+    let i = trackTimes.findLastIndex((time) => time <= t);
+    if (i === track.length - 1) return track[i][1];
+    const span = trackTimes[i + 1] - trackTimes[i];
+    const f = span > 0 ? (t - trackTimes[i]) / span : 0;
+    return track[i][1] + (track[i + 1][1] - track[i][1]) * f;
+  };
+  const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-6, `${actual} is not ${expected}`);
+  const inOrder = (times) => assert.ok(times.every((t, i) => i === 0 || t >= times[i - 1]), times.join(','));
+
+  test('a drone shot between two places: the marker waits where it was, then rides on, arriving on time', () => {
+    const paused = pauseForHiddenParts(ride(two), two, [{ start: 30, end: 50, reason: 'montage' }]);
+    assert.deepEqual(paused.trackTimes, [0, 20, 30, 50, 60, 80, 100]);
+    assert.deepEqual(lngs(paused), [0, 0.25, 0.375, 0.375, 0.5, 0.75, 1]);
+    // Just before, during and after it: no jump.
+    near(eastAt(paused, 30), 0.375);
+    near(eastAt(paused, 40), 0.375);
+    near(eastAt(paused, 50), 0.375);
+    assert.ok(eastAt(paused, 51) > 0.375);
+  });
+
+  test('hidden parts right at a place, or across one, wait there', () => {
+    const three = [two[0], two[1], { time: 200, lat: 0, lng: 2 }];
+    const route = timedTrack(three, [road[0], [[0, 1], [0, 1.5], [0, 2]]]);
+    const paused = pauseForHiddenParts(route, three, [
+      { start: 0, end: 20 }, // at the very start of the ride
+      { start: 90, end: 110 }, // across the second place
+    ]);
+    inOrder(paused.trackTimes);
+    near(eastAt(paused, 10), 0);
+    near(eastAt(paused, 95), 1);
+    near(eastAt(paused, 100), 1);
+    near(eastAt(paused, 105), 1);
+    near(eastAt(paused, 200), 2);
+  });
+
+  test('no hidden parts, ones outside the ride, and a stretch that is all hidden leave the times as they were', () => {
+    const route = ride(two);
+    assert.deepEqual(pauseForHiddenParts(route, two, []), route);
+    assert.deepEqual(pauseForHiddenParts(route, two, [{ start: 150, end: 160 }]).trackTimes, route.trackTimes);
+    assert.deepEqual(pauseForHiddenParts(route, two, [{ start: 0, end: 100 }]).trackTimes, route.trackTimes);
+  });
+
+  test('after a stop, a drone shot still pauses the ride', () => {
+    const stop = [{ ...two[0], stayUntil: 20 }, two[1]];
+    const paused = pauseForHiddenParts(ride(stop), stop, [{ start: 50, end: 60 }]);
+    inOrder(paused.trackTimes);
+    near(eastAt(paused, 15), 0);
+    near(eastAt(paused, 55), eastAt(paused, 50));
+    near(eastAt(paused, 100), 1);
+  });
+
+  test('heights come along, including at the waiting point', () => {
+    const route = { ...ride(two), trackElevations: [100, 200, 300, 400, 500] };
+    const paused = pauseForHiddenParts(route, two, [{ start: 30, end: 50 }]);
+    assert.deepEqual(paused.trackElevations, [100, 200, 250, 250, 300, 400, 500]);
+  });
 });
