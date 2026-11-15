@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatKm, formatMetres, heightAxis, kmTicks } from '../lib/elevation.js';
 import { formatTime } from '../lib/time.js';
-import { distanceAtTime, hiddenRangeAt, locationAtDistance, videoTimeAtDistance } from '../lib/track.js';
+import { distanceAtTime, hiddenRangeAt, locationAtDistance, videoTimeAtDistance, waitsDuring } from '../lib/track.js';
 
 const HEIGHT = 136;
 const MARGIN = { top: 24, right: 14, bottom: 22, left: 44 };
@@ -69,7 +69,10 @@ export default function ElevationChart({ profile, route, clock, approximate, hig
         last = t;
         const cursor = cursorRef.current;
         const recordingTime = t + (route.videoStartsAt ?? 0);
-        const outside = recordingTime < route.trackTimes[0] || recordingTime > route.trackTimes.at(-1) || hiddenRangeAt(route.hiddenRanges, t);
+        // On a drawn route the rider waits in view through a drone shot, as on the map.
+        const hidden = hiddenRangeAt(route.hiddenRanges, t);
+        const outside =
+          recordingTime < route.trackTimes[0] || recordingTime > route.trackTimes.at(-1) || (hidden && !(approximate && waitsDuring(hidden)));
         if (outside) cursor?.setAttribute('visibility', 'hidden');
         else {
           const px = x(distanceAtTime(route.cum, route.trackTimes, recordingTime)).toFixed(1);
@@ -82,7 +85,7 @@ export default function ElevationChart({ profile, route, clock, approximate, hig
     };
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
-  }, [playable, width, clock, route, total, axis]);
+  }, [playable, width, clock, route, total, axis, approximate]);
 
   // The spot under the pointer also shows on the map.
   useEffect(() => {

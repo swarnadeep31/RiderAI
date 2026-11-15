@@ -170,6 +170,9 @@ export function thinSegments(segments, maxPoints = Infinity, toleranceM = 5) {
 // segments[i] runs from points[i] to points[i + 1], as [[lat, lng], ...] or
 // [[lat, lng, height], ...]. Returns trackElevations too: one height (or
 // null) per track point.
+// Leave a stop when it ends, but never later than reaching the next place.
+const departure = (point, next) => Math.min(Math.max(point.stayUntil ?? point.time, point.time), next ? next.time : Infinity);
+
 export function timedTrack(points, segments, maxPoints = Infinity) {
   let track = [];
   let trackTimes = [];
@@ -180,9 +183,6 @@ export function timedTrack(points, segments, maxPoints = Infinity) {
     trackTimes.push(round(time, 1));
     trackElevations.push(Number.isFinite(location[2]) ? round(location[2], 1) : null);
   };
-  // Leave a stop when it ends, but never later than reaching the next place.
-  const departure = (point, next) => Math.min(Math.max(point.stayUntil ?? point.time, point.time), next ? next.time : Infinity);
-
   segments.forEach((segment, i) => {
     const arrive = points[i].time;
     const depart = departure(points[i], points[i + 1]);
@@ -216,4 +216,70 @@ export function timedTrack(points, segments, maxPoints = Infinity) {
     trackElevations = keep.map((i) => trackElevations[i]);
   }
   return { track, trackTimes, trackElevations };
+}
+
+// The parts of the video between two places that aren't riding (a drone
+// montage, a recap, a flashback) shouldn't move the rider along the road:
+// otherwise the marker carries on unseen and jumps ahead when the riding
+// footage is back. This re-spreads a drawn route's times (from timedTrack)
+// over the riding time only, and makes the marker wait where it was during
+// each such part (the same point twice: at its start and at its end).
+// route: { track, trackTimes, trackElevations? }; points: the key points;
+// hiddenRanges: [{ start, end }]. Returns a new { track, trackTimes, trackElevations }.
+export function pauseForHiddenParts(route, points, hiddenRanges = []) {
+  const { track, trackTimes } = route;
+  const heights = route.trackElevations ?? null;
+  const sorted = [...points].sort((a, b) => a.time - b.time);
+  // Each stretch between two places, with the hidden parts inside it on the riding clock.
+  const stretches = sorted.slice(0, -1).map((point, i) => {
+    const from = departure(point, sorted[i + 1]);
+    const to = sorted[i + 1].time;
+    const pauses = [];
+    for (const range of [...hiddenRanges].sort((a, b) => a.start - b.start)) {
+      const start = Math.max(range.start, from, pauses.at(-1)?.end ?? -Infinity);
+      const end = Math.min(range.end, to);
+      if (end > start) pauses.push({ start, end });
+    }
+    let paused = 0;
+    for (const pause of pauses) {
+      pause.at = pause.start - from - paused; // riding seconds into the stretch where it starts
+      paused += pause.end - pause.start;
+    }
+    const riding = to - from - paused;
+    return { from, to, riding, pauses: riding > 0 ? pauses : [] };
+  });
+  const stretchOf = (t) => stretches.find((s) => s.pauses.length && t > s.from && t <= s.to) ?? null;
+  // Riding seconds into the stretch for a time spread over the whole stretch, and back to video time.
+  const ridingAt = (s, t) => (t <= s.from ? 0 : ((t - s.from) / (s.to - s.from)) * s.riding);
+  const videoAt = (s, r) => s.from + r + s.pauses.reduce((sum, p) => sum + (p.at < r ? p.end - p.start : 0), 0);
+
+  const out = { track: [], trackTimes: [], trackElevations: [] };
+  const push = (location, time, height) => {
+    out.track.push(location);
+    out.trackTimes.push(round(time, 1));
+    out.trackElevations.push(height ?? null);
+  };
+  const emitted = new Set();
+  track.forEach((location, k) => {
+    const s = stretchOf(trackTimes[k]);
+    if (!s) return push(location, trackTimes[k], heights?.[k]);
+    const r = ridingAt(s, trackTimes[k]);
+    const r0 = k > 0 && trackTimes[k - 1] > s.from ? ridingAt(s, trackTimes[k - 1]) : 0;
+    const atEnd = trackTimes[k] >= s.to;
+    // The marker waits wherever a hidden part starts between the last point and this one.
+    for (const pause of s.pauses) {
+      if (emitted.has(pause) || pause.at < r0 || pause.at > r || (pause.at === r && !atEnd)) continue;
+      emitted.add(pause);
+      const f = r > r0 ? (pause.at - r0) / (r - r0) : 1;
+      const [a, b] = [track[k - 1] ?? location, location];
+      const here = [round(a[0] + (b[0] - a[0]) * f, 5), round(a[1] + (b[1] - a[1]) * f, 5)];
+      const ha = heights?.[k - 1];
+      const hb = heights?.[k];
+      const height = Number.isFinite(ha) && Number.isFinite(hb) ? round(ha + (hb - ha) * f, 1) : null;
+      push(here, pause.start, height);
+      push(here, pause.end, height);
+    }
+    push(location, atEnd ? s.to : videoAt(s, r), heights?.[k]);
+  });
+  return out;
 }

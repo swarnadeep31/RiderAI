@@ -71,6 +71,11 @@ that moment, and save the places to Google Maps, a GPS app or a printable trip s
   said: about a third of the tokens, good for vlogs where the rider names the places). It also works for private and
   unlisted videos. The file has to be the same length as the YouTube video, so the places line up. It's cut and
   shrunk with FFmpeg, sent to Gemini piece by piece, and deleted from TrailCast and Gemini when the analysis ends.
+- **AI route builder from the transcript:** the owner pastes the video's transcript (from YouTube's "Show
+  transcript") or chooses a caption file, and Gemini reads just the words, with their times: far cheaper than
+  watching. Then, for a public video, TrailCast watches only the parts the transcript says nothing about (10 minutes
+  or more without a place, up to an hour of video in all), which finds places seen on sign boards and milestones
+  but never said aloud. If a part can't be watched, the transcript's places are kept.
 - **Take it with you:** an "Open in Google Maps" link for every key point, GPX and KML downloads (KML imports into
   Google My Maps), and a printable trip sheet you can save as a PDF.
 - **Day and night:** the site follows the device's light or dark setting. The switch is hidden in the scenery:
@@ -204,11 +209,12 @@ SHA-256 hash, so changing that script means updating the hash (`npm test -w clie
 Good to know about the free plans:
 
 - Render's free API **sleeps after 15 minutes without visitors** and takes about a minute to wake up. Background
-  work (AI analyses, fuel stops) only runs while it's awake; it carries on where it stopped. To keep it awake for
-  free, the GitHub Actions workflow `.github/workflows/keep-api-awake.yml` asks its health check every 10 minutes.
-  That uses about 744 of the 750 free hours Render gives a workspace each month, so delete the workflow if you add
-  other free services there; Render's paid plan ($7 a month) stays awake by itself. When the API is slow to
-  answer anyway, the website says it's waking up.
+  work (AI analyses, fuel stops) only runs while it's awake; it carries on where it stopped. To stay awake for
+  free, the server visits itself: every 10 minutes it asks its own public address (`RENDER_EXTERNAL_URL`, set by
+  Render) for its health check, which comes in through Render like a visitor. That uses about 744 of the 750 free
+  hours Render gives a workspace each month, so set `KEEP_AWAKE=off` if you add other free services there; Render's
+  paid plan ($7 a month) stays awake by itself. If it ever does fall asleep, the first visitor wakes it, and the
+  website says it's waking up.
 - Render's Node servers don't have **FFmpeg**, so the AI route builder's "use the video file" option won't work
   there; YouTube links do. Big uploads would also go through Vercel's forwarding, which isn't made for them.
 - OpenStreetMap's own map tiles are meant for light use. Before real traffic, switch to a tile provider with a free
@@ -267,8 +273,10 @@ server/                  Express API + MongoDB (Mongoose)
                          into the elevation chart's profile, highest point and climb; stats.js works out the
                          trip stats (distance, riding days, highest point, climb); services.js splits the route
                          for Overpass, places what it finds along the route and works out the fuel gaps
-    jobs/worker.js       Runs background jobs one at a time (AI analyses and route-enrich); a job continues
-                         where it stopped after a restart, and a paid Gemini answer is never asked for twice
+    jobs/worker.js       Runs background jobs in two lines: AI analyses (AI_WORKERS at once, 3 by default) and
+                         route work (one at a time). Users take turns, only one uploaded file is worked on at
+                         a time, a job continues where it stopped after a restart, and a paid Gemini answer is
+                         never asked for twice
     prompts/             What Gemini is asked (versioned, so a changed prompt doesn't reuse old answers)
     routes/              Which URL goes to which controller
     middleware/          auth.js: login sessions; errorHandler.js: clear JSON error messages

@@ -17,6 +17,7 @@ const STAGES = {
 };
 
 function stageText(job) {
+  if (job.watchingGaps) return "Watching the parts of the video the transcript doesn't explain";
   if (job.source === 'transcript' && ['check', 'extract'].includes(job.stage)) return 'Reading the transcript';
   if (job.source === 'upload' && job.stage === 'check') return 'Getting your file ready';
   if (job.mediaMode === 'sound' && job.stage === 'extract') return 'Listening to the video';

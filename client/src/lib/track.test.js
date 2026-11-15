@@ -49,6 +49,17 @@ describe('positionAt', () => {
     expect(positionAt(track, [30, 100, 200], 0, 10, [{ start: 0, end: 30 }], hold)).toBeNull();
   });
 
+  test('on a drawn route the rider stays in view through a drone shot, but not through a recap', () => {
+    const hold = { hold: true };
+    // The server makes the rider wait during the montage: the same point at 100 and 150.
+    const waiting = [[10, 20], [10.5, 20.5], [10.5, 20.5], [11, 21]];
+    const times = [0, 100, 150, 250];
+    expect(positionAt(waiting, times, 0, 120, [{ start: 100, end: 150, reason: 'montage' }], hold)).toEqual([10.5, 20.5]);
+    expect(positionAt(waiting, times, 0, 120, [{ start: 100, end: 150, reason: 'recap' }], hold)).toBeNull();
+    // A recorded GPS route hides it, as before.
+    expect(positionAt(waiting, times, 0, 120, [{ start: 100, end: 150, reason: 'montage' }])).toBeNull();
+  });
+
   test('copes with two points recorded at the same second', () => {
     expect(positionAt(track, [0, 0, 10], 0, 0)).toEqual([10, 21]);
   });

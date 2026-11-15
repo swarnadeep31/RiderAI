@@ -28,6 +28,7 @@ import {
   nearestIndex,
   positionAt,
   videoTimeAtDistance,
+  waitsDuring,
 } from '../lib/track.js';
 import { formatTime } from '../lib/time.js';
 
@@ -468,7 +469,12 @@ export default function TrailPage() {
               activePointId={activePoint?._id}
               pendingLocation={pendingLocation}
               preview={preview}
-              hiddenNote={hidden && `${HIDDEN_REASONS[hidden.reason]}: the map picks up again at ${formatTime(hidden.end)}`}
+              hiddenNote={
+                hidden &&
+                (waitsDuring(hidden)
+                  ? `${HIDDEN_REASONS[hidden.reason]}: the rider waits here until ${formatTime(hidden.end)}`
+                  : `${HIDDEN_REASONS[hidden.reason]}: the map picks up again at ${formatTime(hidden.end)}`)
+              }
               focus={focus}
               follow={follow}
               onFollowChange={setFollow}

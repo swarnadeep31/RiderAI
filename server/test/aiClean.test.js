@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { cleanClip, mergeClips, mergeHiddenRanges, planClips } from '../src/aiRoute/clean.js';
+import { cleanClip, mergeClips, mergeHiddenRanges, planClips, planGapClips } from '../src/aiRoute/clean.js';
 import { parseClock } from '../src/utils/time.js';
 
 const place = (time, name, extra = {}) => ({ time, name, presence: 'here', evidence: 'sign', confidence: 0.9, ...extra });
@@ -155,4 +155,31 @@ test('a minutes and seconds time written with ":00" after it is not read as hour
   assert.deepEqual(hiddenRanges, [{ start: 4, end: 171, reason: 'intro' }]);
   // A long video's real hours are kept.
   assert.equal(cleanClip({ places: [{ time: '1:02:05', name: 'Leh', presence: 'here', confidence: 0.9 }], hidden_ranges: [] }, { start: 0, end: 7200 }, 7200).places[0].time, 3725);
+});
+
+test('planGapClips: the parts a transcript says nothing about, longest first, within the limits', () => {
+  const here = (time, stayUntil = null) => ({ time, stayUntil, presence: 'here' });
+  const cleaned = {
+    places: [here(300), here(900), here(2000, 2100), { time: 2500, stayUntil: null, presence: 'mentioned' }],
+    hiddenRanges: [{ start: 0, end: 120 }, { start: 3000, end: 3300 }],
+  };
+  // Gaps of 10 minutes or more: 300-900, 900-2000, 2100-3000, 3300-4800 (a mentioned place doesn't count).
+  assert.deepEqual(planGapClips(cleaned, 4800, { minGapSec: 600, maxTotalSec: 7200 }), [
+    { start: 300, end: 900 },
+    { start: 900, end: 2000 },
+    { start: 2100, end: 3000 },
+    { start: 3300, end: 4800 },
+  ]);
+  // Only an hour in all: the longest gaps get it (25, 18 and 15 minutes; the 10-minute one doesn't fit).
+  assert.deepEqual(planGapClips(cleaned, 4800, { minGapSec: 600, maxTotalSec: 3600 }), [
+    { start: 900, end: 2000 },
+    { start: 2100, end: 3000 },
+    { start: 3300, end: 4800 },
+  ]);
+  // A long gap is cut into clips no longer than maxClipSec.
+  assert.deepEqual(planGapClips({ places: [], hiddenRanges: [] }, 3000, { minGapSec: 600, maxClipSec: 1200 }), [
+    { start: 0, end: 1200 },
+    { start: 1200, end: 2400 },
+    { start: 2400, end: 3000 },
+  ]);
 });
