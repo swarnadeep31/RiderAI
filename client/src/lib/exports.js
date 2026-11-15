@@ -19,7 +19,8 @@ export function toGpx(trail, { services = [] } = {}) {
   for (const p of trail.points) {
     lines.push(`  <wpt lat="${p.lat}" lon="${p.lng}">`, `    <name>${escapeXml(p.name)}</name>`);
     if (p.note) lines.push(`    <desc>${escapeXml(p.note)}</desc>`);
-    lines.push(`    <link href="${escapeXml(youtubeUrlAt(trail.youtubeId, p.time))}"><text>Watch this moment</text></link>`);
+    // A route story has no video to link to.
+    if (trail.youtubeId) lines.push(`    <link href="${escapeXml(youtubeUrlAt(trail.youtubeId, p.time))}"><text>Watch this moment</text></link>`);
     lines.push('  </wpt>');
   }
   for (const s of services) {
@@ -55,7 +56,7 @@ export function toKml(trail) {
     `    <name>${escapeXml(trail.title)}</name>`,
   ];
   for (const p of trail.points) {
-    const description = [p.note, `Watch: ${youtubeUrlAt(trail.youtubeId, p.time)}`].filter(Boolean).join('\n');
+    const description = [p.note, trail.youtubeId && `Watch: ${youtubeUrlAt(trail.youtubeId, p.time)}`].filter(Boolean).join('\n');
     lines.push(
       '    <Placemark>',
       `      <name>${escapeXml(p.name)}</name>`,

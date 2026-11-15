@@ -51,5 +51,5 @@ Services along a route keep their own colours and letters (`lib/services.js`): f
 
 - No labels above headings, no 01/02/03 numbering, no rows of identical icon cards, no gradient text, no decorative glass or blur, no emoji or text symbols as icons (use `Icon`).
 - Text on colour uses that colour's own ink (`text-paper` on `bg-ink`, never fixed white), so it reads at night too.
-- Motion: one authored moment (the ride on the sheet); entrances use `animate-rise` once. All of it respects reduced motion.
+- Motion: two authored moments: the ride on the sheet (home page), and the route reveal on a ride's map (`RouteReveal`: fly in over the whole trip, the road draws itself behind the water-blue dot, numbered places pop up with their names, kilometres count up in a corner sheet with Skip). The reveal plays once after a route is made and on "Play the route". Entrances use `animate-rise` once. All of it respects reduced motion (the reveal just shows the route).
 - New outside sources (images, scripts, fonts) must be added to the Content-Security-Policy in `client/vercel.json`.

@@ -66,6 +66,8 @@ const tripEndSchema = new mongoose.Schema(
 // See trailSchema.timing. Drawn routes from before are retimed when the server starts.
 export const ROUTE_TIMING = 2;
 
+export const TRAIL_KINDS = ['video', 'story'];
+
 export const HIDDEN_REASONS = ['intro', 'recap', 'montage', 'flashback', 'off_route'];
 const hiddenRangeSchema = new mongoose.Schema(
   {
@@ -132,7 +134,19 @@ const trailSchema = new mongoose.Schema(
     title: { type: String, required: [true, 'Give the trail a title.'], trim: true, maxlength: 120 },
     description: { type: String, trim: true, maxlength: 5000, default: '' },
     activity: { type: String, enum: ACTIVITIES, default: 'ride' },
-    youtubeId: { type: String, required: true, match: /^[A-Za-z0-9_-]{11}$/ },
+    // 'video': a ride on YouTube with the map beside it. 'story': a route someone
+    // made from their own trip, stop by stop with their tips, and no video.
+    kind: { type: String, enum: TRAIL_KINDS, default: 'video' },
+    youtubeId: {
+      type: String,
+      required: [
+        function () {
+          return this.kind !== 'story';
+        },
+        'A ride needs its YouTube video.',
+      ],
+      match: /^[A-Za-z0-9_-]{11}$/,
+    },
     // Who made the video, as shown on the page: the name the trail's owner
     // gives, or else the YouTube channel's. The owner's own username isn't shown.
     creatorName: { type: String, trim: true, maxlength: 100, default: '' },

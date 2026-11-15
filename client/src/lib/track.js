@@ -234,3 +234,10 @@ export function videoTimeAtDistance(route, alongM, { duration = 0 } = {}) {
   }
   return { time, hidden, outside };
 }
+
+// The part of the route between two distances along it (for outlining a
+// stretch on the map). route: { track, cum }.
+export function routeBetween(route, fromM, toM) {
+  const inside = route.track.filter((_, i) => route.cum[i] > fromM && route.cum[i] < toM);
+  return [locationAtDistance(route.track, route.cum, fromM), ...inside, locationAtDistance(route.track, route.cum, toM)];
+}

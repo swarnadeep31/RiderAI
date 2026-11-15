@@ -10,9 +10,10 @@ const CONTOURS = [
   'M38 128c22-12 50-14 70-4s22 28 4 38-46 8-64-2-30-20-10-32z',
 ];
 
-export default function RoadEnds({ sign, className = '' }) {
+// fill: cover its box, trimming the top (the lettering is at the bottom), instead of fitting inside it.
+export default function RoadEnds({ sign, className = '', fill = false }) {
   return (
-    <svg viewBox="0 0 360 240" className={className} aria-hidden="true">
+    <svg viewBox="0 0 360 240" preserveAspectRatio={fill ? 'xMidYMax slice' : undefined} className={className} aria-hidden="true">
       <rect width="360" height="240" className="fill-paper" />
       {/* The hills, as contour lines; every fourth one bolder, as on the sheets. */}
       {CONTOURS.map((d, i) => (
