@@ -76,6 +76,13 @@ that moment, and save the places to Google Maps, a GPS app or a printable trip s
   watching. Then, for a public video, TrailCast watches only the parts the transcript says nothing about (10 minutes
   or more without a place, up to an hour of video in all), which finds places seen on sign boards and milestones
   but never said aloud. If a part can't be watched, the transcript's places are kept.
+- **Route stories (no video):** anyone can put a route from their own trip on the map: "+ New trail", then "From my
+  own trip". They add their stops in order (search or click the map) and their tips at each (where to eat, sleep,
+  fuel up, what to watch out for), mark the nights, and TrailCast draws the route between them with the distance,
+  days, heights, climb and fuel stops. Only the creator can change it; it shows "Route by ..." only if they give a name.
+- **The route, played like a film:** after a route is made (AI places accepted, a route redrawn, or a story edited),
+  the map flies in over the whole trip and the road draws itself behind the blue dot, each place popping up as it's
+  reached, with the kilometres counting up. Anyone can watch it again with "Play the route".
 - **Take it with you:** an "Open in Google Maps" link for every key point, GPX and KML downloads (KML imports into
   Google My Maps), and a printable trip sheet you can save as a PDF.
 - **Day and night:** the site follows the device's light or dark setting. The switch is hidden in the scenery:
@@ -303,7 +310,7 @@ samples/                 A sample GPX file to try
 | GET | `/api/config` | Anyone | What the server can do (`roadRouting`, `aiRoute`, `routeServices`) and `fuelGapWarnKm` |
 | GET | `/api/trails` | Anyone | List trails (without their routes) |
 | GET | `/api/trails/:id` | Anyone | One trail with its route, key points, `routeVersion` and `elevationProfile` |
-| POST | `/api/trails` | Logged in | Create a trail from `youtubeUrl`, `title` and optional route (`track`, `trackTimes`, and `trackElevations`: one height or null per point) |
+| POST | `/api/trails` | Logged in | Create a trail from `youtubeUrl`, `title` and optional route (`track`, `trackTimes`, and `trackElevations`: one height or null per point); or a route story with `kind: 'story'`, `title` and optional `routeStyle` (no video: its stops are added as key points, in order of `time`) |
 | PATCH | `/api/trails/:id` | Owner | Change a trail (title, sync, support link, `daysOverride`: riding days, or null to work them out...) |
 | DELETE | `/api/trails/:id` | Owner | Delete a trail |
 | POST | `/api/trails/:id/route` | Owner | Draw the route between the key points (`style`: `roads`, `paths` or `straight`) |

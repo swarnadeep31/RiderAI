@@ -1,10 +1,13 @@
 import L from 'leaflet';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CircleMarker, MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
+import { useReducedMotion } from '../hooks/useReducedMotion.js';
 import { SERVICE_KINDS, serviceName } from '../lib/services.js';
 import { useTheme } from '../lib/theme.js';
 import { formatTime } from '../lib/time.js';
 import { boundsOf, cumulativeDistances, indexAtOrBefore, positionAt, videoTimeAtLocation } from '../lib/track.js';
+import Icon from './art/Icon.jsx';
+import RouteReveal from './RouteReveal.jsx';
 
 // The sheet's inks for the map: the route in road red, the rider and the AI's
 // places in water blue. Read from the page's colours, which change at night.
@@ -206,7 +209,7 @@ function RiderLayer({ route, clock, follow, approximate, scrub, inks }) {
     if (!trackTimes?.length || trackTimes.length !== track.length) return undefined;
     // Its own layer, so the marker is drawn above the key point pins (600) and below tooltips (650).
     if (!map.getPane('rider')) map.createPane('rider').style.zIndex = '640';
-    const lineStyle = { color: inks.road, weight: 6, opacity: 1, dashArray: approximate ? '10 8' : undefined, interactive: false };
+    const lineStyle = { color: inks.road, weight: 6, opacity: 1, dashArray: approximate ? '10 8' : undefined, interactive: false, className: 'route-base' };
     const travelled = L.polyline([], lineStyle).addTo(map);
     const tip = L.polyline([], lineStyle).addTo(map);
     // The route point the long part ends at, and when it was last redrawn.
@@ -392,7 +395,16 @@ export default function TrailMap({
   services = [],
   serviceKinds,
   fuelGapLine,
+  // reveal: a number; each new one plays the route reveal (see RouteReveal).
+  // onReplay: shows a "Play the route" button that asks for it.
+  reveal = 0,
+  onReplay,
 }) {
+  const reducedMotion = useReducedMotion();
+  const [revealing, setRevealing] = useState(false);
+  useEffect(() => {
+    if (reveal > 0) setRevealing(true);
+  }, [reveal]);
   const playable = trackTimes?.length > 0 && trackTimes.length === track.length;
   const theme = useTheme();
   const inks = useMemo(readInks, [theme]);
@@ -416,12 +428,19 @@ export default function TrailMap({
         {track.length > 1 && (
           <>
             {/* A road on a sheet: red, edged in ink. */}
-            <Polyline positions={track} pathOptions={{ color: inks.ink, weight: 8, opacity: playable ? 0.3 : 0.5, interactive: false }} />
+            <Polyline positions={track} pathOptions={{ color: inks.ink, weight: 8, opacity: playable ? 0.3 : 0.5, interactive: false, className: 'route-base' }} />
             <Polyline
               positions={track}
               // Faded when the video can play along it (the covered part is drawn bold on top).
               // Dashed for routes drawn between key points: they're approximate.
-              pathOptions={{ color: inks.road, weight: 5, opacity: playable ? 0.6 : 0.95, dashArray: approximate ? '10 8' : undefined, interactive: false }}
+              pathOptions={{
+                color: inks.road,
+                weight: 5,
+                opacity: playable ? 0.6 : 0.95,
+                dashArray: approximate ? '10 8' : undefined,
+                interactive: false,
+                className: 'route-base',
+              }}
             />
           </>
         )}
@@ -456,12 +475,20 @@ export default function TrailMap({
         <FitToPreview places={preview} />
         <PanTo focus={focus} />
         <MapEvents onMapClick={onMapClick} onUserMove={() => onFollowChange?.(false)} />
+        <RouteReveal play={reveal} track={track} points={points} inks={inks} reducedMotion={reducedMotion} onDone={() => setRevealing(false)} />
       </MapContainer>
 
-      {hiddenNote && (
+      {onReplay && track.length > 1 && !revealing && (
+        <button type="button" onClick={onReplay} className="btn-secondary btn-small absolute top-3 right-3 z-[1000] bg-paper">
+          <Icon name="play" className="h-4 w-4" />
+          Play the route
+        </button>
+      )}
+
+      {hiddenNote && !revealing && (
         <p className="absolute top-3 left-14 z-[1000] rounded-[3px] bg-paper/95 px-3 py-1.5 text-small font-medium ring-1 ring-ink/20">{hiddenNote}</p>
       )}
-      {playable && !follow && (
+      {playable && !follow && !revealing && (
         <button
           type="button"
           onClick={() => onFollowChange?.(true)}

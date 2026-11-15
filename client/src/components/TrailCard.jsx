@@ -2,11 +2,14 @@ import { Link } from 'react-router';
 import { cardSummary } from '../lib/stats.js';
 import ActivityBadge from './ActivityBadge.jsx';
 import Icon from './art/Icon.jsx';
+import RoadEnds from './art/RoadEnds.jsx';
 
 // One ride on the home page: the video's picture, its name, how far and how
-// long, and whose video it is. onDelete: only for the person who added it.
+// long, and whose video it is. A route story (no video) gets a drawing of the
+// road instead, and its creator's name. onDelete: only for the person who added it.
 export default function TrailCard({ trail, onDelete }) {
   const aiRoute = trail.routeSource === 'keypoints' && trail.points.some((p) => p.origin === 'ai');
+  const story = trail.kind === 'story';
   const credit = trail.creatorName || trail.channel?.name;
   const summary = cardSummary(trail.stats);
   const places = trail.points.length;
@@ -14,12 +17,16 @@ export default function TrailCard({ trail, onDelete }) {
     <li className="group relative">
       <Link to={`/trails/${trail._id}`} className="block h-full rounded-[3px] focus-visible:outline-offset-4">
         <div className="relative overflow-hidden rounded-[3px] bg-surface-2">
-          <img
-            src={`https://i.ytimg.com/vi/${trail.youtubeId}/hqdefault.jpg`}
-            alt=""
-            loading="lazy"
-            className="aspect-video w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
-          />
+          {story ? (
+            <RoadEnds sign="Route story" fill className="aspect-video w-full transition-transform duration-500 ease-out group-hover:scale-[1.03]" />
+          ) : (
+            <img
+              src={`https://i.ytimg.com/vi/${trail.youtubeId}/hqdefault.jpg`}
+              alt=""
+              loading="lazy"
+              className="aspect-video w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+            />
+          )}
           <ActivityBadge activity={trail.activity} className="absolute top-2.5 left-2.5 bg-paper/95 text-ink" />
         </div>
         <div className="pt-3">
@@ -28,7 +35,7 @@ export default function TrailCard({ trail, onDelete }) {
             {summary && <span className="font-semibold text-ink">{summary}</span>}
             {places > 0 && (
               <span>
-                {places} {places === 1 ? 'place' : 'places'}
+                {places} {story ? (places === 1 ? 'stop' : 'stops') : places === 1 ? 'place' : 'places'}
               </span>
             )}
             {aiRoute && (
@@ -37,7 +44,11 @@ export default function TrailCard({ trail, onDelete }) {
               </span>
             )}
           </p>
-          {credit && <p className="mt-0.5 text-small text-ink-soft">Video by {credit}</p>}
+          {credit && (
+            <p className="mt-0.5 text-small text-ink-soft">
+              {story ? 'Route' : 'Video'} by {credit}
+            </p>
+          )}
         </div>
       </Link>
       {/* Outside the link, so deleting doesn't open the trail. */}

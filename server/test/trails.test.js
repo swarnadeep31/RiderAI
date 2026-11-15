@@ -390,3 +390,46 @@ test('the config says what the server can do', async () => {
   const res = await request(app).get('/api/config');
   assert.deepEqual(res.body, { roadRouting: false, aiRoute: false, routeServices: true, fuelGapWarnKm: 150, googleClientId: '', aiMaxUploadMb: 500 });
 });
+
+describe("route stories: a route from someone's own trip, with no video", () => {
+  test('made with a title, then stops with tips; the route is drawn between them, and the AI is not offered', async () => {
+    const alice = await signedUpAgent('storyteller');
+    const made = await alice.post('/api/trails').send({ kind: 'story', title: 'Manali to Kaza, my way', activity: 'ride', routeStyle: 'straight' });
+    assert.equal(made.status, 201, JSON.stringify(made.body));
+    assert.equal(made.body.kind, 'story');
+    assert.equal(made.body.youtubeId, undefined);
+    const id = made.body._id;
+
+    // Stops in order, with the creator's own tips.
+    await alice.post(`/api/trails/${id}/points`).send({ time: 0, name: 'Manali', lat: 32.24, lng: 77.19, note: 'Fill the tank here' });
+    const { body: one } = await alice.get(`/api/trails/${id}`);
+    assert.equal(one.track.length, 0, 'one stop is not a route yet');
+    const second = await alice.post(`/api/trails/${id}/points`).send({ time: 1, name: 'Kaza', lat: 32.23, lng: 78.07, note: 'Stay at the monastery guesthouse' });
+    assert.equal(second.status, 201, JSON.stringify(second.body));
+    assert.ok(second.body.track.length >= 2, 'drawn between the stops');
+    assert.equal(second.body.routeSource, 'keypoints');
+    assert.deepEqual(second.body.points.map((p) => p.note), ['Fill the tank here', 'Stay at the monastery guesthouse']);
+
+    // Listed with the rest, as a story.
+    const { body: list } = await request(app).get('/api/trails');
+    assert.equal(list.find((t) => t._id === id).kind, 'story');
+
+    // No video: no AI analysis, and a video link can't be slipped in.
+    process.env.GEMINI_API_KEY = 'test-key';
+    try {
+      const ai = await alice.post(`/api/trails/${id}/ai-route`).send({ durationSec: 600 });
+      assert.equal(ai.status, 409);
+      assert.match(ai.body.error, /no video/);
+    } finally {
+      delete process.env.GEMINI_API_KEY;
+    }
+    const patched = await alice.patch(`/api/trails/${id}`).send({ youtubeUrl: 'https://youtu.be/aBcD3fGh1_-' });
+    assert.equal(patched.body.youtubeId, undefined);
+  });
+
+  test('a ride with a video still needs its link', async () => {
+    const alice = await signedUpAgent('linkless');
+    const res = await alice.post('/api/trails').send({ title: 'No link' });
+    assert.equal(res.status, 400);
+  });
+});
