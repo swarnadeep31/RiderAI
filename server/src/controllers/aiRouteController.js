@@ -5,6 +5,7 @@ import { mkdir, rm, statfs } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { spentThisMonthUsd } from '../aiRoute/budget.js';
 import { farOffPlaces } from '../aiRoute/geocode.js';
 import { tripKey, tripOf } from '../aiRoute/trip.js';
 import { aiConfig } from '../config.js';
@@ -37,6 +38,8 @@ export function jobView(job) {
     modelsUsed: [...new Set((job.clips ?? []).map((clip) => clip.usage?.model).filter(Boolean))],
     highDetail: job.highDetail,
     source: job.source ?? 'youtube',
+    // A transcript read, the parts of the video it said nothing about are being watched.
+    watchingGaps: job.stage === 'extract' && Boolean(job.gapsPlanned),
     mediaMode: job.mediaMode ?? 'full',
     reused: Boolean(job.reusedFrom),
     costUsd: job.usage?.costUsd ?? 0,
@@ -47,10 +50,6 @@ export function jobView(job) {
 
 const hasRecordedRoute = (trail) => trail.track.length > 0 && trail.routeSource !== 'keypoints';
 const startOfTodayUtc = () => new Date(new Date().setUTCHours(0, 0, 0, 0));
-const startOfMonthUtc = () => {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-};
 
 // The checks before any analysis: the server can do it, the trail is the
 // user's and has no GPS route, and nothing is running for it already.
@@ -81,11 +80,7 @@ async function checkLimits(user, config) {
   if (today >= config.jobsPerUserPerDay) {
     throw httpError(429, `You can run ${config.jobsPerUserPerDay} AI analyses a day. Please try again tomorrow.`);
   }
-  const [month] = await Job.aggregate([
-    { $match: { createdAt: { $gte: startOfMonthUtc() } } },
-    { $group: { _id: null, spent: { $sum: '$usage.costUsd' } } },
-  ]);
-  if ((month?.spent ?? 0) >= config.monthlyBudgetUsd) {
+  if ((await spentThisMonthUsd()) >= config.monthlyBudgetUsd) {
     throw httpError(429, "This month's AI budget is used up. Please try again next month.");
   }
 }

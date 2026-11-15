@@ -19,7 +19,10 @@ beforeEach(async () => {
   const res = await alice.post('/api/trails').send({ title: 'Kolkata to Dhanbad', youtubeUrl: 'https://youtu.be/aBcD3fGh1_-' });
   trailId = res.body._id;
 });
-afterEach(() => delete process.env.GEMINI_API_KEY);
+afterEach(() => {
+  delete process.env.GEMINI_API_KEY;
+  delete process.env.AI_WATCH_GAPS;
+});
 
 // Fake outside services: what Gemini "found", and where those places are.
 const geminiAnswer = {
@@ -31,7 +34,7 @@ const geminiAnswer = {
   ],
   hidden_ranges: [{ start: '0:00', end: '1:30', reason: 'intro' }],
 };
-const COORDS = { Howrah: [22.59, 88.31], Durgapur: [23.52, 87.31], Leh: [34.15, 77.58], Asansol: [23.68, 86.98] };
+const COORDS = { Howrah: [22.59, 88.31], Durgapur: [23.52, 87.31], Leh: [34.15, 77.58], Asansol: [23.68, 86.98], Dhanbad: [23.8, 86.43] };
 
 function fakeServices({ extract } = {}) {
   const calls = { extract: 0 };
@@ -164,6 +167,7 @@ describe('AI route jobs', () => {
   });
 
   test("from the video's transcript: Gemini reads only the words, with their times, and nothing is watched", async () => {
+    process.env.AI_WATCH_GAPS = 'off';
     const pasted = ['0:00', 'welcome to the channel', '1:30', 'we are at Howrah station', '9:00', 'night in Durgapur', '16:00', 'Asansol now'].join('\n');
     const started = await alice.post(`/api/trails/${trailId}/ai-route/transcript`).send({ text: pasted, durationSec: 1800 });
     assert.equal(started.status, 202, JSON.stringify(started.body));
@@ -191,6 +195,63 @@ describe('AI route jobs', () => {
     const again = await alice.post(`/api/trails/${trailId}/ai-route/transcript`).send({ text: `${pasted}\n`, durationSec: 1800 });
     assert.equal(again.status, 201);
     assert.equal(again.body.reused, true);
+  });
+
+  test('after the transcript, only the parts of the video it says nothing about are watched', async () => {
+    process.env.AI_JOBS_PER_USER_PER_DAY = '10';
+    const pasted = ['1:30', 'we are at Howrah station', '9:00', 'night in Durgapur', '16:00', 'Asansol now', '59:00', 'that was the ride'].join('\n');
+    // A different last line each time, so an earlier answer isn't reused.
+    let takes = 0;
+    const send = () => alice.post(`/api/trails/${trailId}/ai-route/transcript`).send({ text: `${pasted}\n59:30\ntake ${(takes += 1)}`, durationSec: 3600 });
+    const asked = [];
+    // Reading the transcript finds places up to 16:00; watching 16:00 to the end finds Dhanbad at 45:00.
+    const watched = { places: [{ time: '45:00', name: 'Dhanbad', presence: 'here', evidence: 'sign', confidence: 0.9 }], hidden_ranges: [] };
+    const { services } = fakeServices({
+      extract: async (options) => {
+        asked.push(options);
+        const data = options.transcript ? geminiAnswer : watched;
+        return { data, raw: JSON.stringify(data), usage: { promptTokenCount: 900, candidatesTokenCount: 300 } };
+      },
+    });
+
+    const { body: started } = await send();
+    await processNextJob(services);
+    assert.equal(asked.length, 2);
+    assert.ok(asked[0].transcript);
+    assert.deepEqual([asked[1].youtubeId, asked[1].clipStart, asked[1].clipEnd, asked[1].transcript], ['aBcD3fGh1_-', 960, 3600, undefined]);
+    const { body: job } = await alice.get(`/api/jobs/${started._id}`);
+    assert.equal(job.state, 'needs_review');
+    assert.deepEqual(job.result.candidates.map((c) => c.name), ['Howrah', 'Durgapur', 'Leh', 'Asansol', 'Dhanbad']);
+    const saved = await Job.findById(started._id).lean();
+    assert.deepEqual(saved.clips.map((c) => [c.kind ?? 'transcript', c.start, c.end]), [['transcript', 0, 3600], ['gap', 960, 3600]]);
+
+    // A video that can't be watched (private, say): the transcript's places are kept.
+    asked.length = 0;
+    const privateVideo = fakeServices({
+      extract: async (options) => {
+        asked.push(options);
+        if (!options.transcript) throw new GeminiError('This video is private.', { retryable: false });
+        return { data: geminiAnswer, raw: '{}', usage: {} };
+      },
+    }).services;
+    const { body: second } = await send();
+    await processNextJob(privateVideo);
+    const { body: kept } = await alice.get(`/api/jobs/${second._id}`);
+    assert.equal(kept.state, 'needs_review');
+    assert.deepEqual(kept.result.candidates.map((c) => c.name), ['Howrah', 'Durgapur', 'Leh', 'Asansol']);
+    assert.match((await Job.findById(second._id).lean()).clips[1].skipped, /private/);
+
+    // Switched off, or this month's budget used up: only the transcript is read.
+    for (const [name, value] of [['AI_WATCH_GAPS', 'off'], ['AI_MONTHLY_BUDGET_USD', '0']]) {
+      process.env.AI_MONTHLY_BUDGET_USD = '5';
+      asked.length = 0;
+      const { body: next } = await send();
+      process.env[name] = value;
+      await processNextJob(services);
+      delete process.env.AI_WATCH_GAPS;
+      assert.equal(asked.length, 1, name);
+      assert.equal((await Job.findById(next._id).lean()).state, 'needs_review');
+    }
   });
 
   test('a transcript needs its times, and must be of this video', async () => {

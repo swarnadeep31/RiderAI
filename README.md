@@ -71,6 +71,11 @@ that moment, and save the places to Google Maps, a GPS app or a printable trip s
   said: about a third of the tokens, good for vlogs where the rider names the places). It also works for private and
   unlisted videos. The file has to be the same length as the YouTube video, so the places line up. It's cut and
   shrunk with FFmpeg, sent to Gemini piece by piece, and deleted from TrailCast and Gemini when the analysis ends.
+- **AI route builder from the transcript:** the owner pastes the video's transcript (from YouTube's "Show
+  transcript") or chooses a caption file, and Gemini reads just the words, with their times: far cheaper than
+  watching. Then, for a public video, TrailCast watches only the parts the transcript says nothing about (10 minutes
+  or more without a place, up to an hour of video in all), which finds places seen on sign boards and milestones
+  but never said aloud. If a part can't be watched, the transcript's places are kept.
 - **Take it with you:** an "Open in Google Maps" link for every key point, GPX and KML downloads (KML imports into
   Google My Maps), and a printable trip sheet you can save as a PDF.
 - **Day and night:** the site follows the device's light or dark setting. The switch is hidden in the scenery:

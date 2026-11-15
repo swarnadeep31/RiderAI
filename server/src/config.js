@@ -29,6 +29,12 @@ export function aiConfig() {
     // High detail reads boards and milestones better, but costs about 3-4x as much.
     highDetail: process.env.AI_HIGH_DETAIL === 'true',
     clipMinutes: number('AI_CLIP_MINUTES', 60),
+    // After reading a transcript, watch the parts of the video it says nothing
+    // about (stretches of at least AI_GAP_MIN_MINUTES with no place), up to
+    // AI_GAP_MAX_MINUTES of video in all. Only public YouTube videos. "off": don't.
+    watchGaps: process.env.AI_WATCH_GAPS !== 'off',
+    gapMinMinutes: number('AI_GAP_MIN_MINUTES', 10),
+    gapMaxMinutes: number('AI_GAP_MAX_MINUTES', 60),
     maxVideoMinutes: number('AI_MAX_VIDEO_MINUTES', 180),
     minConfidence: number('AI_MIN_CONFIDENCE', 0.5),
     jobsPerUserPerDay: number('AI_JOBS_PER_USER_PER_DAY', 6),
