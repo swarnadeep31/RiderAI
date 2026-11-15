@@ -34,7 +34,7 @@ const OWNER_FIELDS = '_id';
 
 // What the home page's cards need: not the route, the description, or the key
 // points themselves (only whether the AI found them).
-const CARD_FIELDS = 'title activity youtubeId creatorName channel routeSource stats owner createdAt points.origin';
+const CARD_FIELDS = 'title kind activity youtubeId creatorName channel routeSource stats owner createdAt points.origin';
 const LIST_PAGE = 24;
 const LIST_MAX = 100;
 
@@ -43,6 +43,7 @@ const LIST_MAX = 100;
 // sent, as plain data about 3 MB. Plain data skips the schema's defaults, so
 // a trail saved before a field existed gets these (kept equal to Trail.js by a test).
 export const TRAIL_DEFAULTS = {
+  kind: 'video',
   description: '',
   activity: 'ride',
   creatorName: '',
@@ -113,7 +114,7 @@ export async function findOwnTrail(req) {
 // Finds the YouTube channel a trail's video is on, if it isn't known yet
 // (trails saved before, or when YouTube couldn't be reached), and saves it.
 async function fillChannel(trail) {
-  if (trail.channel?.name) return;
+  if (trail.channel?.name || trail.kind === 'story') return;
   const channel = await fetchChannel(trail.youtubeId);
   if (!channel) return;
   trail.channel = channel;
@@ -171,7 +172,8 @@ export async function drawRouteFromPoints(trail) {
 }
 
 // A route drawn from key points is redrawn whenever the key points change.
-const redrawIfDrawn = (trail) => (trail.routeSource === 'keypoints' ? drawRouteFromPoints(trail) : null);
+// A story's route is always drawn between its stops.
+const redrawIfDrawn = (trail) => (trail.routeSource === 'keypoints' || trail.kind === 'story' ? drawRouteFromPoints(trail) : null);
 
 // The newest trails, a page at a time: ?before=<the last trail's _id> gives
 // the next page, ?limit= its size (24 by default, at most 100).
@@ -191,6 +193,17 @@ export async function listTrails(req, res) {
 
 export async function createTrail(req, res) {
   const fields = pick(req.body, TRAIL_FIELDS);
+  // A route made from someone's own trip: no video, the stops come next.
+  if (req.body?.kind === 'story') {
+    const trail = new Trail({
+      ...pick(req.body, ['title', 'description', 'activity', 'creatorName', 'supportUrl']),
+      kind: 'story',
+      routeStyle: ROUTE_STYLES.includes(req.body?.routeStyle) ? req.body.routeStyle : 'roads',
+      owner: req.user._id,
+    });
+    await saveTrail(trail, 0);
+    return sendTrail(res, trail, { status: 201 });
+  }
   const trail = new Trail({
     ...fields,
     youtubeId: youtubeIdFrom(req.body),
@@ -237,7 +250,7 @@ export async function updateTrail(req, res) {
     const heights = elevationsFrom(req.body, fields.track);
     if (trail.routeVersion !== version || heights) setProfile(trail, heights, 'gpx');
   }
-  if (req.body?.youtubeUrl !== undefined) {
+  if (req.body?.youtubeUrl !== undefined && trail.kind !== 'story') {
     const youtubeId = youtubeIdFrom(req.body);
     if (youtubeId !== trail.youtubeId) {
       trail.youtubeId = youtubeId;

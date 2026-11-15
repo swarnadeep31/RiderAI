@@ -142,16 +142,24 @@ export default function PrintPage() {
         </button>
         <span className="text-ink-soft">In the print window, choose "Save as PDF" as the printer.</span>
         <Link to={`/trails/${trail._id}`} className="ml-auto underline">
-          Back to the video
+          {trail.youtubeId ? 'Back to the video' : 'Back to the route'}
         </Link>
       </div>
 
       <h1 className="text-title">{trail.title}</h1>
       <p className="mt-1 text-ink-soft">
-        {ACTIVITIES[trail.activity]} · {trail.points.length} {trail.points.length === 1 ? 'place' : 'places'} · Video:{' '}
-        <a href={youtubeUrlAt(trail.youtubeId, 0)} className="underline">
-          youtu.be/{trail.youtubeId}
-        </a>
+        {ACTIVITIES[trail.activity]} · {trail.points.length} {trail.points.length === 1 ? 'place' : 'places'}
+        {trail.youtubeId ? (
+          <>
+            {' '}
+            · Video:{' '}
+            <a href={youtubeUrlAt(trail.youtubeId, 0)} className="underline">
+              youtu.be/{trail.youtubeId}
+            </a>
+          </>
+        ) : (
+          trail.creatorName && ` · Route by ${trail.creatorName}`
+        )}
       </p>
       {statsLine && <p className="mt-3 font-semibold">{statsLine}</p>}
       {trail.description && <p className="mt-4 whitespace-pre-line">{trail.description}</p>}
@@ -161,7 +169,7 @@ export default function PrintPage() {
           <thead>
             <tr className="border-b-2 border-ink">
               <th className="py-2 pr-3">#</th>
-              <th className="py-2 pr-3">Video</th>
+              {trail.youtubeId && <th className="py-2 pr-3">Video</th>}
               <th className="py-2 pr-3">Place</th>
               <th className="py-2">Location</th>
             </tr>
@@ -170,11 +178,13 @@ export default function PrintPage() {
             {trail.points.map((point, i) => (
               <tr key={point._id} className="break-inside-avoid border-b border-ink/15 align-top">
                 <td className="py-2 pr-3 font-semibold">{i + 1}</td>
-                <td className="py-2 pr-3 tabular-nums">
-                  <a href={youtubeUrlAt(trail.youtubeId, point.time)} className="underline">
-                    {formatTime(point.time)}
-                  </a>
-                </td>
+                {trail.youtubeId && (
+                  <td className="py-2 pr-3 tabular-nums">
+                    <a href={youtubeUrlAt(trail.youtubeId, point.time)} className="underline">
+                      {formatTime(point.time)}
+                    </a>
+                  </td>
+                )}
                 <td className="py-2 pr-3">
                   <div className="font-semibold">{point.name}</div>
                   {point.note && <div className="text-ink-soft">{point.note}</div>}

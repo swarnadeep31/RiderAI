@@ -56,6 +56,7 @@ const startOfTodayUtc = () => new Date(new Date().setUTCHours(0, 0, 0, 0));
 async function trailReadyForAi(req, config) {
   if (!config.apiKey) throw httpError(503, "AI route building isn't set up on this server yet (GEMINI_API_KEY in server/.env).");
   const trail = await findOwnTrail(req);
+  if (trail.kind === 'story') throw httpError(409, 'A route story has no video for the AI to watch.');
   if (hasRecordedRoute(trail)) throw httpError(409, "This trail already has the rider's GPS route.");
   if (await Job.exists({ type: 'ai-route', trail: trail._id, state: { $in: ['queued', 'running'] } })) {
     throw httpError(409, 'An analysis is already running for this trail.');

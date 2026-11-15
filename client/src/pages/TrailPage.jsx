@@ -14,6 +14,7 @@ import KeyPointList from '../components/KeyPointList.jsx';
 import RoutePanel from '../components/RoutePanel.jsx';
 import SaveOptions from '../components/SaveOptions.jsx';
 import SectionHeading from '../components/SectionHeading.jsx';
+import StoryPage from './StoryPage.jsx';
 import ServicesPanel, { ServiceBadge } from '../components/ServicesPanel.jsx';
 import TrailMap from '../components/TrailMap.jsx';
 import TripStats, { Readout } from '../components/TripStats.jsx';
@@ -157,6 +158,8 @@ export default function TrailPage() {
 
   // Only the person who added the trail sees the Edit button and the creator tools.
   const isOwner = Boolean(user && trail.owner?._id === user._id);
+  // A route story: no video, its own page.
+  if (trail.kind === 'story') return <StoryPage trail={trail} isOwner={isOwner} onChange={setTrail} fuelGapWarnKm={fuelGapWarnKm} />;
   const editing = isOwner && searchParams.has('edit');
   // Where the rider is now (the map draws its own smoothly moving marker; this is for new key points).
   const recorded = isGpxRoute(trail);
