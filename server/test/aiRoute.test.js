@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, test } from 'node:test';
+import mongoose from 'mongoose';
 import request from 'supertest';
 import { processNextJob } from '../src/jobs/worker.js';
 import { Job } from '../src/models/Job.js';
@@ -416,6 +417,37 @@ describe('AI route jobs', () => {
     assert.equal(await processNextJob(services, { types: ['route-enrich'] }), null);
     assert.equal(calls.extract, 0);
     assert.equal((await processNextJob(services, { types: ['ai-route'] }))._id.toString(), job._id);
+  });
+
+  test("turns are fair: while one user's analysis runs, another user's waiting one goes before their next", async () => {
+    const { body: first } = await start();
+    const base = await Job.findById(first._id).lean();
+    const another = (fields = {}) => Job.create({ ...base, _id: undefined, createdAt: undefined, updatedAt: undefined, ...fields });
+    // Alice's first analysis is being worked on (by another worker); then she starts a second, then Bob one.
+    await Job.updateOne({ _id: first._id }, { state: 'running', lockedUntil: new Date(Date.now() + 60000) });
+    const aliceSecond = await another();
+    const bobs = await another({ user: new mongoose.Types.ObjectId() });
+
+    const ran = await processNextJob(fakeServices().services, { types: ['ai-route'] });
+    assert.equal(String(ran._id), String(bobs._id));
+    assert.equal((await Job.findById(aliceSecond._id)).state, 'queued');
+    // With nobody else waiting, Alice's second is next, even with her first still running.
+    const next = await processNextJob(fakeServices().services, { types: ['ai-route'] });
+    assert.equal(String(next._id), String(aliceSecond._id));
+  });
+
+  test('only one uploaded video file is worked on at a time', async () => {
+    const { body: first } = await start();
+    const base = await Job.findById(first._id).lean();
+    const another = (fields = {}) => Job.create({ ...base, _id: undefined, createdAt: undefined, updatedAt: undefined, user: new mongoose.Types.ObjectId(), ...fields });
+    await Job.deleteOne({ _id: first._id });
+    await another({ source: 'upload', uploadPath: '/nowhere/a.mp4', state: 'running', lockedUntil: new Date(Date.now() + 60000) });
+    const waitingUpload = await another({ source: 'upload', uploadPath: '/nowhere/b.mp4' });
+    const link = await another();
+
+    const ran = await processNextJob(fakeServices().services, { types: ['ai-route'] });
+    assert.equal(String(ran._id), String(link._id));
+    assert.equal((await Job.findById(waitingUpload._id)).state, 'queued');
   });
 
   test('a job left by a stopped server is picked up again where it stopped', async () => {

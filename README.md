@@ -272,8 +272,10 @@ server/                  Express API + MongoDB (Mongoose)
                          into the elevation chart's profile, highest point and climb; stats.js works out the
                          trip stats (distance, riding days, highest point, climb); services.js splits the route
                          for Overpass, places what it finds along the route and works out the fuel gaps
-    jobs/worker.js       Runs background jobs one at a time (AI analyses and route-enrich); a job continues
-                         where it stopped after a restart, and a paid Gemini answer is never asked for twice
+    jobs/worker.js       Runs background jobs in two lines: AI analyses (AI_WORKERS at once, 3 by default) and
+                         route work (one at a time). Users take turns, only one uploaded file is worked on at
+                         a time, a job continues where it stopped after a restart, and a paid Gemini answer is
+                         never asked for twice
     prompts/             What Gemini is asked (versioned, so a changed prompt doesn't reuse old answers)
     routes/              Which URL goes to which controller
     middleware/          auth.js: login sessions; errorHandler.js: clear JSON error messages

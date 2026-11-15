@@ -37,6 +37,9 @@ export function aiConfig() {
     gapMaxMinutes: number('AI_GAP_MAX_MINUTES', 60),
     maxVideoMinutes: number('AI_MAX_VIDEO_MINUTES', 180),
     minConfidence: number('AI_MIN_CONFIDENCE', 0.5),
+    // How many AI analyses run at once (all users together). They mostly wait
+    // on Gemini, so a few cost little memory; more just meet Gemini's limits.
+    workers: number('AI_WORKERS', 3),
     jobsPerUserPerDay: number('AI_JOBS_PER_USER_PER_DAY', 6),
     monthlyBudgetUsd: number('AI_MONTHLY_BUDGET_USD', 5),
     // Waits (seconds) before retrying a failed Gemini call.
