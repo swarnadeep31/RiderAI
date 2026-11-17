@@ -25,6 +25,14 @@ const SECURITY_HEADERS = {
   'Cross-Origin-Resource-Policy': 'same-origin',
 };
 
+const smallJson = express.json({ limit: '100kb' });
+const bigJson = express.json({ limit: '5mb' });
+const BIG_BODIES = [
+  ['POST', /^\/api\/trails\/?$/],
+  ['PATCH', /^\/api\/trails\/[^/]+\/?$/],
+  ['POST', /^\/api\/trails\/[^/]+\/ai-route\/(transcript|accept)\/?$/],
+];
+
 export function createApp() {
   const app = express();
   // Don't announce what the server runs on.
@@ -36,8 +44,12 @@ export function createApp() {
   // Answers are JSON, which gzip makes about five times smaller: a long route
   // goes from ~760 KB to ~150 KB.
   app.use(compression());
-  // Routes from long GPS recordings can be a few MB.
-  app.use(express.json({ limit: '5mb' }));
+  // Most requests are a few hundred bytes, so bodies are kept to 100 KB:
+  // anything bigger is refused before it's read (a stream of big logins
+  // would otherwise eat the free server's memory). Only these can be big:
+  // a ride's route (a long GPS recording), a pasted transcript, and the AI's
+  // places sent back after review.
+  app.use((req, res, next) => (BIG_BODIES.some(([method, path]) => req.method === method && path.test(req.path)) ? bigJson : smallJson)(req, res, next));
   app.use(cookieParser());
   app.use(loadUser);
   if (rateLimitsOn()) applyRateLimits(app);
