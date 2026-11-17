@@ -22,6 +22,11 @@ services:
         value: production
       - key: NODE_VERSION
         value: "24"
+      # The free plan has 512 MB. Without a limit, Node lets memory pile up
+      # (734 MB in a load test) and the server is restarted; told 300 MB for its
+      # heap, it stayed at about 445 MB in all, at the same speed.
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=300
       # Signs login sessions: a long random value, made by Render.
       - key: JWT_SECRET
         generateValue: true
