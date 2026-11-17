@@ -7,13 +7,16 @@ import { httpError } from '../utils/httpError.js';
 import { concurrencyLimit } from '../utils/limit.js';
 
 const MIN_PASSWORD_LENGTH = 8;
-const HASH_ROUNDS = 12;
+// bcrypt's cost: 10 (OWASP's minimum for bcrypt) takes about 60 ms; each step
+// up doubles it. At 12, a burst of 150 sign-ups saw 118 told the server was
+// busy. Passwords hashed at 12 before still check, as bcrypt keeps the cost.
+const HASH_ROUNDS = 10;
 
-// Hashing or checking a password takes about a fifth of a second of a whole
-// processor (several times longer on a small server), so only two run at once.
-// A burst waits its turn, or past 30 waiting is told the server is busy,
-// and the rest of the site stays quick meanwhile.
-const passwordWork = concurrencyLimit(2, { maxWaiting: 30 });
+// Hashing or checking a password takes a whole processor meanwhile, so only
+// two run at once. A burst waits its turn (200 waiting clear in a few seconds),
+// or past that is told the server is busy, and the rest of the site stays
+// quick meanwhile.
+const passwordWork = concurrencyLimit(2, { maxWaiting: 200 });
 const normalize = (text) => String(text ?? '').trim().toLowerCase();
 
 // An error the sign-up and log-in pages can act on: code 'exists' (offer to
